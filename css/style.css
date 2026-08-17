@@ -1,0 +1,212 @@
+/* Reset & Global Retro Layout */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Courier New', Courier, monospace;
+  user-select: none;
+}
+
+body {
+  background-color: #0d0d11;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* Main Game Window Container */
+#game-container {
+  width: 800px;
+  height: 600px;
+  background-color: #1a1a24;
+  border: 4px solid #4a4a6a;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Top HUD Area */
+#hud {
+  height: 70px;
+  background: linear-gradient(180deg, #222233 0%, #11111a 100%);
+  border-bottom: 2px solid #555577;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 15px;
+}
+
+.player-hud {
+  width: 30%;
+}
+
+.player-hud h2 {
+  font-size: 14px;
+  color: #ffcc00;
+  text-shadow: 1px 1px #000;
+  white-space: nowrap;
+}
+
+.stat-row {
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 3px;
+}
+
+#center-slot {
+  text-align: center;
+  width: 30%;
+}
+
+#turn-display {
+  font-size: 12px;
+  color: #8888aa;
+}
+
+#item-display {
+  font-size: 11px;
+  padding: 4px 8px;
+  background-color: #2a2a3d;
+  border: 1px solid #7777aa;
+  border-radius: 4px;
+  margin-top: 2px;
+  color: #00ffcc;
+}
+
+/* Stage Viewport & Layering */
+#stage-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: #111;
+}
+
+#stage-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, #2b3252 0%, #111218 100%);
+  z-index: 1;
+}
+
+/* Dual Video Container */
+.video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.character-video {
+  width: 45%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.character-video.mirrored {
+  transform: scaleX(-1); /* Flips CPU character to face left */
+}
+
+.effect-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 3;
+}
+
+#battle-message {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  font-weight: bold;
+  color: #ff3300;
+  text-shadow: 2px 2px #000;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 20px;
+  border: 2px solid #ff3300;
+  z-index: 4;
+}
+
+/* Command Buttons Panel */
+#command-panel {
+  height: 120px;
+  background-color: #12121a;
+  border-top: 2px solid #33334d;
+  padding: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.command-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn {
+  background: linear-gradient(180deg, #3a3a52 0%, #222233 100%);
+  color: #fff;
+  border: 1px solid #666688;
+  padding: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.1s ease;
+}
+
+.btn:hover {
+  background: #555577;
+  border-color: #ffcc00;
+  color: #ffcc00;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn.defensive {
+  border-color: #4488ff;
+}
+
+.btn.utility {
+  border-color: #44ff88;
+}
+
+/* Start Overlay Screen */
+#start-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 10, 15, 0.95);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+#start-overlay h1 {
+  font-size: 36px;
+  color: #ff3300;
+  letter-spacing: 3px;
+}
