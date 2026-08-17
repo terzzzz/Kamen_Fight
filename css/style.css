@@ -210,3 +210,71 @@ body {
   color: #ff3300;
   letter-spacing: 3px;
 }
+
+
+#vs-select-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  height: 100%;
+}
+
+.vs-container {
+  display: flex;
+  gap: 40px;
+}
+
+.rider-card {
+  width: 220px;
+  background-color: #1a1a2e;
+  border: 2px solid #444466;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.portrait-frame {
+  width: 140px;
+  height: 180px;
+  border: 2px solid #8888aa;
+  margin-bottom: 10px;
+  background-color: #0d0d14;
+}
+
+.portrait-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 5px;
+}
+
+.rider-label {
+  font-size: 11px;
+  color: #ffcc00;
+  text-align: center;
+}
+
+.type-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #00ffcc;
+}
+
+#vs-error-banner {
+  color: #ff3333;
+  background: rgba(50, 0, 0, 0.8);
+  border: 1px solid #ff3333;
+  padding: 6px 12px;
+  font-size: 12px;
+}
