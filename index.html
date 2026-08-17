@@ -78,3 +78,57 @@
   <script src="js/game.js"></script>
 </body>
 </html>
+
+<div id="vs-select-screen">
+  <h1 class="vs-title">VS Mode</h1>
+
+  <div class="vs-container">
+    <!-- Player 1 Slot -->
+    <div class="rider-card" id="p1-card">
+      <div class="portrait-frame">
+        <img id="p1-img" src="assets/images/icons/black.png" alt="P1 Rider">
+      </div>
+      
+      <!-- Rider Selector -->
+      <div class="selector-row">
+        <button class="arrow-btn" onclick="cycleRider('p1', -1)">◀</button>
+        <span id="p1-name-display" class="rider-label">Kamen Rider Black</span>
+        <button class="arrow-btn" onclick="cycleRider('p1', 1)">▶</button>
+      </div>
+
+      <!-- Control Type Selector -->
+      <div class="selector-row control-row">
+        <button class="arrow-btn" onclick="toggleControlType('p1')">◀</button>
+        <span id="p1-type-display" class="type-label">PLAYER</span>
+        <button class="arrow-btn" onclick="toggleControlType('p1')">▶</button>
+      </div>
+    </div>
+
+    <!-- Player 2 Slot -->
+    <div class="rider-card" id="p2-card">
+      <div class="portrait-frame">
+        <img id="p2-img" src="assets/images/icons/stronger.png" alt="P2 Rider">
+      </div>
+      
+      <!-- Rider Selector -->
+      <div class="selector-row">
+        <button class="arrow-btn" onclick="cycleRider('p2', -1)">◀</button>
+        <span id="p2-name-display" class="rider-label">Kamen Rider Stronger</span>
+        <button class="arrow-btn" onclick="cycleRider('p2', 1)">▶</button>
+      </div>
+
+      <!-- Control Type Selector -->
+      <div class="selector-row control-row">
+        <button class="arrow-btn" onclick="toggleControlType('p2')">◀</button>
+        <span id="p2-type-display" class="type-label">CPU</span>
+        <button class="arrow-btn" onclick="toggleControlType('p2')">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Notification -->
+  <div id="vs-error-banner" hidden>2P Local Play Not Supported! At least one slot must be CPU.</div>
+
+  <!-- Start Button -->
+  <button id="start-game-btn" class="btn" onclick="validateAndStartMatch()">START</button>
+</div>
