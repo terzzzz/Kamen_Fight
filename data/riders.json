@@ -1,1 +1,151 @@
-
+[
+  {
+    "id": "ichigo",
+    "name": "Kamen Rider 1",
+    "maxLp": 1000,
+    "chiRegen": 25,
+    "archetype": "Balanced All-Rounder",
+    "icon": "assets/images/icons/ichigo.png",
+    "finisher": "Rider Headcrusher Kick"
+  },
+  {
+    "id": "nigo",
+    "name": "Kamen Rider 2",
+    "maxLp": 1150,
+    "chiRegen": 20,
+    "archetype": "Heavy Power",
+    "icon": "assets/images/icons/nigo.png",
+    "finisher": "Rider Punch"
+  },
+  {
+    "id": "v3",
+    "name": "Kamen Rider V3",
+    "maxLp": 1000,
+    "chiRegen": 30,
+    "archetype": "High CHI / Fast Combo",
+    "icon": "assets/images/icons/v3.png",
+    "finisher": "V3 Double Kick"
+  },
+  {
+    "id": "riderman",
+    "name": "Riderman",
+    "maxLp": 850,
+    "chiRegen": 25,
+    "archetype": "Low Cost Utility",
+    "icon": "assets/images/icons/riderman.png",
+    "finisher": "Cassette Arm Attachment Strike"
+  },
+  {
+    "id": "x",
+    "name": "Kamen Rider X",
+    "maxLp": 1050,
+    "chiRegen": 22,
+    "archetype": "Mid-Range Weapon Guard",
+    "icon": "assets/images/icons/x.png",
+    "finisher": "Ridol Chop & X Kick"
+  },
+  {
+    "id": "amazon",
+    "name": "Kamen Rider Amazon",
+    "maxLp": 900,
+    "chiRegen": 28,
+    "archetype": "High Crit Speed",
+    "icon": "assets/images/icons/amazon.png",
+    "finisher": "Violent Slash"
+  },
+  {
+    "id": "stronger",
+    "name": "Kamen Rider Stronger",
+    "maxLp": 1100,
+    "chiRegen": 22,
+    "archetype": "Electric Powerhouse",
+    "icon": "assets/images/icons/stronger.png",
+    "finisher": "Electro Waterfall Kick"
+  },
+  {
+    "id": "skyrider",
+    "name": "Skyrider",
+    "maxLp": 950,
+    "chiRegen": 25,
+    "archetype": "Evasion & Dodge",
+    "icon": "assets/images/icons/skyrider.png",
+    "finisher": "Sky Kick"
+  },
+  {
+    "id": "super1",
+    "name": "Kamen Rider Super-1",
+    "maxLp": 1000,
+    "chiRegen": 25,
+    "archetype": "Multi-Hand Martial Artist",
+    "icon": "assets/images/icons/super1.png",
+    "finisher": "Super Rider Moon Surface Kick"
+  },
+  {
+    "id": "black",
+    "name": "Kamen Rider Black",
+    "maxLp": 1050,
+    "chiRegen": 25,
+    "archetype": "Energy Fighter",
+    "icon": "assets/images/icons/black.png",
+    "finisher": "Rider Punch & Rider Kick"
+  },
+  {
+    "id": "rx",
+    "name": "Kamen Rider Black RX",
+    "maxLp": 1100,
+    "chiRegen": 25,
+    "archetype": "Form-Changing Tactical Brawler",
+    "icon": "assets/images/icons/rx.png",
+    "activeForm": "base",
+    "forms": {
+      "base": {
+        "name": "Black RX",
+        "finisher": "Revolcane Piercing Thrust",
+        "damageMult": 1.0,
+        "defenseMult": 1.0,
+        "videoFolder": "assets/videos/rx/base/"
+      },
+      "robo": {
+        "name": "Robo Rider",
+        "finisher": "Voltick Shooter Laser Burst",
+        "damageMult": 1.3,
+        "defenseMult": 0.7,
+        "videoFolder": "assets/videos/rx/robo/"
+      },
+      "bio": {
+        "name": "Bio Rider",
+        "finisher": "Bio Blade Spark Cut",
+        "damageMult": 0.9,
+        "dodgeBonus": 20,
+        "videoFolder": "assets/videos/rx/bio/"
+      }
+    }
+  },
+  {
+    "id": "shin",
+    "name": "Kamen Rider Shin",
+    "maxLp": 1200,
+    "chiRegen": 18,
+    "archetype": "Berserker Tank",
+    "icon": "assets/images/icons/shin.png",
+    "finisher": "High-Impact Brutal Slash"
+  },
+  {
+    "id": "zo",
+    "name": "Kamen Rider ZO",
+    "maxLp": 1000,
+    "chiRegen": 26,
+    "archetype": "Fast Counter-Attacker",
+    "icon": "assets/images/icons/zo.png",
+    "finisher": "Z-Break Kick"
+  },
+  {
+    "id": "j",
+    "name": "Kamen Rider J",
+    "maxLp": 1050,
+    "chiRegen": 22,
+    "archetype": "Titan Finisher",
+    "icon": "assets/images/icons/j.png",
+    "finisher": "J-Power Giant Rider Kick"
+  }
+]
