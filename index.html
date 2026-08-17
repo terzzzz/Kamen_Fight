@@ -1,1 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kamen Fight - Showa Era Battle</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
 
+  <!-- Main Game Stage Window -->
+  <div id="game-container">
+
+    <!-- Top HUD: LP, CHI, and Center Item -->
+    <header id="hud">
+      <div id="p1-stats" class="player-hud">
+        <h2 id="p1-name">Kamen Rider 1</h2>
+        <div class="stat-row">LP: <span id="p1-lp">1000</span> / <span id="p1-max-lp">1000</span></div>
+        <div class="stat-row">CHI: <span id="p1-chi">0</span> / 100</div>
+      </div>
+
+      <div id="center-slot">
+        <div id="turn-display">TURN 1</div>
+        <div id="item-display" class="empty-item">NO ITEM</div>
+      </div>
+
+      <div id="p2-stats" class="player-hud">
+        <h2 id="p2-name">CPU (Kamen Rider 2)</h2>
+        <div class="stat-row">LP: <span id="p2-lp">1150</span> / <span id="p2-max-lp">1150</span></div>
+        <div class="stat-row">CHI: <span id="p2-chi">0</span> / 100</div>
+      </div>
+    </header>
+
+    <!-- Stage Video Viewport (Transparent WebM Layers) -->
+    <main id="stage-viewport">
+      <!-- Background Stage Layer -->
+      <div id="stage-background"></div>
+
+      <!-- Video Character Players -->
+      <div class="video-container">
+        <video id="p1-video" class="character-video" autoplay loop muted playsinline></video>
+        <video id="clash-video" class="effect-video" playsinline hidden></video>
+        <video id="p2-video" class="character-video mirrored" autoplay loop muted playsinline></video>
+      </div>
+
+      <!-- Action Announcement Banner -->
+      <div id="battle-message" hidden>READY?</div>
+    </main>
+
+    <!-- Bottom Command UI Panel -->
+    <footer id="command-panel">
+      <div class="command-group">
+        <button class="btn cmd-btn" data-move="LIGHT">Light Punch (0 CHI)</button>
+        <button class="btn cmd-btn" data-move="COMBO">Combo Kick (20 CHI)</button>
+        <button class="btn cmd-btn" data-move="SPECIAL">Signature Finisher (50 CHI)</button>
+      </div>
+
+      <div class="command-group">
+        <button class="btn cmd-btn utility" data-move="CHARGE">Charge CHI (+25 CHI)</button>
+        <button class="btn cmd-btn defensive" data-move="GUARD">Guard (10 CHI)</button>
+        <button class="btn cmd-btn defensive" data-move="DODGE">Dodge (15 CHI)</button>
+      </div>
+    </footer>
+
+    <!-- Title Screen Overlay (Unlocks Browser Audio) -->
+    <div id="start-overlay">
+      <h1>KAMEN FIGHT</h1>
+      <p>Super Famicom Tactical Brawler</p>
+      <button id="start-btn" class="btn">CLICK TO START</button>
+    </div>
+
+  </div>
+
+  <!-- Game Scripts -->
+  <script src="js/item.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
