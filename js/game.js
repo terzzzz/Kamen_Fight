@@ -1,9 +1,25 @@
+const CHARGE_TIMES = {
+  'A': 800,   // Defense: 0.8s
+  'D': 1300,  // Offense: 1.3s
+  'W': 2000,  // Air/Buffs: 2.0s
+  'S': 2600   // Energy/Specials: 2.6s
+};
 
 let gameState = {
   turnCounter: 1,
+  turnTimerSeconds: 5,
+  timerInterval: null,
   movesData: {},
   p1: null,
-  p2: null
+  p2: null,
+  input: {
+    heldDirection: null,
+    chargeStartTime: 0,
+    currentPercent: 0,
+    isConfirmed: false,
+    selectedMoveKey: null,
+    chargeInterval: null
+  }
 };
 
 async function startBattle(config) {
@@ -13,12 +29,10 @@ async function startBattle(config) {
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
 
-  updateHUD();
+  bindKeyboardInputs();
   bindCommandButtons();
-
-  if (gameState.p1.isCPU && gameState.p2.isCPU) {
-    runAutoMatchLoop();
-  }
+  startTurnCountdown();
+  updateHUD();
 }
 
 function createPlayerState(riderConfig, isCPU) {
@@ -26,64 +40,162 @@ function createPlayerState(riderConfig, isCPU) {
     ...riderConfig,
     isCPU: isCPU,
     lp: riderConfig.maxLp,
-    chi: 10, // Max 20 CHI system; starts at 10 CHI
+    chi: 10,
     consecutiveHitsLanded: 0,
     isFainted: false,
-    faintTimer: null,
     airborneTicks: 0,
     atkBuff: 1.0,
     currentFormKey: riderConfig.activeForm || 'base'
   };
 }
 
+function startTurnCountdown() {
+  clearInterval(gameState.timerInterval);
+  gameState.turnTimerSeconds = 5;
+  document.getElementById('turn-timer').textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+
+  gameState.timerInterval = setInterval(() => {
+    gameState.turnTimerSeconds--;
+    document.getElementById('turn-timer').textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+
+    if (gameState.turnTimerSeconds <= 0) {
+      clearInterval(gameState.timerInterval);
+      // Timeout default fallback to Guard if no action confirmed
+      if (!gameState.input.isConfirmed && !gameState.p1.isCPU) {
+        confirmPlayerAction('A+J');
+      }
+      executeTurnCycle();
+    }
+  }, 1000);
+}
+
+function bindKeyboardInputs() {
+  window.addEventListener('keydown', (e) => {
+    if (gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
+
+    const key = e.key.toUpperCase();
+
+    // Directional Hold Engine (A, D, W, S)
+    if (['A', 'D', 'W', 'S'].includes(key)) {
+      if (gameState.input.heldDirection !== key) {
+        resetCharge(); // Instant 0% reset on direction switch
+        gameState.input.heldDirection = key;
+        gameState.input.chargeStartTime = Date.now();
+        gameState.input.chargeInterval = setInterval(updateChargeProgress, 30);
+      }
+    }
+
+    // Action Triggering (J, K, L, I) when 100% Charged
+    if (['J', 'K', 'L', 'I'].includes(key) && gameState.input.heldDirection) {
+      if (gameState.input.currentPercent >= 100) {
+        confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    const key = e.key.toUpperCase();
+    if (key === gameState.input.heldDirection && !gameState.input.isConfirmed) {
+      resetCharge(); // Instant 0% reset on button release
+    }
+  });
+}
+
+function updateChargeProgress() {
+  if (!gameState.input.heldDirection) return;
+
+  const duration = CHARGE_TIMES[gameState.input.heldDirection];
+  const elapsed = Date.now() - gameState.input.chargeStartTime;
+
+  gameState.input.currentPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
+
+  const fillEl = document.getElementById('p1-charge-fill');
+  fillEl.style.width = `${gameState.input.currentPercent}%`;
+  fillEl.textContent = `${gameState.input.currentPercent}%`;
+}
+
+function resetCharge() {
+  clearInterval(gameState.input.chargeInterval);
+  gameState.input.heldDirection = null;
+  gameState.input.currentPercent = 0;
+
+  const fillEl = document.getElementById('p1-charge-fill');
+  fillEl.style.width = '0%';
+  fillEl.textContent = '0%';
+}
+
+function confirmPlayerAction(moveKey) {
+  gameState.input.isConfirmed = true;
+  gameState.input.selectedMoveKey = moveKey;
+  clearInterval(gameState.input.chargeInterval);
+
+  document.getElementById('p1-action-flag').hidden = false;
+}
+
 function bindCommandButtons() {
   const buttons = document.querySelectorAll('.cmd-btn');
   buttons.forEach(btn => {
     btn.onclick = () => {
+      if (gameState.p1.isCPU || gameState.p1.isFainted || gameState.input.isConfirmed) return;
       const cmd = btn.getAttribute('data-cmd');
-      if (gameState.p1.isCPU || gameState.p1.isFainted) return;
-      executeTurn(cmd);
+      confirmPlayerAction(cmd);
     };
   });
 }
 
-function executeTurn(p1Cmd) {
-  let p1MoveKey = gameState.p1.isCPU ? selectCPUMove(gameState.p1, gameState.p2, gameState.movesData) : p1Cmd;
+function executeTurnCycle() {
+  let p1MoveKey = gameState.p1.isCPU
+    ? selectCPUMove(gameState.p1, gameState.p2, gameState.movesData)
+    : (gameState.input.selectedMoveKey || 'A+J');
+
   let p2MoveKey = selectCPUMove(gameState.p2, gameState.p1, gameState.movesData);
 
-  let p1Move = gameState.movesData[p1MoveKey];
-  let p2Move = gameState.movesData[p2MoveKey];
+  let p1Move = gameState.movesData[p1MoveKey] || gameState.movesData['A+J'];
+  let p2Move = gameState.movesData[p2MoveKey] || gameState.movesData['A+J'];
 
-  // CHI Deduction
-  gameState.p1.chi -= p1Move.chiCost;
-  gameState.p2.chi -= p2Move.chiCost;
+  // Deduct CHI Costs
+  gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
+  gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  // Charge Action Handling
+  // Charge CHI Action
   if (p1MoveKey === 'S+J') gameState.p1.chi = Math.min(20, gameState.p1.chi + gameState.p1.chiRegen);
   if (p2MoveKey === 'S+J') gameState.p2.chi = Math.min(20, gameState.p2.chi + gameState.p2.chiRegen);
 
-  // Form Swap Command (RX Transformation)
+  // Form Transformations
   if (p1MoveKey === 'W+J' && gameState.p1.forms) cycleRiderForm(gameState.p1);
   if (p2MoveKey === 'W+J' && gameState.p2.forms) cycleRiderForm(gameState.p2);
 
-  // Airborne Timer Evaluation
+  // Handle Airborne Timers
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // Resolution Math
+  // Resolve Damage
   let p1Hit = resolveAttack(gameState.p1, gameState.p2, p1Move, p2Move);
   let p2Hit = resolveAttack(gameState.p2, gameState.p1, p2Move, p1Move);
 
-  // Fainted State Triggers (3 Consecutive Landed Hits)
+  // Track Faint Mechanics
   updateFaintTracker(gameState.p1, gameState.p2, p1Hit, 'p2');
   updateFaintTracker(gameState.p2, gameState.p1, p2Hit, 'p1');
 
-  // Center Item Lifecycle
+  // Items Lifecycle
   checkItemSpawn(gameState.turnCounter);
   resolveItemPickup(p1Hit && !p2Hit, p2Hit && !p1Hit, gameState.p1, gameState.p2);
 
+  // Turn Cleanup & Reset Input State
   gameState.turnCounter++;
+  resetTurnState();
   updateHUD();
+
+  if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
+    startTurnCountdown();
+  }
+}
+
+function resetTurnState() {
+  resetCharge();
+  gameState.input.isConfirmed = false;
+  gameState.input.selectedMoveKey = null;
+  document.getElementById('p1-action-flag').hidden = true;
 }
 
 function handleAirborneState(player, moveKey) {
@@ -122,7 +234,7 @@ function resolveAttack(attacker, defender, atkMove, defMove) {
 
   let finalDmg = Math.floor(atkMove.baseDamage * attacker.atkBuff * damageRatio);
   defender.lp = Math.max(0, defender.lp - finalDmg);
-  attacker.atkBuff = 1.0; // Reset consumable buff
+  attacker.atkBuff = 1.0;
   return finalDmg > 0;
 }
 
@@ -156,14 +268,4 @@ function updateHUD() {
   document.getElementById('p2-lp').textContent = gameState.p2.lp;
   document.getElementById('p2-chi').textContent = gameState.p2.chi;
   document.getElementById('turn-display').textContent = `TURN ${gameState.turnCounter}`;
-}
-
-function runAutoMatchLoop() {
-  let interval = setInterval(() => {
-    if (gameState.p1.lp <= 0 || gameState.p2.lp <= 0) {
-      clearInterval(interval);
-      return;
-    }
-    executeTurn(null);
-  }, 2000);
 }
