@@ -115,38 +115,33 @@
 
     <!-- Interactive Command UI Grid -->
     <footer id="command-panel">
-      <div class="command-column">
-        <span class="column-title">FORWARD (D) - OFFENSE (1.3s)</span>
-        <button class="btn cmd-btn" data-cmd="D+J">D+J Punch (0 CHI)</button>
-        <button class="btn cmd-btn" data-cmd="D+I">D+I Combo 1 (4 CHI)</button>
-        <button class="btn cmd-btn" data-cmd="D+K">D+K Kick (0 CHI)</button>
-        <button class="btn cmd-btn" data-cmd="D+L">D+L Combo 2 (4 CHI)</button>
-      </div>
+  <!-- D-Pad Directional Controls -->
+  <div class="controller-group">
+    <span class="group-label">DIRECTION (HOLD TO CHARGE)</span>
+    <div class="dpad-grid">
+      <div id="key-W" class="pad-btn dpad-up">W</div>
+      <div id="key-A" class="pad-btn dpad-left">A</div>
+      <div id="key-S" class="pad-btn dpad-down">S</div>
+      <div id="key-D" class="pad-btn dpad-right">D</div>
+    </div>
+  </div>
 
-      <div class="command-column">
-        <span class="column-title">UPWARD (W) - AIR/MOD (2.0s)</span>
-        <button class="btn cmd-btn" data-cmd="W+I">W+I Jump (3 CHI)</button>
-        <button class="btn cmd-btn" data-cmd="W+J">W+J Form Switch (2 CHI)</button>
-        <button class="btn cmd-btn" data-cmd="W+K">W+K Speed Boost (2 CHI)</button>
-        <button class="btn cmd-btn" data-cmd="W+L">W+L Charge Boost (2 CHI)</button>
-      </div>
+  <!-- Status Center Banner -->
+  <div class="controller-center">
+    <div id="charge-status-display">HOLD DIRECTION TO CHARGE</div>
+  </div>
 
-      <div class="command-column">
-        <span class="column-title">BACKWARD (A) - DEFENSE (0.8s)</span>
-        <button class="btn cmd-btn defensive" data-cmd="A+J">A+J Block (0 CHI)</button>
-        <button class="btn cmd-btn defensive" data-cmd="A+I">A+I Absorb (0 CHI)</button>
-        <button class="btn cmd-btn defensive" data-cmd="A+K">A+K Defense Skill 1 (3 CHI)</button>
-        <button class="btn cmd-btn defensive" data-cmd="A+L">A+L Barrier (4 CHI)</button>
-      </div>
-
-      <div class="command-column">
-        <span class="column-title">DOWN/NEUTRAL (S) - ENERGY (2.6s)</span>
-        <button class="btn cmd-btn utility" data-cmd="S+J">S+J Charge CHI (+5 CHI)</button>
-        <button class="btn cmd-btn energy" data-cmd="S+I">S+I Hand Beam (6 CHI)</button>
-        <button class="btn cmd-btn energy" data-cmd="S+K">S+K Energy Ball (10 CHI)</button>
-        <button class="btn cmd-btn energy" data-cmd="S+L">S+L Finisher (15 CHI)</button>
-      </div>
-    </footer>
+  <!-- Action Buttons -->
+  <div class="controller-group">
+    <span class="group-label">ACTION (REQUIRES CHARGE)</span>
+    <div class="action-grid">
+      <div id="key-I" class="pad-btn btn-top">I</div>
+      <div id="key-J" class="pad-btn btn-left">J</div>
+      <div id="key-K" class="pad-btn btn-bottom">K</div>
+      <div id="key-L" class="pad-btn btn-right">L</div>
+    </div>
+  </div>
+</footer>
 
   </div>
 
