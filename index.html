@@ -12,58 +12,54 @@
 
     <!-- VS Mode Setup Screen Overlay -->
     <div id="vs-select-screen">
-  <h1 class="vs-title" id="vs-header-text">STEP 1: SELECT PLAYER 1 RIDER</h1>
+      <h1 class="vs-title" id="vs-header-text">STEP 1: SELECT PLAYER 1 RIDER</h1>
 
-  <div class="vs-container">
-    <!-- Player 1 Slot Card -->
-    <div class="rider-card active-slot" id="p1-card">
-      <div class="slot-badge" id="p1-badge">P1 CHOOSING</div>
-      <div class="portrait-frame">
-        <img id="p1-img" src="assets/images/icons/black.png" alt="P1 Rider">
-      </div>
-      <div class="selector-row">
-        <button class="arrow-btn" id="p1-left-btn" onclick="cycleRider('p1', -1)">◀</button>
-        <span id="p1-name-display" class="rider-label">Kamen Rider Black</span>
-        <button class="arrow-btn" id="p1-right-btn" onclick="cycleRider('p1', 1)">▶</button>
-      </div>
-      <div class="selector-row control-row">
-        <button class="arrow-btn" onclick="toggleControlType('p1')">◀</button>
-        <span id="p1-type-display" class="type-label">HUMAN</span>
-        <button class="arrow-btn" onclick="toggleControlType('p1')">▶</button>
-      </div>
-    </div>
+      <div class="vs-container">
+        <!-- Player 1 Slot Card -->
+        <div class="rider-card active-slot" id="p1-card">
+          <div class="slot-badge" id="p1-badge">P1 CHOOSING</div>
+          <div class="portrait-frame">
+            <img id="p1-img" src="assets/images/icons/black.png" alt="P1 Rider">
+          </div>
+          <div class="selector-row">
+            <button class="arrow-btn" id="p1-left-btn" onclick="cycleRider('p1', -1)">◀</button>
+            <span id="p1-name-display" class="rider-label">Kamen Rider Black</span>
+            <button class="arrow-btn" id="p1-right-btn" onclick="cycleRider('p1', 1)">▶</button>
+          </div>
+          <div class="selector-row control-row">
+            <button class="arrow-btn" onclick="toggleControlType('p1')">◀</button>
+            <span id="p1-type-display" class="type-label">HUMAN</span>
+            <button class="arrow-btn" onclick="toggleControlType('p1')">▶</button>
+          </div>
+        </div>
 
-    <!-- Player 2 Slot Card -->
-    <div class="rider-card locked-slot" id="p2-card">
-      <div class="slot-badge" id="p2-badge">WAITING</div>
-      <div class="portrait-frame">
-        <img id="p2-img" src="assets/images/icons/stronger.png" alt="P2 Rider">
+        <!-- Player 2 Slot Card -->
+        <div class="rider-card locked-slot" id="p2-card">
+          <div class="slot-badge" id="p2-badge">WAITING</div>
+          <div class="portrait-frame">
+            <img id="p2-img" src="assets/images/icons/stronger.png" alt="P2 Rider">
+          </div>
+          <div class="selector-row">
+            <button class="arrow-btn" id="p2-left-btn" onclick="cycleRider('p2', -1)" disabled>◀</button>
+            <span id="p2-name-display" class="rider-label">Kamen Rider Stronger</span>
+            <button class="arrow-btn" id="p2-right-btn" onclick="cycleRider('p2', 1)" disabled>▶</button>
+          </div>
+          <div class="selector-row control-row">
+            <button class="arrow-btn" id="p2-type-left" onclick="toggleControlType('p2')" disabled>◀</button>
+            <span id="p2-type-display" class="type-label">CPU</span>
+            <button class="arrow-btn" id="p2-type-right" onclick="toggleControlType('p2')" disabled>▶</button>
+          </div>
+        </div>
       </div>
-      <div class="selector-row">
-        <button class="arrow-btn" id="p2-left-btn" onclick="cycleRider('p2', -1)" disabled>◀</button>
-        <span id="p2-name-display" class="rider-label">Kamen Rider Stronger</span>
-        <button class="arrow-btn" id="p2-right-btn" onclick="cycleRider('p2', 1)" disabled>▶</button>
+
+      <div id="vs-error-banner" hidden>2-Player Local Mode Unavailable! At least one slot must be CPU.</div>
+
+      <!-- Selection Navigation Buttons -->
+      <div class="nav-button-row">
+        <button id="back-btn" class="btn defensive" onclick="handleBackStep()">BACK (UNDO)</button>
+        <button id="confirm-btn" class="btn" onclick="handleConfirmStep()">CONFIRM P1</button>
+        <button id="start-game-btn" class="btn" onclick="validateAndStartMatch()" hidden>START FIGHT</button>
       </div>
-      <div class="selector-row control-row">
-        <button class="arrow-btn" id="p2-type-left" onclick="toggleControlType('p2')" disabled>◀</button>
-        <span id="p2-type-display" class="type-label">CPU</span>
-        <button class="arrow-btn" id="p2-type-right" onclick="toggleControlType('p2')" disabled>▶</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="vs-error-banner" hidden>2-Player Local Mode Unavailable! At least one slot must be CPU.</div>
-
-  <!-- Selection Navigation Buttons -->
-  <div class="nav-button-row">
-    <button id="back-btn" class="btn defensive" onclick="handleBackStep()">BACK (UNDO)</button>
-    <button id="confirm-btn" class="btn" onclick="handleConfirmStep()">CONFIRM P1</button>
-  </div>
-</div>
-    
-
-      <div id="vs-error-banner" hidden>2P Local Mode Unavailable! At least one slot must be CPU.</div>
-      <button id="start-game-btn" class="btn" onclick="validateAndStartMatch()">START FIGHT</button>
     </div>
 
     <!-- Main Game HUD Header -->
@@ -73,10 +69,17 @@
         <div class="stat-row">LP: <span id="p1-lp">1050</span> / <span id="p1-max-lp">1050</span></div>
         <div class="stat-row">CHI: <span id="p1-chi">10</span> / 20</div>
         <div id="p1-status" class="status-indicator">NORMAL</div>
+
+        <!-- Directional Hold Meter & Action Lock Badge -->
+        <div id="p1-charge-container" class="charge-bar-wrap">
+          <div id="p1-charge-fill" class="charge-bar-fill" style="width: 0%;">0%</div>
+        </div>
+        <div id="p1-action-flag" class="action-badge" hidden>ACTION!</div>
       </div>
 
       <div id="center-slot">
         <div id="turn-display">TURN 1</div>
+        <div id="turn-timer" class="timer-display">TIME: 5s</div>
         <div id="item-display" class="empty-item">NO ITEM</div>
       </div>
 
@@ -85,6 +88,12 @@
         <div class="stat-row">LP: <span id="p2-lp">1100</span> / <span id="p2-max-lp">1100</span></div>
         <div class="stat-row">CHI: <span id="p2-chi">10</span> / 20</div>
         <div id="p2-status" class="status-indicator">NORMAL</div>
+
+        <!-- Directional Hold Meter & Action Lock Badge -->
+        <div id="p2-charge-container" class="charge-bar-wrap">
+          <div id="p2-charge-fill" class="charge-bar-fill" style="width: 0%;">0%</div>
+        </div>
+        <div id="p2-action-flag" class="action-badge" hidden>ACTION!</div>
       </div>
     </header>
 
@@ -107,7 +116,7 @@
     <!-- Interactive Command UI Grid -->
     <footer id="command-panel">
       <div class="command-column">
-        <span class="column-title">FORWARD (D) - OFFENSE</span>
+        <span class="column-title">FORWARD (D) - OFFENSE (1.3s)</span>
         <button class="btn cmd-btn" data-cmd="D+J">D+J Punch (0 CHI)</button>
         <button class="btn cmd-btn" data-cmd="D+I">D+I Combo 1 (4 CHI)</button>
         <button class="btn cmd-btn" data-cmd="D+K">D+K Kick (0 CHI)</button>
@@ -115,7 +124,7 @@
       </div>
 
       <div class="command-column">
-        <span class="column-title">UPWARD (W) - AIR/MOD</span>
+        <span class="column-title">UPWARD (W) - AIR/MOD (2.0s)</span>
         <button class="btn cmd-btn" data-cmd="W+I">W+I Jump (3 CHI)</button>
         <button class="btn cmd-btn" data-cmd="W+J">W+J Form Switch (2 CHI)</button>
         <button class="btn cmd-btn" data-cmd="W+K">W+K Speed Boost (2 CHI)</button>
@@ -123,7 +132,7 @@
       </div>
 
       <div class="command-column">
-        <span class="column-title">BACKWARD (A) - DEFENSE</span>
+        <span class="column-title">BACKWARD (A) - DEFENSE (0.8s)</span>
         <button class="btn cmd-btn defensive" data-cmd="A+J">A+J Block (0 CHI)</button>
         <button class="btn cmd-btn defensive" data-cmd="A+I">A+I Absorb (0 CHI)</button>
         <button class="btn cmd-btn defensive" data-cmd="A+K">A+K Defense Skill 1 (3 CHI)</button>
@@ -131,7 +140,7 @@
       </div>
 
       <div class="command-column">
-        <span class="column-title">DOWN/NEUTRAL (S) - ENERGY</span>
+        <span class="column-title">DOWN/NEUTRAL (S) - ENERGY (2.6s)</span>
         <button class="btn cmd-btn utility" data-cmd="S+J">S+J Charge CHI (+5 CHI)</button>
         <button class="btn cmd-btn energy" data-cmd="S+I">S+I Hand Beam (6 CHI)</button>
         <button class="btn cmd-btn energy" data-cmd="S+K">S+K Energy Ball (10 CHI)</button>
