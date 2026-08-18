@@ -333,39 +333,98 @@ body {
   z-index: 6;
 }
 
-/* Command Panel */
+/* Command Panel / Interactive Arcade Controller */
 #command-panel {
   height: 165px;
-  background-color: #101018;
+  background-color: #0c0c14;
   border-top: 2px solid #33334d;
-  padding: 6px;
+  padding: 10px 30px;
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.controller-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 6px;
 }
 
-.command-column {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.group-label {
+  font-size: 9px;
+  color: #8888aa;
+  letter-spacing: 1px;
+}
+
+/* D-Pad Layout */
+.dpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
   gap: 3px;
 }
 
-.column-title {
-  font-size: 8px;
-  color: #aaa;
+.dpad-up    { grid-column: 2; grid-row: 1; }
+.dpad-left  { grid-column: 1; grid-row: 2; }
+.dpad-down  { grid-column: 2; grid-row: 2; }
+.dpad-right { grid-column: 3; grid-row: 2; }
+
+/* Action Grid Layout */
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  gap: 3px;
+}
+
+.btn-top    { grid-column: 2; grid-row: 1; border-color: #ffcc00; }
+.btn-left   { grid-column: 1; grid-row: 2; border-color: #00ffcc; }
+.btn-bottom { grid-column: 2; grid-row: 2; border-color: #ff3366; }
+.btn-right  { grid-column: 3; grid-row: 2; border-color: #aa44ff; }
+
+/* Pad Buttons */
+.pad-btn {
+  width: 40px;
+  height: 40px;
+  background: #1a1a2b;
+  border: 2px solid #444466;
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #8888aa;
+  box-shadow: 0 3px 0 #000;
+  transition: all 0.05s ease;
+}
+
+/* Key Press Lighting FX */
+.pad-btn.active {
+  background: #ffcc00;
+  color: #000;
+  border-color: #ffffff;
+  box-shadow: 0 0 12px #ffcc00, inset 0 0 4px #ffffff;
+  transform: translateY(2px);
+}
+
+.controller-center {
+  font-size: 11px;
+  color: #00ffcc;
   text-align: center;
-  margin-bottom: 2px;
+  max-width: 180px;
 }
 
 .btn {
   background: linear-gradient(180deg, #3a3a52 0%, #222233 100%);
   color: #fff;
   border: 1px solid #666688;
-  padding: 5px;
-  font-size: 10px;
+  padding: 8px 16px;
+  font-size: 12px;
   font-weight: bold;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .btn:hover {
@@ -375,5 +434,3 @@ body {
 }
 
 .btn.defensive { border-color: #4488ff; }
-.btn.utility { border-color: #44ff88; }
-.btn.energy { border-color: #ff4444; }
