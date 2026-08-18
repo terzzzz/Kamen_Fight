@@ -5,6 +5,14 @@ const CHARGE_TIMES = {
   'S': 2600   // Energy/Specials: 2.6s
 };
 
+const DO_NOTHING_MOVE = {
+  name: "Do Nothing",
+  type: "IDLE",
+  chiCost: 0,
+  baseDamage: 0,
+  hitChance: 100
+};
+
 let gameState = {
   turnCounter: 1,
   turnTimerSeconds: 5,
@@ -18,6 +26,7 @@ let gameState = {
     currentPercent: 0,
     isConfirmed: false,
     selectedMoveKey: null,
+    lockInTime: 0,
     chargeInterval: null
   }
 };
@@ -60,9 +69,10 @@ function startTurnCountdown() {
 
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
-      // Timeout default fallback to Guard if no action confirmed
+      
+      // Fallback to "DO NOTHING" if no action locked in
       if (!gameState.input.isConfirmed && !gameState.p1.isCPU) {
-        confirmPlayerAction('A+J');
+        confirmPlayerAction('DO_NOTHING');
       }
       executeTurnCycle();
     }
@@ -71,22 +81,32 @@ function startTurnCountdown() {
 
 function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
-    if (gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
-
     const key = e.key.toUpperCase();
 
-    // Directional Hold Engine (A, D, W, S)
+    // Light up corresponding UI button element on key press
+    const keyEl = document.getElementById(`key-${key}`);
+    if (keyEl) keyEl.classList.add('active');
+
+    if (gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
+
+    // 1. Directional Hold Engine (A, D, W, S)
     if (['A', 'D', 'W', 'S'].includes(key)) {
       if (gameState.input.heldDirection !== key) {
-        resetCharge(); // Instant 0% reset on direction switch
+        resetCharge();
         gameState.input.heldDirection = key;
         gameState.input.chargeStartTime = Date.now();
         gameState.input.chargeInterval = setInterval(updateChargeProgress, 30);
       }
     }
 
-    // Action Triggering (J, K, L, I) when 100% Charged
-    if (['J', 'K', 'L', 'I'].includes(key) && gameState.input.heldDirection) {
+    // 2. Action Triggering (J, K, L, I)
+    if (['J', 'K', 'L', 'I'].includes(key)) {
+      // Ignore key press completely if % charge is 0 or direction not held
+      if (!gameState.input.heldDirection || gameState.input.currentPercent <= 0) {
+        return;
+      }
+
+      // Execute lock-in if fully charged to 100%
       if (gameState.input.currentPercent >= 100) {
         confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
       }
@@ -95,8 +115,13 @@ function bindKeyboardInputs() {
 
   window.addEventListener('keyup', (e) => {
     const key = e.key.toUpperCase();
+
+    // Turn off lighting FX
+    const keyEl = document.getElementById(`key-${key}`);
+    if (keyEl) keyEl.classList.remove('active');
+
     if (key === gameState.input.heldDirection && !gameState.input.isConfirmed) {
-      resetCharge(); // Instant 0% reset on button release
+      resetCharge(); // Instant 0% reset on direction release
     }
   });
 }
@@ -127,39 +152,48 @@ function resetCharge() {
 function confirmPlayerAction(moveKey) {
   gameState.input.isConfirmed = true;
   gameState.input.selectedMoveKey = moveKey;
+  gameState.input.lockInTime = gameState.turnTimerSeconds;
   clearInterval(gameState.input.chargeInterval);
 
-  document.getElementById('p1-action-flag').hidden = false;
+  const flagEl = document.getElementById('p1-action-flag');
+  flagEl.hidden = false;
+  flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : 'ACTION!';
 }
 
 function bindCommandButtons() {
-  const buttons = document.querySelectorAll('.cmd-btn');
+  // Support on-screen clicks for controller elements if needed
+  const buttons = document.querySelectorAll('.pad-btn');
   buttons.forEach(btn => {
-    btn.onclick = () => {
-      if (gameState.p1.isCPU || gameState.p1.isFainted || gameState.input.isConfirmed) return;
-      const cmd = btn.getAttribute('data-cmd');
-      confirmPlayerAction(cmd);
+    btn.onmousedown = () => {
+      const key = btn.id.replace('key-', '');
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
+    };
+    btn.onmouseup = () => {
+      const key = btn.id.replace('key-', '');
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
     };
   });
 }
 
 function executeTurnCycle() {
-  let p1MoveKey = gameState.p1.isCPU
-    ? selectCPUMove(gameState.p1, gameState.p2, gameState.movesData)
-    : (gameState.input.selectedMoveKey || 'A+J');
+  let p1Time = gameState.input.lockInTime || 0;
+  let p2Time = gameState.p2.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.p2LockInTime || 0);
 
-  let p2MoveKey = selectCPUMove(gameState.p2, gameState.p1, gameState.movesData);
+  let p1MoveKey = gameState.input.selectedMoveKey || 'DO_NOTHING';
+  let p2MoveKey = gameState.p2.isCPU 
+    ? selectCPUMove(gameState.p2, gameState.p1, gameState.movesData) 
+    : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
 
-  let p1Move = gameState.movesData[p1MoveKey] || gameState.movesData['A+J'];
-  let p2Move = gameState.movesData[p2MoveKey] || gameState.movesData['A+J'];
+  let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
+  let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
   // Deduct CHI Costs
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
   // Charge CHI Action
-  if (p1MoveKey === 'S+J') gameState.p1.chi = Math.min(20, gameState.p1.chi + gameState.p1.chiRegen);
-  if (p2MoveKey === 'S+J') gameState.p2.chi = Math.min(20, gameState.p2.chi + gameState.p2.chiRegen);
+  if (p1MoveKey === 'S+J') gameState.p1.chi = Math.min(20, gameState.p1.chi + (gameState.p1.chiRegen || 5));
+  if (p2MoveKey === 'S+J') gameState.p2.chi = Math.min(20, gameState.p2.chi + (gameState.p2.chiRegen || 5));
 
   // Form Transformations
   if (p1MoveKey === 'W+J' && gameState.p1.forms) cycleRiderForm(gameState.p1);
@@ -169,19 +203,54 @@ function executeTurnCycle() {
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // Resolve Damage
-  let p1Hit = resolveAttack(gameState.p1, gameState.p2, p1Move, p2Move);
-  let p2Hit = resolveAttack(gameState.p2, gameState.p1, p2Move, p1Move);
+  // Initiative Logic with Defensive Priority & P1 Tie-Breaker
+  let p1IsDefensive = p1Move.type === 'DEFENSE';
+  let p2IsDefensive = p2Move.type === 'DEFENSE';
+  let p1GoesFirst = false;
 
-  // Track Faint Mechanics
-  updateFaintTracker(gameState.p1, gameState.p2, p1Hit, 'p2');
-  updateFaintTracker(gameState.p2, gameState.p1, p2Hit, 'p1');
+  if (p1IsDefensive && !p2IsDefensive) {
+    p1GoesFirst = false; // Defensive skill executes AFTER opponent's attack
+  } else if (!p1IsDefensive && p2IsDefensive) {
+    p1GoesFirst = true;  // Opponent is defending, P1 attacks first
+  } else {
+    // Both attacking or both defending/doing nothing:
+    // Higher remaining timer goes first. On tie, default to Player 1
+    if (p1Time === p2Time) {
+      p1GoesFirst = true;
+    } else {
+      p1GoesFirst = p1Time > p2Time;
+    }
+  }
+
+  // Assign Attacker/Defender Roles
+  let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
+  let defender1 = p1GoesFirst ? gameState.p2 : gameState.p1;
+  let move1 = p1GoesFirst ? p1Move : p2Move;
+
+  let attacker2 = p1GoesFirst ? gameState.p2 : gameState.p1;
+  let defender2 = p1GoesFirst ? gameState.p1 : gameState.p2;
+  let move2 = p1GoesFirst ? p2Move : p1Move;
+
+  // Execute First Action
+  let hit1Landed = resolveAttack(attacker1, defender1, move1, move2);
+
+  // Execute Second Action (Canceled if interrupted by faster clean melee hit)
+  let hit2Landed = false;
+  if (!hit1Landed || move1.type !== 'MELEE') {
+    hit2Landed = resolveAttack(attacker2, defender2, move2, move1);
+  }
+
+  // Faint Mechanics Processing
+  updateFaintTracker(attacker1, defender1, hit1Landed, p1GoesFirst ? 'p2' : 'p1');
+  updateFaintTracker(attacker2, defender2, hit2Landed, p1GoesFirst ? 'p1' : 'p2');
 
   // Items Lifecycle
-  checkItemSpawn(gameState.turnCounter);
-  resolveItemPickup(p1Hit && !p2Hit, p2Hit && !p1Hit, gameState.p1, gameState.p2);
+  if (typeof checkItemSpawn === 'function') checkItemSpawn(gameState.turnCounter);
+  if (typeof resolveItemPickup === 'function') {
+    resolveItemPickup(p1GoesFirst ? hit1Landed : hit2Landed, p1GoesFirst ? hit2Landed : hit1Landed, gameState.p1, gameState.p2);
+  }
 
-  // Turn Cleanup & Reset Input State
+  // Cleanup Turn
   gameState.turnCounter++;
   resetTurnState();
   updateHUD();
@@ -195,6 +264,7 @@ function resetTurnState() {
   resetCharge();
   gameState.input.isConfirmed = false;
   gameState.input.selectedMoveKey = null;
+  gameState.input.lockInTime = 0;
   document.getElementById('p1-action-flag').hidden = true;
 }
 
@@ -225,14 +295,14 @@ function resolveAttack(attacker, defender, atkMove, defMove) {
 
   let damageRatio = 1.0;
   if (defMove.type === 'DEFENSE') {
-    let success = Math.random() * 100 < defMove.successChance;
+    let success = Math.random() * 100 < (defMove.successChance || 80);
     if (success) {
-      damageRatio = defMove.damageTakenRatio;
+      damageRatio = defMove.damageTakenRatio || 0.2;
       if (defMove.chiGainOnSuccess) defender.chi = Math.min(20, defender.chi + defMove.chiGainOnSuccess);
     }
   }
 
-  let finalDmg = Math.floor(atkMove.baseDamage * attacker.atkBuff * damageRatio);
+  let finalDmg = Math.floor((atkMove.baseDamage || 0) * attacker.atkBuff * damageRatio);
   defender.lp = Math.max(0, defender.lp - finalDmg);
   attacker.atkBuff = 1.0;
   return finalDmg > 0;
