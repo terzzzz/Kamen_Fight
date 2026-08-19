@@ -101,6 +101,9 @@ function startRoundCountdown() {
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
+    battleMsg.style.position = 'static';
+    battleMsg.style.transform = 'none';
+    battleMsg.style.margin = '10px auto';
     battleMsg.textContent = `ROUND ${gameState.roundCounter}: READY!`;
   }
 
@@ -293,20 +296,42 @@ function renderBuffTrays() {
   });
 }
 
-function getLongestVideoDurationMs() {
-  const v1 = document.getElementById('p1-video');
-  const v2 = document.getElementById('p2-video');
+// Promise Helper: Plays video and awaits explicit completion before resolving
+function playVideoAndWait(playerKey, stateType) {
+  return new Promise((resolve) => {
+    updateCharacterMedia(playerKey, stateType);
+    const videoEl = document.getElementById(`${playerKey}-video`);
 
-  const getDur = (v) => {
-    if (!v || isNaN(v.duration) || v.duration <= 0) return 2.5;
-    return v.duration;
-  };
+    if (!videoEl || stateType === 'IDLE') {
+      resolve();
+      return;
+    }
 
-  const maxSeconds = Math.max(getDur(v1), getDur(v2), 2.5);
-  return Math.ceil(maxSeconds * 1000);
+    const onEnded = () => {
+      videoEl.removeEventListener('ended', onEnded);
+      videoEl.removeEventListener('error', onError);
+      resolve();
+    };
+
+    const onError = () => {
+      videoEl.removeEventListener('ended', onEnded);
+      videoEl.removeEventListener('error', onError);
+      resolve();
+    };
+
+    videoEl.addEventListener('ended', onEnded);
+    videoEl.addEventListener('error', onError);
+
+    // Safety timeout fallback (5 seconds max)
+    setTimeout(() => {
+      videoEl.removeEventListener('ended', onEnded);
+      videoEl.removeEventListener('error', onError);
+      resolve();
+    }, 5000);
+  });
 }
 
-function executeTurnResolutionPhase() {
+async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
   let p1Time = gameState.p1.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.input.lockInTime || 0);
@@ -332,13 +357,11 @@ function executeTurnResolutionPhase() {
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
-  updateCharacterMedia('p1', p1Move.video || 'idle.mp4');
-  updateCharacterMedia('p2', p2Move.video || 'idle.mp4');
-
+  // Non-blocking status announcement below top HUD
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
-    battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}% ACC)<br>VS<br>P2: ${p2Move.name} (${gameState.p2.activeChargePercent}% ACC)`;
+    battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}%) VS P2: ${p2Move.name} (${gameState.p2.activeChargePercent}%)`;
   }
 
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
@@ -369,60 +392,66 @@ function executeTurnResolutionPhase() {
   let defender1 = p1GoesFirst ? gameState.p2 : gameState.p1;
   let move1 = p1GoesFirst ? p1Move : p2Move;
   let key1 = p1GoesFirst ? p1MoveKey : p2MoveKey;
+  let atkKey1 = p1GoesFirst ? 'p1' : 'p2';
   let defKey1 = p1GoesFirst ? 'p2' : 'p1';
 
   let attacker2 = p1GoesFirst ? gameState.p2 : gameState.p1;
   let defender2 = p1GoesFirst ? gameState.p1 : gameState.p2;
   let move2 = p1GoesFirst ? p2Move : p1Move;
   let key2 = p1GoesFirst ? p2MoveKey : p1MoveKey;
+  let atkKey2 = p1GoesFirst ? 'p2' : 'p1';
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
+  // --- SEQUENTIAL ATTACK STEP 1 ---
+  await playVideoAndWait(atkKey1, move1.video || 'idle.mp4');
   let hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, defKey1);
-  let hit2Landed = false;
-
-  if (!hit1Landed || move1.type !== 'MELEE') {
-    hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
-  }
 
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
-  if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
-
   updateFaintTracker(attacker1, defender1, hit1Landed, defKey1);
-  updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
-
   updateHUD();
 
+  // Short pause before second attack
+  await new Promise(r => setTimeout(r, 600));
+
+  // --- SEQUENTIAL ATTACK STEP 2 ---
+  let hit2Landed = false;
+  if (defender2.lp > 0 && (!hit1Landed || move1.type !== 'MELEE')) {
+    await playVideoAndWait(atkKey2, move2.video || 'idle.mp4');
+    hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
+
+    if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
+    updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
+    updateHUD();
+  }
+
+  // --- ROUND CONCLUSION ---
   setTimeout(() => {
-    const dynamicWaitTime = getLongestVideoDurationMs();
+    if (battleMsg) battleMsg.hidden = true;
 
-    setTimeout(() => {
-      if (battleMsg) battleMsg.hidden = true;
+    processRoundBuffs(gameState.p1);
+    processRoundBuffs(gameState.p2);
 
-      processRoundBuffs(gameState.p1);
-      processRoundBuffs(gameState.p2);
+    if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
+      gameState.roundCounter++;
+      startRoundCountdown();
+    } else {
+      if (battleMsg) battleMsg.hidden = false;
 
-      if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
-        gameState.roundCounter++;
-        startRoundCountdown();
+      if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
+        if (battleMsg) battleMsg.innerHTML = "DOUBLE KO!<br>DRAW MATCH!";
+        updateCharacterMedia('p1', 'KO');
+        updateCharacterMedia('p2', 'KO');
+      } else if (gameState.p1.lp <= 0) {
+        if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p2.name.toUpperCase()} WINS!`;
+        updateCharacterMedia('p1', 'KO');
+        updateCharacterMedia('p2', 'VICTORY');
       } else {
-        if (battleMsg) battleMsg.hidden = false;
-
-        if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
-          if (battleMsg) battleMsg.innerHTML = "DOUBLE KO!<br>DRAW MATCH!";
-          updateCharacterMedia('p1', 'KO');
-          updateCharacterMedia('p2', 'KO');
-        } else if (gameState.p1.lp <= 0) {
-          if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p2.name.toUpperCase()} WINS!`;
-          updateCharacterMedia('p1', 'KO');
-          updateCharacterMedia('p2', 'VICTORY');
-        } else {
-          if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p1.name.toUpperCase()} WINS!`;
-          updateCharacterMedia('p1', 'VICTORY');
-          updateCharacterMedia('p2', 'KO');
-        }
+        if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p1.name.toUpperCase()} WINS!`;
+        updateCharacterMedia('p1', 'VICTORY');
+        updateCharacterMedia('p2', 'KO');
       }
-    }, dynamicWaitTime);
-  }, 200);
+    }
+  }, 1000);
 }
 
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defenderKey) {
@@ -481,7 +510,6 @@ function updateCharacterMedia(playerKey, stateType) {
   const spriteEl = document.getElementById(`${playerKey}-sprite`);
   if (!videoEl) return;
 
-  // Enforce muted and inline playback for instant autoplay permission
   videoEl.muted = true;
   videoEl.playsInline = true;
 
@@ -511,7 +539,6 @@ function updateCharacterMedia(playerKey, stateType) {
   const riderId = player.id || 'ichigo';
   const videoUrl = `assets/videos/${riderId}/${fileName}`;
 
-  // Use dataset tracking to prevent re-assigning src when the video file hasn't changed
   if (videoEl.dataset.currentFile !== videoUrl) {
     videoEl.dataset.currentFile = videoUrl;
     videoEl.src = videoUrl;
