@@ -76,10 +76,9 @@ function triggerMatchTransition() {
   const splashRound = document.getElementById('splash-round-text');
   const splashNames = document.getElementById('splash-names-text');
 
-  if (splashScreen && splashRound && splashNames) {
-    // Reworded from "ROUND 1" to "GET READY FOR THE FIGHT!"
-    splashRound.textContent = "GET READY FOR THE FIGHT!";
-    splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
+  if (splashScreen) {
+    if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
+    if (splashNames) splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
     splashScreen.hidden = false;
 
     setTimeout(() => {
@@ -96,7 +95,6 @@ function startRoundCountdown() {
   resetTurnInputState();
   updateHUD();
 
-  // Re-sync dynamic idle states (idle, faint, or mid-air)
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
@@ -295,7 +293,6 @@ function renderBuffTrays() {
   });
 }
 
-// Helper to determine longest playing video duration dynamically
 function getLongestVideoDurationMs() {
   const v1 = document.getElementById('p1-video');
   const v2 = document.getElementById('p2-video');
@@ -335,7 +332,6 @@ function executeTurnResolutionPhase() {
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
-  // Trigger Action Videos
   updateCharacterMedia('p1', p1Move.video || 'idle.mp4');
   updateCharacterMedia('p2', p2Move.video || 'idle.mp4');
 
@@ -345,11 +341,9 @@ function executeTurnResolutionPhase() {
     battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}% ACC)<br>VS<br>P2: ${p2Move.name} (${gameState.p2.activeChargePercent}% ACC)`;
   }
 
-  // Deduct CHI Costs
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  // Apply Utility Buffs
   if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
   if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
 
@@ -398,7 +392,6 @@ function executeTurnResolutionPhase() {
 
   updateHUD();
 
-  // Wait for the longest playing video to finish before proceeding to next round
   setTimeout(() => {
     const dynamicWaitTime = getLongestVideoDurationMs();
 
@@ -488,6 +481,10 @@ function updateCharacterMedia(playerKey, stateType) {
   const spriteEl = document.getElementById(`${playerKey}-sprite`);
   if (!videoEl) return;
 
+  // Enforce muted and inline playback for instant autoplay permission
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+
   let fileName = stateType;
 
   if (stateType === 'IDLE') {
@@ -508,20 +505,26 @@ function updateCharacterMedia(playerKey, stateType) {
     fileName += '.mp4';
   }
 
-  // Continuous looping for stance videos; single-run for actions
   const isLoopingState = ['idle.mp4', 'mid-air.mp4', 'faint.mp4'].includes(fileName);
   videoEl.loop = isLoopingState;
 
   const riderId = player.id || 'ichigo';
   const videoUrl = `assets/videos/${riderId}/${fileName}`;
 
-  if (videoEl.getAttribute('src') !== videoUrl) {
+  // Use dataset tracking to prevent re-assigning src when the video file hasn't changed
+  if (videoEl.dataset.currentFile !== videoUrl) {
+    videoEl.dataset.currentFile = videoUrl;
     videoEl.src = videoUrl;
+    videoEl.load();
   }
+
   if (spriteEl) spriteEl.hidden = true;
   videoEl.hidden = false;
-  videoEl.currentTime = 0;
-  videoEl.play().catch(() => {});
+
+  const playPromise = videoEl.play();
+  if (playPromise !== undefined) {
+    playPromise.catch(() => {});
+  }
 
   if (playerKey === 'p2') {
     videoEl.classList.add('mirrored');
