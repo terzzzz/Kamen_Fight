@@ -10,7 +10,8 @@ const DO_NOTHING_MOVE = {
   type: "IDLE",
   chiCost: 0,
   baseDamage: 0,
-  hitChance: 100
+  hitChance: 100,
+  video: "idle.mp4"
 };
 
 let gameState = {
@@ -76,7 +77,8 @@ function triggerMatchTransition() {
   const splashNames = document.getElementById('splash-names-text');
 
   if (splashScreen && splashRound && splashNames) {
-    splashRound.textContent = `ROUND ${gameState.roundCounter}`;
+    // Reworded from "ROUND 1" to "GET READY FOR THE FIGHT!"
+    splashRound.textContent = "GET READY FOR THE FIGHT!";
     splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
     splashScreen.hidden = false;
 
@@ -94,29 +96,33 @@ function startRoundCountdown() {
   resetTurnInputState();
   updateHUD();
 
-  // Reset/Set character idle videos for the countdown phase
+  // Re-sync dynamic idle states (idle, faint, or mid-air)
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
   const battleMsg = document.getElementById('battle-message');
-  battleMsg.hidden = false;
-  battleMsg.textContent = `ROUND ${gameState.roundCounter}: READY!`;
+  if (battleMsg) {
+    battleMsg.hidden = false;
+    battleMsg.textContent = `ROUND ${gameState.roundCounter}: READY!`;
+  }
 
   setTimeout(() => {
-    if (gameState.roundPhase === 'INPUT') {
+    if (gameState.roundPhase === 'INPUT' && battleMsg) {
       battleMsg.hidden = true;
     }
   }, 1200);
 
   clearInterval(gameState.timerInterval);
   gameState.turnTimerSeconds = 5;
-  document.getElementById('turn-timer').textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+
+  const timerEl = document.getElementById('turn-timer');
+  if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
 
     gameState.turnTimerSeconds--;
-    document.getElementById('turn-timer').textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+    if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
@@ -127,6 +133,14 @@ function startRoundCountdown() {
       executeTurnResolutionPhase();
     }
   }, 1000);
+}
+
+function getCPUMoveChoice(cpuPlayer, opponentPlayer) {
+  if (typeof selectCPUMove === 'function') {
+    return selectCPUMove(cpuPlayer, opponentPlayer, gameState.movesData) || 'D+J';
+  }
+  const availableKeys = Object.keys(gameState.movesData);
+  return availableKeys.length > 0 ? availableKeys[Math.floor(Math.random() * availableKeys.length)] : 'D+J';
 }
 
 function bindKeyboardInputs() {
@@ -281,34 +295,55 @@ function renderBuffTrays() {
   });
 }
 
+// Helper to determine longest playing video duration dynamically
+function getLongestVideoDurationMs() {
+  const v1 = document.getElementById('p1-video');
+  const v2 = document.getElementById('p2-video');
+
+  const getDur = (v) => {
+    if (!v || isNaN(v.duration) || v.duration <= 0) return 2.5;
+    return v.duration;
+  };
+
+  const maxSeconds = Math.max(getDur(v1), getDur(v2), 2.5);
+  return Math.ceil(maxSeconds * 1000);
+}
+
 function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
-  let p1Time = gameState.input.lockInTime || 0;
+  let p1Time = gameState.p1.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.input.lockInTime || 0);
   let p2Time = gameState.p2.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.p2LockInTime || 0);
 
-  let p1MoveKey = gameState.input.selectedMoveKey || 'DO_NOTHING';
+  let p1MoveKey = gameState.p1.isCPU
+    ? getCPUMoveChoice(gameState.p1, gameState.p2)
+    : (gameState.input.selectedMoveKey || 'DO_NOTHING');
+
   let p2MoveKey = gameState.p2.isCPU 
-    ? selectCPUMove(gameState.p2, gameState.p1, gameState.movesData) 
+    ? getCPUMoveChoice(gameState.p2, gameState.p1) 
     : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
 
+  if (gameState.p1.isCPU) {
+    gameState.p1.activeChargePercent = p1MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+    simulateCPUButtonPress(p1MoveKey);
+  }
   if (gameState.p2.isCPU) {
     gameState.p2.activeChargePercent = p2MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+    simulateCPUButtonPress(p2MoveKey);
   }
-
-  if (gameState.p1.isCPU) simulateCPUButtonPress(p1MoveKey);
-  if (gameState.p2.isCPU) simulateCPUButtonPress(p2MoveKey);
 
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
-  // Play Action Videos
-  if (p1Move.video) updateCharacterMedia('p1', p1Move.video);
-  if (p2Move.video) updateCharacterMedia('p2', p2Move.video);
+  // Trigger Action Videos
+  updateCharacterMedia('p1', p1Move.video || 'idle.mp4');
+  updateCharacterMedia('p2', p2Move.video || 'idle.mp4');
 
   const battleMsg = document.getElementById('battle-message');
-  battleMsg.hidden = false;
-  battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}% ACC)<br>VS<br>P2: ${p2Move.name} (${gameState.p2.activeChargePercent}% ACC)`;
+  if (battleMsg) {
+    battleMsg.hidden = false;
+    battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}% ACC)<br>VS<br>P2: ${p2Move.name} (${gameState.p2.activeChargePercent}% ACC)`;
+  }
 
   // Deduct CHI Costs
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
@@ -355,7 +390,6 @@ function executeTurnResolutionPhase() {
     hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
   }
 
-  // Restore +3 CHI on landed D-attacks
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
   if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
 
@@ -364,33 +398,38 @@ function executeTurnResolutionPhase() {
 
   updateHUD();
 
+  // Wait for the longest playing video to finish before proceeding to next round
   setTimeout(() => {
-    battleMsg.hidden = true;
+    const dynamicWaitTime = getLongestVideoDurationMs();
 
-    processRoundBuffs(gameState.p1);
-    processRoundBuffs(gameState.p2);
+    setTimeout(() => {
+      if (battleMsg) battleMsg.hidden = true;
 
-    if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
-      gameState.roundCounter++;
-      startRoundCountdown();
-    } else {
-      battleMsg.hidden = false;
+      processRoundBuffs(gameState.p1);
+      processRoundBuffs(gameState.p2);
 
-      if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
-        battleMsg.innerHTML = "DOUBLE KO!<br>DRAW MATCH!";
-        updateCharacterMedia('p1', 'KO');
-        updateCharacterMedia('p2', 'KO');
-      } else if (gameState.p1.lp <= 0) {
-        battleMsg.innerHTML = `KO!<br>${gameState.p2.name.toUpperCase()} WINS!`;
-        updateCharacterMedia('p1', 'KO');
-        updateCharacterMedia('p2', 'VICTORY');
+      if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
+        gameState.roundCounter++;
+        startRoundCountdown();
       } else {
-        battleMsg.innerHTML = `KO!<br>${gameState.p1.name.toUpperCase()} WINS!`;
-        updateCharacterMedia('p1', 'VICTORY');
-        updateCharacterMedia('p2', 'KO');
+        if (battleMsg) battleMsg.hidden = false;
+
+        if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
+          if (battleMsg) battleMsg.innerHTML = "DOUBLE KO!<br>DRAW MATCH!";
+          updateCharacterMedia('p1', 'KO');
+          updateCharacterMedia('p2', 'KO');
+        } else if (gameState.p1.lp <= 0) {
+          if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p2.name.toUpperCase()} WINS!`;
+          updateCharacterMedia('p1', 'KO');
+          updateCharacterMedia('p2', 'VICTORY');
+        } else {
+          if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p1.name.toUpperCase()} WINS!`;
+          updateCharacterMedia('p1', 'VICTORY');
+          updateCharacterMedia('p2', 'KO');
+        }
       }
-    }
-  }, 2500);
+    }, dynamicWaitTime);
+  }, 200);
 }
 
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defenderKey) {
@@ -428,7 +467,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defende
 
   defender.lp = Math.max(0, defender.lp - finalDmg);
 
-  // Trigger Reaction Videos based on Hit/Guard Result
   if (finalDmg > 0) {
     if (atkMoveKey && atkMoveKey.startsWith('D')) {
       updateCharacterMedia(defenderKey, 'hit_physical.mp4');
@@ -452,7 +490,6 @@ function updateCharacterMedia(playerKey, stateType) {
 
   let fileName = stateType;
 
-  // Handle Dynamic IDLE States
   if (stateType === 'IDLE') {
     if (player.isFainted) {
       fileName = 'faint.mp4';
@@ -461,13 +498,9 @@ function updateCharacterMedia(playerKey, stateType) {
     } else {
       fileName = 'idle.mp4';
     }
-  } 
-  // Handle 50/50 Victory Pose Randomizer
-  else if (stateType === 'VICTORY' || stateType === 'victory') {
+  } else if (stateType === 'VICTORY' || stateType === 'victory') {
     fileName = Math.random() < 0.5 ? 'victory.mp4' : 'victory2.mp4';
-  } 
-  // Handle KO Exhaustion
-  else if (stateType === 'KO' || stateType === 'ko') {
+  } else if (stateType === 'KO' || stateType === 'ko') {
     fileName = 'ko.mp4';
   }
 
@@ -475,17 +508,21 @@ function updateCharacterMedia(playerKey, stateType) {
     fileName += '.mp4';
   }
 
+  // Continuous looping for stance videos; single-run for actions
+  const isLoopingState = ['idle.mp4', 'mid-air.mp4', 'faint.mp4'].includes(fileName);
+  videoEl.loop = isLoopingState;
+
   const riderId = player.id || 'ichigo';
   const videoUrl = `assets/videos/${riderId}/${fileName}`;
 
   if (videoEl.getAttribute('src') !== videoUrl) {
     videoEl.src = videoUrl;
-    if (spriteEl) spriteEl.hidden = true;
-    videoEl.hidden = false;
-    videoEl.play().catch(() => {});
   }
+  if (spriteEl) spriteEl.hidden = true;
+  videoEl.hidden = false;
+  videoEl.currentTime = 0;
+  videoEl.play().catch(() => {});
 
-  // Mirror P2 video element facing left
   if (playerKey === 'p2') {
     videoEl.classList.add('mirrored');
   }
