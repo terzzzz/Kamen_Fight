@@ -48,7 +48,6 @@ async function startBattle(config) {
   bindCommandButtons();
   updateHUD();
 
-  // Load default idle media states
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
@@ -59,13 +58,15 @@ function createPlayerState(riderConfig, isCPU) {
   return {
     ...riderConfig,
     isCPU: isCPU,
-    lp: riderConfig.maxLp || 1000,
+    lp: riderConfig.maxLp || 1050,
     chi: 10,
+    maxChi: 16,
     consecutiveHitsLanded: 0,
     isFainted: false,
     airborneTicks: 0,
-    atkBuff: 1.0,
-    currentFormKey: riderConfig.activeForm || 'base'
+    sSkillBuffTurns: 0,
+    chargeSpeedTurns: 0,
+    activeBuffs: []
   };
 }
 
@@ -167,9 +168,13 @@ function bindKeyboardInputs() {
 function updateChargeProgress() {
   if (!gameState.input.heldDirection || gameState.roundPhase !== 'INPUT') return;
 
-  const duration = CHARGE_TIMES[gameState.input.heldDirection];
-  const elapsed = Date.now() - gameState.input.chargeStartTime;
+  let duration = CHARGE_TIMES[gameState.input.heldDirection];
+  
+  if (gameState.p1.activeBuffs.some(b => b.id === 'charge_speed')) {
+    duration = duration * 0.75;
+  }
 
+  const elapsed = Date.now() - gameState.input.chargeStartTime;
   gameState.input.currentPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
 
   const fillEl = document.getElementById('p1-charge-fill');
@@ -212,16 +217,48 @@ function bindCommandButtons() {
   });
 }
 
-/* Dynamic Controller Lighting Simulation for CPU or Actions */
 function simulateCPUButtonPress(moveKey) {
   if (moveKey === 'DO_NOTHING') return;
-  const parts = moveKey.split('+'); // e.g., ["D", "J"]
+  const parts = moveKey.split('+');
   parts.forEach(k => {
     const keyEl = document.getElementById(`key-${k}`);
     if (keyEl) {
       keyEl.classList.add('active');
       setTimeout(() => keyEl.classList.remove('active'), 1200);
     }
+  });
+}
+
+function applyBuff(player, buffId, label, buffType, durationRounds) {
+  player.activeBuffs = player.activeBuffs.filter(b => b.id !== buffId);
+  player.activeBuffs.push({
+    id: buffId,
+    label: label,
+    type: buffType,
+    roundsLeft: durationRounds
+  });
+  renderBuffTrays();
+}
+
+function processRoundBuffs(player) {
+  player.activeBuffs.forEach(b => b.roundsLeft--);
+  player.activeBuffs = player.activeBuffs.filter(b => b.roundsLeft > 0);
+  renderBuffTrays();
+}
+
+function renderBuffTrays() {
+  ['p1', 'p2'].forEach(slot => {
+    const player = gameState[slot];
+    const tray = document.getElementById(`${slot}-buff-tray`);
+    if (!tray || !player) return;
+
+    tray.innerHTML = '';
+    player.activeBuffs.forEach(b => {
+      const tag = document.createElement('div');
+      tag.className = `buff-tag ${b.type}`;
+      tag.textContent = `${b.label} (${b.roundsLeft}R)`;
+      tray.appendChild(tag);
+    });
   });
 }
 
@@ -236,7 +273,6 @@ function executeTurnResolutionPhase() {
     ? selectCPUMove(gameState.p2, gameState.p1, gameState.movesData) 
     : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
 
-  // Trigger lighting FX for CPU actions
   if (gameState.p1.isCPU) simulateCPUButtonPress(p1MoveKey);
   if (gameState.p2.isCPU) simulateCPUButtonPress(p2MoveKey);
 
@@ -247,14 +283,16 @@ function executeTurnResolutionPhase() {
   battleMsg.hidden = false;
   battleMsg.innerHTML = `P1: ${p1Move.name}<br>VS<br>P2: ${p2Move.name}`;
 
+  // Deduct CHI
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  if (p1MoveKey === 'S+J') gameState.p1.chi = Math.min(20, gameState.p1.chi + (gameState.p1.chiRegen || 5));
-  if (p2MoveKey === 'S+J') gameState.p2.chi = Math.min(20, gameState.p2.chi + (gameState.p2.chiRegen || 5));
+  // Apply Utility Buffs
+  if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
+  if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
 
-  if (p1MoveKey === 'W+J' && gameState.p1.forms) cycleRiderForm(gameState.p1);
-  if (p2MoveKey === 'W+J' && gameState.p2.forms) cycleRiderForm(gameState.p2);
+  if (p1MoveKey === 'W+K') applyBuff(gameState.p1, 'focus', 'S-ATK +20%', 'attack', 2);
+  if (p2MoveKey === 'W+K') applyBuff(gameState.p2, 'focus', 'S-ATK +20%', 'attack', 2);
 
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
@@ -281,9 +319,15 @@ function executeTurnResolutionPhase() {
 
   let hit1Landed = resolveAttack(attacker1, defender1, move1, move2);
   let hit2Landed = false;
+
+  // If Attack 1 missed, Attack 2 executes uninterrupted
   if (!hit1Landed || move1.type !== 'MELEE') {
     hit2Landed = resolveAttack(attacker2, defender2, move2, move1);
   }
+
+  // Award +3 CHI on landed D-attacks
+  if (hit1Landed && move1.key && move1.key.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
+  if (hit2Landed && move2.key && move2.key.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
 
   updateFaintTracker(attacker1, defender1, hit1Landed, p1GoesFirst ? 'p2' : 'p1');
   updateFaintTracker(attacker2, defender2, hit2Landed, p1GoesFirst ? 'p1' : 'p2');
@@ -301,6 +345,9 @@ function executeTurnResolutionPhase() {
   setTimeout(() => {
     battleMsg.hidden = true;
 
+    processRoundBuffs(gameState.p1);
+    processRoundBuffs(gameState.p2);
+
     if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
       gameState.roundCounter++;
       startRoundCountdown();
@@ -312,7 +359,6 @@ function executeTurnResolutionPhase() {
   }, 2500);
 }
 
-/* Viewport Media State Controller (Swaps video/images in Left & Right boxes) */
 function updateCharacterMedia(playerKey, stateType, videoUrl = null) {
   const videoEl = document.getElementById(`${playerKey}-video`);
   const spriteEl = document.getElementById(`${playerKey}-sprite`);
@@ -325,7 +371,6 @@ function updateCharacterMedia(playerKey, stateType, videoUrl = null) {
     spriteEl.hidden = true;
     videoEl.play().catch(() => {});
   } else {
-    // Default fallback to idle video loop
     videoEl.hidden = false;
     spriteEl.hidden = true;
   }
@@ -352,31 +397,37 @@ function handleAirborneState(player, moveKey) {
   }
 }
 
-function cycleRiderForm(player) {
-  if (!player.forms) return;
-  const formKeys = Object.keys(player.forms);
-  let nextIndex = (formKeys.indexOf(player.currentFormKey) + 1) % formKeys.length;
-  player.currentFormKey = formKeys[nextIndex];
-}
-
 function resolveAttack(attacker, defender, atkMove, defMove) {
-  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'FINISHER') return false;
+  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER') return false;
 
   let rolledHit = Math.random() * 100 < atkMove.hitChance;
   if (!rolledHit) return false;
 
   let damageRatio = 1.0;
+
+  // Custom Guard System Math
   if (defMove.type === 'DEFENSE') {
-    let success = Math.random() * 100 < (defMove.successChance || 80);
-    if (success) {
-      damageRatio = defMove.damageTakenRatio || 0.2;
-      if (defMove.chiGainOnSuccess) defender.chi = Math.min(20, defender.chi + defMove.chiGainOnSuccess);
+    const atkButton = atkMove.key ? atkMove.key.split('+')[1] : null;
+
+    if (defMove.key === 'A+I') {
+      // Total Counter Guard (2 CHI): 70% chance to completely block S or D moves unless unblockable
+      if (atkMove.unblockable) {
+        damageRatio = 1.0;
+      } else if (Math.random() * 100 < 70) {
+        damageRatio = 0.0;
+      }
+    } else if (defMove.key === `A+${atkButton}`) {
+      // Standard Matching Guard (A+J vs J, A+K vs K, A+L vs L): 20% chance block 80%, 80% chance block 30%
+      let rolledHighBlock = Math.random() * 100 < 20;
+      damageRatio = rolledHighBlock ? 0.20 : 0.70;
     }
   }
 
-  let finalDmg = Math.floor((atkMove.baseDamage || 0) * attacker.atkBuff * damageRatio);
+  // Calculate damage with active W+K (+20% S-skill boost)
+  let sSkillMultiplier = (atkMove.key && atkMove.key.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
+  
+  let finalDmg = Math.floor((atkMove.baseDamage || 0) * sSkillMultiplier * damageRatio);
   defender.lp = Math.max(0, defender.lp - finalDmg);
-  attacker.atkBuff = 1.0;
   return finalDmg > 0;
 }
 
