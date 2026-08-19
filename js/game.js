@@ -48,7 +48,10 @@ async function startBattle(config) {
   bindCommandButtons();
   updateHUD();
 
-  // Phase 1: Show Transition Splash with dynamic Rider names
+  // Load default idle media states
+  updateCharacterMedia('p1', 'IDLE');
+  updateCharacterMedia('p2', 'IDLE');
+
   triggerMatchTransition();
 }
 
@@ -80,7 +83,7 @@ function triggerMatchTransition() {
     setTimeout(() => {
       splashScreen.hidden = true;
       startRoundCountdown();
-    }, 2200); // 2.2-second transition hold before Round 1 starts
+    }, 2200);
   } else {
     startRoundCountdown();
   }
@@ -209,6 +212,19 @@ function bindCommandButtons() {
   });
 }
 
+/* Dynamic Controller Lighting Simulation for CPU or Actions */
+function simulateCPUButtonPress(moveKey) {
+  if (moveKey === 'DO_NOTHING') return;
+  const parts = moveKey.split('+'); // e.g., ["D", "J"]
+  parts.forEach(k => {
+    const keyEl = document.getElementById(`key-${k}`);
+    if (keyEl) {
+      keyEl.classList.add('active');
+      setTimeout(() => keyEl.classList.remove('active'), 1200);
+    }
+  });
+}
+
 function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -219,6 +235,10 @@ function executeTurnResolutionPhase() {
   let p2MoveKey = gameState.p2.isCPU 
     ? selectCPUMove(gameState.p2, gameState.p1, gameState.movesData) 
     : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
+
+  // Trigger lighting FX for CPU actions
+  if (gameState.p1.isCPU) simulateCPUButtonPress(p1MoveKey);
+  if (gameState.p2.isCPU) simulateCPUButtonPress(p2MoveKey);
 
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
@@ -268,10 +288,13 @@ function executeTurnResolutionPhase() {
   updateFaintTracker(attacker1, defender1, hit1Landed, p1GoesFirst ? 'p2' : 'p1');
   updateFaintTracker(attacker2, defender2, hit2Landed, p1GoesFirst ? 'p1' : 'p2');
 
-  if (typeof checkItemSpawn === 'function') checkItemSpawn(gameState.roundCounter);
-  if (typeof resolveItemPickup === 'function') {
-    resolveItemPickup(p1GoesFirst ? hit1Landed : hit2Landed, p1GoesFirst ? hit2Landed : hit1Landed, gameState.p1, gameState.p2);
-  }
+  // ==========================================
+  // TO BE USED IN FUTURE: CENTER ITEM LIFECYCLE
+  // ==========================================
+  // if (typeof checkItemSpawn === 'function') checkItemSpawn(gameState.roundCounter);
+  // if (typeof resolveItemPickup === 'function') {
+  //   resolveItemPickup(p1GoesFirst ? hit1Landed : hit2Landed, p1GoesFirst ? hit2Landed : hit1Landed, gameState.p1, gameState.p2);
+  // }
 
   updateHUD();
 
@@ -287,6 +310,25 @@ function executeTurnResolutionPhase() {
       battleMsg.textContent = `KO! ${winnerName} WINS!`;
     }
   }, 2500);
+}
+
+/* Viewport Media State Controller (Swaps video/images in Left & Right boxes) */
+function updateCharacterMedia(playerKey, stateType, videoUrl = null) {
+  const videoEl = document.getElementById(`${playerKey}-video`);
+  const spriteEl = document.getElementById(`${playerKey}-sprite`);
+
+  if (!videoEl || !spriteEl) return;
+
+  if (videoUrl) {
+    videoEl.src = videoUrl;
+    videoEl.hidden = false;
+    spriteEl.hidden = true;
+    videoEl.play().catch(() => {});
+  } else {
+    // Default fallback to idle video loop
+    videoEl.hidden = false;
+    spriteEl.hidden = true;
+  }
 }
 
 function resetTurnInputState() {
