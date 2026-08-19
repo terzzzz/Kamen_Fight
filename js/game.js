@@ -64,7 +64,7 @@ function createPlayerState(riderConfig, isCPU) {
     consecutiveHitsLanded: 0,
     isFainted: false,
     airborneTicks: 0,
-    activeChargePercent: 100, // Captured charge ratio for active turn
+    activeChargePercent: 100,
     activeBuffs: []
   };
 }
@@ -93,6 +93,10 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
   updateHUD();
+
+  // Reset/Set character idle videos for the countdown phase
+  updateCharacterMedia('p1', 'IDLE');
+  updateCharacterMedia('p2', 'IDLE');
 
   const battleMsg = document.getElementById('battle-message');
   battleMsg.hidden = false;
@@ -145,8 +149,6 @@ function bindKeyboardInputs() {
 
     if (['J', 'K', 'L', 'I'].includes(key)) {
       if (!gameState.input.heldDirection) return;
-
-      // Lock action with current accumulated charge percent
       confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
     }
   });
@@ -168,7 +170,6 @@ function updateChargeProgress() {
 
   let duration = CHARGE_TIMES[gameState.input.heldDirection];
   
-  // Apply W+J speed buff if active
   if (gameState.p1.activeBuffs.some(b => b.id === 'charge_speed')) {
     duration = duration * 0.75;
   }
@@ -176,12 +177,12 @@ function updateChargeProgress() {
   const elapsed = Date.now() - gameState.input.chargeStartTime;
   gameState.input.currentPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
 
-  // Update HUD Bar
   const fillEl = document.getElementById('p1-charge-fill');
-  fillEl.style.width = `${gameState.input.currentPercent}%`;
-  fillEl.textContent = `${gameState.input.currentPercent}%`;
+  if (fillEl) {
+    fillEl.style.width = `${gameState.input.currentPercent}%`;
+    fillEl.textContent = `${gameState.input.currentPercent}%`;
+  }
 
-  // Update Controller Status Center Display
   const statusEl = document.getElementById('charge-status-display');
   if (statusEl) {
     statusEl.textContent = `CHARGING [${gameState.input.heldDirection}]: ${gameState.input.currentPercent}%`;
@@ -211,12 +212,14 @@ function confirmPlayerAction(moveKey) {
   gameState.input.isConfirmed = true;
   gameState.input.selectedMoveKey = moveKey;
   gameState.input.lockInTime = gameState.turnTimerSeconds;
-  gameState.p1.activeChargePercent = Math.max(10, gameState.input.currentPercent); // Min 10% base
+  gameState.p1.activeChargePercent = Math.max(10, gameState.input.currentPercent);
   clearInterval(gameState.input.chargeInterval);
 
   const flagEl = document.getElementById('p1-action-flag');
-  flagEl.hidden = false;
-  flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p1.activeChargePercent}%!`;
+  if (flagEl) {
+    flagEl.hidden = false;
+    flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p1.activeChargePercent}%!`;
+  }
 }
 
 function bindCommandButtons() {
@@ -289,7 +292,6 @@ function executeTurnResolutionPhase() {
     ? selectCPUMove(gameState.p2, gameState.p1, gameState.movesData) 
     : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
 
-  // Assign CPU charge percent (simulating realistic AI charge holding: 75% to 100%)
   if (gameState.p2.isCPU) {
     gameState.p2.activeChargePercent = p2MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
   }
@@ -300,6 +302,10 @@ function executeTurnResolutionPhase() {
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
+  // Play Action Videos
+  if (p1Move.video) updateCharacterMedia('p1', p1Move.video);
+  if (p2Move.video) updateCharacterMedia('p2', p2Move.video);
+
   const battleMsg = document.getElementById('battle-message');
   battleMsg.hidden = false;
   battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}% ACC)<br>VS<br>P2: ${p2Move.name} (${gameState.p2.activeChargePercent}% ACC)`;
@@ -308,7 +314,7 @@ function executeTurnResolutionPhase() {
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  // Apply Utility Buffs (W-Skill Tree is unscaled)
+  // Apply Utility Buffs
   if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
   if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
 
@@ -333,24 +339,28 @@ function executeTurnResolutionPhase() {
   let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
   let defender1 = p1GoesFirst ? gameState.p2 : gameState.p1;
   let move1 = p1GoesFirst ? p1Move : p2Move;
+  let key1 = p1GoesFirst ? p1MoveKey : p2MoveKey;
+  let defKey1 = p1GoesFirst ? 'p2' : 'p1';
 
   let attacker2 = p1GoesFirst ? gameState.p2 : gameState.p1;
   let defender2 = p1GoesFirst ? gameState.p1 : gameState.p2;
   let move2 = p1GoesFirst ? p2Move : p1Move;
+  let key2 = p1GoesFirst ? p2MoveKey : p1MoveKey;
+  let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
-  let hit1Landed = resolveAttack(attacker1, defender1, move1, move2);
+  let hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, defKey1);
   let hit2Landed = false;
 
   if (!hit1Landed || move1.type !== 'MELEE') {
-    hit2Landed = resolveAttack(attacker2, defender2, move2, move1);
+    hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
   }
 
   // Restore +3 CHI on landed D-attacks
-  if (hit1Landed && move1.key && move1.key.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
-  if (hit2Landed && move2.key && move2.key.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
+  if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
+  if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
 
-  updateFaintTracker(attacker1, defender1, hit1Landed, p1GoesFirst ? 'p2' : 'p1');
-  updateFaintTracker(attacker2, defender2, hit2Landed, p1GoesFirst ? 'p1' : 'p2');
+  updateFaintTracker(attacker1, defender1, hit1Landed, defKey1);
+  updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
 
   updateHUD();
 
@@ -364,71 +374,120 @@ function executeTurnResolutionPhase() {
       gameState.roundCounter++;
       startRoundCountdown();
     } else {
-      let winnerName = gameState.p1.lp > 0 ? gameState.p1.name : gameState.p2.name;
       battleMsg.hidden = false;
-      battleMsg.textContent = `KO! ${winnerName} WINS!`;
+
+      if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
+        battleMsg.innerHTML = "DOUBLE KO!<br>DRAW MATCH!";
+        updateCharacterMedia('p1', 'KO');
+        updateCharacterMedia('p2', 'KO');
+      } else if (gameState.p1.lp <= 0) {
+        battleMsg.innerHTML = `KO!<br>${gameState.p2.name.toUpperCase()} WINS!`;
+        updateCharacterMedia('p1', 'KO');
+        updateCharacterMedia('p2', 'VICTORY');
+      } else {
+        battleMsg.innerHTML = `KO!<br>${gameState.p1.name.toUpperCase()} WINS!`;
+        updateCharacterMedia('p1', 'VICTORY');
+        updateCharacterMedia('p2', 'KO');
+      }
     }
   }, 2500);
 }
 
-function resolveAttack(attacker, defender, atkMove, defMove) {
-  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER') return false;
+function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defenderKey) {
+  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return false;
 
-  // 1. Calculate Charge Scaler Ratios (0.10 to 1.00)
   const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
   const defChargeRatio = (defender.activeChargePercent || 100) / 100;
 
-  // 2. Scale Attack Hit Rate / Accuracy ONLY by Charge Ratio
   let effectiveHitChance = (atkMove.hitChance || 80) * atkChargeRatio;
   let rolledHit = Math.random() * 100 < effectiveHitChance;
   if (!rolledHit) return false;
 
   let damageRatio = 1.0;
 
-  // 3. Scale Defensive Guard / Evasion Rates ONLY by Charge Ratio
   if (defMove.type === 'DEFENSE') {
-    const atkButton = atkMove.key ? atkMove.key.split('+')[1] : null;
+    const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    if (defMove.key === 'A+I') {
-      // Total Counter Guard (2 CHI): Base 70% scaled by charge ratio
+    if (defMove.key === 'A+I' || defMove.name === 'Windmill Guard') {
       let effectiveCounterChance = 70 * defChargeRatio;
       if (atkMove.unblockable) {
         damageRatio = 1.0;
       } else if (Math.random() * 100 < effectiveCounterChance) {
-        damageRatio = 0.0; // Complete block / evasion
+        damageRatio = 0.0;
       }
-    } else if (defMove.key === `A+${atkButton}`) {
-      // Standard Guard: High-block chance (20%) scaled by charge ratio
+    } else if (defMove.key === `A+${atkButton}` || defMove.name.includes('Guard')) {
       let effectiveHighBlockChance = 20 * defChargeRatio;
       let rolledHighBlock = Math.random() * 100 < effectiveHighBlockChance;
       damageRatio = rolledHighBlock ? 0.20 : 0.70;
     }
   }
 
-  // 4. Calculate Final Damage Output (Base Damage is 100% intact!)
-  let sSkillMultiplier = (atkMove.key && atkMove.key.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
-
+  let sSkillMultiplier = (atkMoveKey && atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
   let baseDamage = atkMove.baseDamage || 0;
   let finalDmg = Math.floor(baseDamage * sSkillMultiplier * damageRatio);
 
   defender.lp = Math.max(0, defender.lp - finalDmg);
+
+  // Trigger Reaction Videos based on Hit/Guard Result
+  if (finalDmg > 0) {
+    if (atkMoveKey && atkMoveKey.startsWith('D')) {
+      updateCharacterMedia(defenderKey, 'hit_physical.mp4');
+    } else {
+      updateCharacterMedia(defenderKey, 'hit.mp4');
+    }
+  } else if (defMove.type === 'DEFENSE' && defMove.video) {
+    updateCharacterMedia(defenderKey, defMove.video);
+  }
+
   return finalDmg > 0;
 }
 
-function updateCharacterMedia(playerKey, stateType, videoUrl = null) {
+function updateCharacterMedia(playerKey, stateType) {
+  const player = gameState[playerKey];
+  if (!player) return;
+
   const videoEl = document.getElementById(`${playerKey}-video`);
   const spriteEl = document.getElementById(`${playerKey}-sprite`);
+  if (!videoEl) return;
 
-  if (!videoEl || !spriteEl) return;
+  let fileName = stateType;
 
-  if (videoUrl) {
+  // Handle Dynamic IDLE States
+  if (stateType === 'IDLE') {
+    if (player.isFainted) {
+      fileName = 'faint.mp4';
+    } else if (player.airborneTicks > 0) {
+      fileName = 'mid-air.mp4';
+    } else {
+      fileName = 'idle.mp4';
+    }
+  } 
+  // Handle 50/50 Victory Pose Randomizer
+  else if (stateType === 'VICTORY' || stateType === 'victory') {
+    fileName = Math.random() < 0.5 ? 'victory.mp4' : 'victory2.mp4';
+  } 
+  // Handle KO Exhaustion
+  else if (stateType === 'KO' || stateType === 'ko') {
+    fileName = 'ko.mp4';
+  }
+
+  if (!fileName.endsWith('.mp4') && !fileName.endsWith('.webm')) {
+    fileName += '.mp4';
+  }
+
+  const riderId = player.id || 'ichigo';
+  const videoUrl = `assets/videos/${riderId}/${fileName}`;
+
+  if (videoEl.getAttribute('src') !== videoUrl) {
     videoEl.src = videoUrl;
+    if (spriteEl) spriteEl.hidden = true;
     videoEl.hidden = false;
-    spriteEl.hidden = true;
     videoEl.play().catch(() => {});
-  } else {
-    videoEl.hidden = false;
-    spriteEl.hidden = true;
+  }
+
+  // Mirror P2 video element facing left
+  if (playerKey === 'p2') {
+    videoEl.classList.add('mirrored');
   }
 }
 
@@ -437,7 +496,8 @@ function resetTurnInputState() {
   gameState.input.isConfirmed = false;
   gameState.input.selectedMoveKey = null;
   gameState.input.lockInTime = 0;
-  document.getElementById('p1-action-flag').hidden = true;
+  const flagEl = document.getElementById('p1-action-flag');
+  if (flagEl) flagEl.hidden = true;
 }
 
 function handleAirborneState(player, moveKey) {
@@ -467,22 +527,41 @@ function updateFaintTracker(attacker, defender, hitLanded, defenderSlot) {
 
 function triggerFaint(targetPlayer, slotKey) {
   targetPlayer.isFainted = true;
-  document.getElementById(`${slotKey}-stun-overlay`).hidden = false;
-  document.getElementById(`${slotKey}-status`).textContent = 'FAINTED (5s)';
+  const stunOverlay = document.getElementById(`${slotKey}-stun-overlay`);
+  const statusEl = document.getElementById(`${slotKey}-status`);
+
+  if (stunOverlay) stunOverlay.hidden = false;
+  if (statusEl) statusEl.textContent = 'FAINTED (5s)';
+
+  updateCharacterMedia(slotKey, 'faint.mp4');
 
   setTimeout(() => {
     targetPlayer.isFainted = false;
-    document.getElementById(`${slotKey}-stun-overlay`).hidden = true;
-    document.getElementById(`${slotKey}-status`).textContent = 'NORMAL';
+    if (stunOverlay) stunOverlay.hidden = true;
+    if (statusEl) statusEl.textContent = 'NORMAL';
+    updateCharacterMedia(slotKey, 'IDLE');
   }, 5000);
 }
 
 function updateHUD() {
-  document.getElementById('p1-name').textContent = gameState.p1.name;
-  document.getElementById('p2-name').textContent = gameState.p2.name;
-  document.getElementById('p1-lp').textContent = gameState.p1.lp;
-  document.getElementById('p1-chi').textContent = gameState.p1.chi;
-  document.getElementById('p2-lp').textContent = gameState.p2.lp;
-  document.getElementById('p2-chi').textContent = gameState.p2.chi;
-  document.getElementById('turn-display').textContent = `ROUND ${gameState.roundCounter}`;
+  if (gameState.p1) {
+    const p1Name = document.getElementById('p1-name');
+    const p1Lp = document.getElementById('p1-lp');
+    const p1Chi = document.getElementById('p1-chi');
+    if (p1Name) p1Name.textContent = gameState.p1.name;
+    if (p1Lp) p1Lp.textContent = gameState.p1.lp;
+    if (p1Chi) p1Chi.textContent = gameState.p1.chi;
+  }
+
+  if (gameState.p2) {
+    const p2Name = document.getElementById('p2-name');
+    const p2Lp = document.getElementById('p2-lp');
+    const p2Chi = document.getElementById('p2-chi');
+    if (p2Name) p2Name.textContent = gameState.p2.name;
+    if (p2Lp) p2Lp.textContent = gameState.p2.lp;
+    if (p2Chi) p2Chi.textContent = gameState.p2.chi;
+  }
+
+  const turnDisp = document.getElementById('turn-display');
+  if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
