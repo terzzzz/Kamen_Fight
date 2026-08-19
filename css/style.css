@@ -49,7 +49,7 @@ body {
 }
 
 .vs-title {
-  font-size: 26px; /* Scaled up */
+  font-size: 26px;
   font-weight: 900;
   color: #ffcc00;
   letter-spacing: 2px;
@@ -85,7 +85,7 @@ body {
 }
 
 .slot-badge {
-  font-size: 11px; /* Scaled up */
+  font-size: 11px;
   font-weight: bold;
   color: #ffcc00;
   background-color: #000;
@@ -140,14 +140,14 @@ body {
 }
 
 .rider-label {
-  font-size: 13px; /* Scaled up */
+  font-size: 13px;
   color: #ffcc00;
   text-align: center;
   font-weight: bold;
 }
 
 .type-label {
-  font-size: 15px; /* Scaled up */
+  font-size: 15px;
   font-weight: bold;
   color: #00ffcc;
   letter-spacing: 1px;
@@ -184,7 +184,7 @@ body {
 }
 
 .splash-banner {
-  font-size: 42px; /* Scaled up */
+  font-size: 42px;
   font-weight: 900;
   color: #ffcc00;
   text-shadow: 0 0 20px #ff3300, 3px 3px 0 #000;
@@ -193,7 +193,7 @@ body {
 }
 
 .splash-vs-names {
-  font-size: 20px; /* Scaled up */
+  font-size: 20px;
   font-weight: bold;
   color: #00ffcc;
   letter-spacing: 2px;
@@ -294,17 +294,7 @@ body {
   margin-top: 2px;
 }
 
-#item-display {
-  font-size: 10px;
-  padding: 3px 5px;
-  background-color: #2a2a3d;
-  border: 1px solid #7777aa;
-  border-radius: 4px;
-  margin-top: 4px;
-  color: #00ffcc;
-}
-
-/* Stage Viewport */
+/* Stage Viewport (Split Left & Right Character Boxes) */
 #stage-viewport {
   flex: 1;
   position: relative;
@@ -333,16 +323,43 @@ body {
   z-index: 2;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
+  padding: 10px 20px;
 }
 
-.character-video {
-  width: 48%;
+/* Left & Right Character Viewport Boxes */
+.character-box {
+  width: 47%;
+  height: 92%;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  border: 2px solid rgba(85, 85, 119, 0.5);
+  background: rgba(10, 10, 20, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8);
+  transition: all 0.2s ease;
+}
+
+.character-box.left-box {
+  border-left: 4px solid #00ffcc;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8), -3px 0 12px rgba(0, 255, 204, 0.2);
+}
+
+.character-box.right-box {
+  border-right: 4px solid #ff3366;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8), 3px 0 12px rgba(255, 51, 102, 0.2);
+}
+
+.character-video, .character-sprite {
+  width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.character-video.mirrored {
+.character-video.mirrored, .character-sprite.mirrored {
   transform: scaleX(-1);
 }
 
@@ -353,7 +370,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  z-index: 3;
+  z-index: 4;
 }
 
 .stun-banner {
@@ -454,7 +471,7 @@ body {
   transition: all 0.05s ease;
 }
 
-/* Key Press Lighting FX */
+/* Key Press & CPU Simulation Lighting FX */
 .pad-btn.active {
   background: #ffcc00;
   color: #000;
