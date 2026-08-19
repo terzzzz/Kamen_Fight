@@ -86,7 +86,8 @@
       <div id="center-slot">
         <div id="turn-display">ROUND 1</div>
         <div id="turn-timer" class="timer-display">TIME: 5s</div>
-        <div id="item-display" class="empty-item">NO ITEM</div>
+        <!-- Item function visually hidden for now -->
+        <div id="item-display" class="empty-item" style="display: none !important;">NO ITEM</div>
       </div>
 
       <div id="p2-stats" class="player-hud">
@@ -103,14 +104,25 @@
       </div>
     </header>
 
-    <!-- Stage Viewport -->
+    <!-- Stage Viewport (Left & Right Boxes Layout) -->
     <main id="stage-viewport">
       <div id="stage-background"></div>
 
       <div class="video-container">
-        <video id="p1-video" class="character-video" autoplay loop muted playsinline></video>
+        <!-- Left Player Box (P1 Viewport) -->
+        <div id="p1-box" class="character-box left-box">
+          <video id="p1-video" class="character-video" autoplay loop muted playsinline></video>
+          <img id="p1-sprite" class="character-sprite" hidden alt="P1 Pose">
+        </div>
+
+        <!-- Effect Overlay -->
         <video id="clash-video" class="effect-video" playsinline hidden></video>
-        <video id="p2-video" class="character-video mirrored" autoplay loop muted playsinline></video>
+
+        <!-- Right Player Box (P2 Viewport) -->
+        <div id="p2-box" class="character-box right-box">
+          <video id="p2-video" class="character-video mirrored" autoplay loop muted playsinline></video>
+          <img id="p2-sprite" class="character-sprite mirrored" hidden alt="P2 Pose">
+        </div>
       </div>
 
       <div id="p1-stun-overlay" class="stun-banner" hidden>FAINTED!</div>
