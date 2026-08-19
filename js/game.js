@@ -33,8 +33,12 @@ let gameState = {
 };
 
 async function startBattle(config) {
-  const response = await fetch('data/moves.json');
-  gameState.movesData = await response.json();
+  try {
+    const response = await fetch('data/moves.json');
+    gameState.movesData = await response.json();
+  } catch (err) {
+    console.warn("Could not load moves.json, using fallback data.");
+  }
 
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
@@ -44,7 +48,7 @@ async function startBattle(config) {
   bindCommandButtons();
   updateHUD();
 
-  // Phase 1: Show Transition Splash before starting Round 1 countdown
+  // Phase 1: Show Transition Splash with dynamic Rider names
   triggerMatchTransition();
 }
 
@@ -52,7 +56,7 @@ function createPlayerState(riderConfig, isCPU) {
   return {
     ...riderConfig,
     isCPU: isCPU,
-    lp: riderConfig.maxLp,
+    lp: riderConfig.maxLp || 1000,
     chi: 10,
     consecutiveHitsLanded: 0,
     isFainted: false,
@@ -76,9 +80,8 @@ function triggerMatchTransition() {
     setTimeout(() => {
       splashScreen.hidden = true;
       startRoundCountdown();
-    }, 2200); // Hold transition overlay for 2.2 seconds
+    }, 2200); // 2.2-second transition hold before Round 1 starts
   } else {
-    // Safety fallback if splash element is missing in index.html
     startRoundCountdown();
   }
 }
@@ -111,7 +114,6 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      // Auto fallback to "DO NOTHING" on timeout
       if (!gameState.input.isConfirmed && !gameState.p1.isCPU) {
         confirmPlayerAction('DO_NOTHING');
       }
@@ -124,14 +126,11 @@ function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toUpperCase();
 
-    // Light up controller buttons
     const keyEl = document.getElementById(`key-${key}`);
     if (keyEl) keyEl.classList.add('active');
 
-    // Restrict inputs to active INPUT phase
     if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
-    // 1. Directional Hold Engine (A, D, W, S)
     if (['A', 'D', 'W', 'S'].includes(key)) {
       if (gameState.input.heldDirection !== key) {
         resetCharge();
@@ -141,7 +140,6 @@ function bindKeyboardInputs() {
       }
     }
 
-    // 2. Action Triggering (J, K, L, I)
     if (['J', 'K', 'L', 'I'].includes(key)) {
       if (!gameState.input.heldDirection || gameState.input.currentPercent <= 0) return;
 
@@ -225,28 +223,22 @@ function executeTurnResolutionPhase() {
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
-  // Display Selected Actions Banner
   const battleMsg = document.getElementById('battle-message');
   battleMsg.hidden = false;
   battleMsg.innerHTML = `P1: ${p1Move.name}<br>VS<br>P2: ${p2Move.name}`;
 
-  // Deduct CHI Costs
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  // Charge CHI Actions
   if (p1MoveKey === 'S+J') gameState.p1.chi = Math.min(20, gameState.p1.chi + (gameState.p1.chiRegen || 5));
   if (p2MoveKey === 'S+J') gameState.p2.chi = Math.min(20, gameState.p2.chi + (gameState.p2.chiRegen || 5));
 
-  // Form Transformations
   if (p1MoveKey === 'W+J' && gameState.p1.forms) cycleRiderForm(gameState.p1);
   if (p2MoveKey === 'W+J' && gameState.p2.forms) cycleRiderForm(gameState.p2);
 
-  // Airborne Stance Tracking
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // Determine Initiative
   let p1IsDefensive = p1Move.type === 'DEFENSE';
   let p2IsDefensive = p2Move.type === 'DEFENSE';
   let p1GoesFirst = false;
@@ -256,7 +248,7 @@ function executeTurnResolutionPhase() {
   } else if (!p1IsDefensive && p2IsDefensive) {
     p1GoesFirst = true;
   } else {
-    p1GoesFirst = p1Time >= p2Time; // P1 tie-breaker
+    p1GoesFirst = p1Time >= p2Time;
   }
 
   let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
@@ -267,7 +259,6 @@ function executeTurnResolutionPhase() {
   let defender2 = p1GoesFirst ? gameState.p1 : gameState.p2;
   let move2 = p1GoesFirst ? p2Move : p1Move;
 
-  // Execute Combat Math
   let hit1Landed = resolveAttack(attacker1, defender1, move1, move2);
   let hit2Landed = false;
   if (!hit1Landed || move1.type !== 'MELEE') {
@@ -284,13 +275,12 @@ function executeTurnResolutionPhase() {
 
   updateHUD();
 
-  // Phase 3: Hold Action Display for 2.5s, then advance to Next Round
   setTimeout(() => {
     battleMsg.hidden = true;
 
     if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
       gameState.roundCounter++;
-      startRoundCountdown(); // Loop back to 5s input phase for next round
+      startRoundCountdown();
     } else {
       let winnerName = gameState.p1.lp > 0 ? gameState.p1.name : gameState.p2.name;
       battleMsg.hidden = false;
@@ -373,6 +363,8 @@ function triggerFaint(targetPlayer, slotKey) {
 }
 
 function updateHUD() {
+  document.getElementById('p1-name').textContent = gameState.p1.name;
+  document.getElementById('p2-name').textContent = gameState.p2.name;
   document.getElementById('p1-lp').textContent = gameState.p1.lp;
   document.getElementById('p1-chi').textContent = gameState.p1.chi;
   document.getElementById('p2-lp').textContent = gameState.p2.lp;
