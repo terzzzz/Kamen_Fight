@@ -15,7 +15,7 @@ const DO_NOTHING_MOVE = {
 
 let gameState = {
   roundCounter: 1,
-  roundPhase: 'IDLE', // 'TRANSITION', 'INPUT', 'RESOLUTION'
+  roundPhase: 'IDLE',
   turnTimerSeconds: 5,
   timerInterval: null,
   movesData: {},
@@ -64,8 +64,7 @@ function createPlayerState(riderConfig, isCPU) {
     consecutiveHitsLanded: 0,
     isFainted: false,
     airborneTicks: 0,
-    sSkillBuffTurns: 0,
-    chargeSpeedTurns: 0,
+    activeChargePercent: 100, // Captured charge ratio for active turn
     activeBuffs: []
   };
 }
@@ -145,11 +144,10 @@ function bindKeyboardInputs() {
     }
 
     if (['J', 'K', 'L', 'I'].includes(key)) {
-      if (!gameState.input.heldDirection || gameState.input.currentPercent <= 0) return;
+      if (!gameState.input.heldDirection) return;
 
-      if (gameState.input.currentPercent >= 100) {
-        confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
-      }
+      // Lock action with current accumulated charge percent
+      confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
     }
   });
 
@@ -170,6 +168,7 @@ function updateChargeProgress() {
 
   let duration = CHARGE_TIMES[gameState.input.heldDirection];
   
+  // Apply W+J speed buff if active
   if (gameState.p1.activeBuffs.some(b => b.id === 'charge_speed')) {
     duration = duration * 0.75;
   }
@@ -177,9 +176,17 @@ function updateChargeProgress() {
   const elapsed = Date.now() - gameState.input.chargeStartTime;
   gameState.input.currentPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
 
+  // Update HUD Bar
   const fillEl = document.getElementById('p1-charge-fill');
   fillEl.style.width = `${gameState.input.currentPercent}%`;
   fillEl.textContent = `${gameState.input.currentPercent}%`;
+
+  // Update Controller Status Center Display
+  const statusEl = document.getElementById('charge-status-display');
+  if (statusEl) {
+    statusEl.textContent = `CHARGING [${gameState.input.heldDirection}]: ${gameState.input.currentPercent}%`;
+    statusEl.style.color = gameState.input.currentPercent >= 100 ? '#00ffcc' : '#ffcc00';
+  }
 }
 
 function resetCharge() {
@@ -188,19 +195,28 @@ function resetCharge() {
   gameState.input.currentPercent = 0;
 
   const fillEl = document.getElementById('p1-charge-fill');
-  fillEl.style.width = '0%';
-  fillEl.textContent = '0%';
+  if (fillEl) {
+    fillEl.style.width = '0%';
+    fillEl.textContent = '0%';
+  }
+
+  const statusEl = document.getElementById('charge-status-display');
+  if (statusEl) {
+    statusEl.textContent = 'HOLD DIRECTION TO CHARGE';
+    statusEl.style.color = '#00ffcc';
+  }
 }
 
 function confirmPlayerAction(moveKey) {
   gameState.input.isConfirmed = true;
   gameState.input.selectedMoveKey = moveKey;
   gameState.input.lockInTime = gameState.turnTimerSeconds;
+  gameState.p1.activeChargePercent = Math.max(10, gameState.input.currentPercent); // Min 10% base
   clearInterval(gameState.input.chargeInterval);
 
   const flagEl = document.getElementById('p1-action-flag');
   flagEl.hidden = false;
-  flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : 'ACTION!';
+  flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p1.activeChargePercent}%!`;
 }
 
 function bindCommandButtons() {
@@ -273,6 +289,11 @@ function executeTurnResolutionPhase() {
     ? selectCPUMove(gameState.p2, gameState.p1, gameState.movesData) 
     : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
 
+  // Assign CPU charge percent (simulating realistic AI charge holding: 75% to 100%)
+  if (gameState.p2.isCPU) {
+    gameState.p2.activeChargePercent = p2MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+  }
+
   if (gameState.p1.isCPU) simulateCPUButtonPress(p1MoveKey);
   if (gameState.p2.isCPU) simulateCPUButtonPress(p2MoveKey);
 
@@ -281,13 +302,13 @@ function executeTurnResolutionPhase() {
 
   const battleMsg = document.getElementById('battle-message');
   battleMsg.hidden = false;
-  battleMsg.innerHTML = `P1: ${p1Move.name}<br>VS<br>P2: ${p2Move.name}`;
+  battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}% ACC)<br>VS<br>P2: ${p2Move.name} (${gameState.p2.activeChargePercent}% ACC)`;
 
-  // Deduct CHI
+  // Deduct CHI Costs
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  // Apply Utility Buffs
+  // Apply Utility Buffs (W-Skill Tree is unscaled)
   if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
   if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
 
@@ -320,25 +341,16 @@ function executeTurnResolutionPhase() {
   let hit1Landed = resolveAttack(attacker1, defender1, move1, move2);
   let hit2Landed = false;
 
-  // If Attack 1 missed, Attack 2 executes uninterrupted
   if (!hit1Landed || move1.type !== 'MELEE') {
     hit2Landed = resolveAttack(attacker2, defender2, move2, move1);
   }
 
-  // Award +3 CHI on landed D-attacks
+  // Restore +3 CHI on landed D-attacks
   if (hit1Landed && move1.key && move1.key.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
   if (hit2Landed && move2.key && move2.key.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
 
   updateFaintTracker(attacker1, defender1, hit1Landed, p1GoesFirst ? 'p2' : 'p1');
   updateFaintTracker(attacker2, defender2, hit2Landed, p1GoesFirst ? 'p1' : 'p2');
-
-  // ==========================================
-  // TO BE USED IN FUTURE: CENTER ITEM LIFECYCLE
-  // ==========================================
-  // if (typeof checkItemSpawn === 'function') checkItemSpawn(gameState.roundCounter);
-  // if (typeof resolveItemPickup === 'function') {
-  //   resolveItemPickup(p1GoesFirst ? hit1Landed : hit2Landed, p1GoesFirst ? hit2Landed : hit1Landed, gameState.p1, gameState.p2);
-  // }
 
   updateHUD();
 
@@ -357,6 +369,50 @@ function executeTurnResolutionPhase() {
       battleMsg.textContent = `KO! ${winnerName} WINS!`;
     }
   }, 2500);
+}
+
+function resolveAttack(attacker, defender, atkMove, defMove) {
+  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER') return false;
+
+  // 1. Calculate Charge Scaler Ratios (0.10 to 1.00)
+  const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
+  const defChargeRatio = (defender.activeChargePercent || 100) / 100;
+
+  // 2. Scale Attack Hit Rate / Accuracy ONLY by Charge Ratio
+  let effectiveHitChance = (atkMove.hitChance || 80) * atkChargeRatio;
+  let rolledHit = Math.random() * 100 < effectiveHitChance;
+  if (!rolledHit) return false;
+
+  let damageRatio = 1.0;
+
+  // 3. Scale Defensive Guard / Evasion Rates ONLY by Charge Ratio
+  if (defMove.type === 'DEFENSE') {
+    const atkButton = atkMove.key ? atkMove.key.split('+')[1] : null;
+
+    if (defMove.key === 'A+I') {
+      // Total Counter Guard (2 CHI): Base 70% scaled by charge ratio
+      let effectiveCounterChance = 70 * defChargeRatio;
+      if (atkMove.unblockable) {
+        damageRatio = 1.0;
+      } else if (Math.random() * 100 < effectiveCounterChance) {
+        damageRatio = 0.0; // Complete block / evasion
+      }
+    } else if (defMove.key === `A+${atkButton}`) {
+      // Standard Guard: High-block chance (20%) scaled by charge ratio
+      let effectiveHighBlockChance = 20 * defChargeRatio;
+      let rolledHighBlock = Math.random() * 100 < effectiveHighBlockChance;
+      damageRatio = rolledHighBlock ? 0.20 : 0.70;
+    }
+  }
+
+  // 4. Calculate Final Damage Output (Base Damage is 100% intact!)
+  let sSkillMultiplier = (atkMove.key && atkMove.key.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
+
+  let baseDamage = atkMove.baseDamage || 0;
+  let finalDmg = Math.floor(baseDamage * sSkillMultiplier * damageRatio);
+
+  defender.lp = Math.max(0, defender.lp - finalDmg);
+  return finalDmg > 0;
 }
 
 function updateCharacterMedia(playerKey, stateType, videoUrl = null) {
@@ -395,40 +451,6 @@ function handleAirborneState(player, moveKey) {
       player.airborneTicks--;
     }
   }
-}
-
-function resolveAttack(attacker, defender, atkMove, defMove) {
-  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER') return false;
-
-  let rolledHit = Math.random() * 100 < atkMove.hitChance;
-  if (!rolledHit) return false;
-
-  let damageRatio = 1.0;
-
-  // Custom Guard System Math
-  if (defMove.type === 'DEFENSE') {
-    const atkButton = atkMove.key ? atkMove.key.split('+')[1] : null;
-
-    if (defMove.key === 'A+I') {
-      // Total Counter Guard (2 CHI): 70% chance to completely block S or D moves unless unblockable
-      if (atkMove.unblockable) {
-        damageRatio = 1.0;
-      } else if (Math.random() * 100 < 70) {
-        damageRatio = 0.0;
-      }
-    } else if (defMove.key === `A+${atkButton}`) {
-      // Standard Matching Guard (A+J vs J, A+K vs K, A+L vs L): 20% chance block 80%, 80% chance block 30%
-      let rolledHighBlock = Math.random() * 100 < 20;
-      damageRatio = rolledHighBlock ? 0.20 : 0.70;
-    }
-  }
-
-  // Calculate damage with active W+K (+20% S-skill boost)
-  let sSkillMultiplier = (atkMove.key && atkMove.key.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
-  
-  let finalDmg = Math.floor((atkMove.baseDamage || 0) * sSkillMultiplier * damageRatio);
-  defender.lp = Math.max(0, defender.lp - finalDmg);
-  return finalDmg > 0;
 }
 
 function updateFaintTracker(attacker, defender, hitLanded, defenderSlot) {
