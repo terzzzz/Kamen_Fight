@@ -14,7 +14,8 @@ const DO_NOTHING_MOVE = {
 };
 
 let gameState = {
-  turnCounter: 1,
+  roundCounter: 1,
+  roundPhase: 'IDLE', // 'TRANSITION', 'INPUT', 'RESOLUTION'
   turnTimerSeconds: 5,
   timerInterval: null,
   movesData: {},
@@ -37,11 +38,14 @@ async function startBattle(config) {
 
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
+  gameState.roundCounter = 1;
 
   bindKeyboardInputs();
   bindCommandButtons();
-  startTurnCountdown();
   updateHUD();
+
+  // Phase 1: Show Transition Splash before starting Round 1 countdown
+  triggerMatchTransition();
 }
 
 function createPlayerState(riderConfig, isCPU) {
@@ -58,23 +62,60 @@ function createPlayerState(riderConfig, isCPU) {
   };
 }
 
-function startTurnCountdown() {
+function triggerMatchTransition() {
+  gameState.roundPhase = 'TRANSITION';
+  const splashScreen = document.getElementById('match-transition-screen');
+  const splashRound = document.getElementById('splash-round-text');
+  const splashNames = document.getElementById('splash-names-text');
+
+  if (splashScreen && splashRound && splashNames) {
+    splashRound.textContent = `ROUND ${gameState.roundCounter}`;
+    splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
+    splashScreen.hidden = false;
+
+    setTimeout(() => {
+      splashScreen.hidden = true;
+      startRoundCountdown();
+    }, 2200); // Hold transition overlay for 2.2 seconds
+  } else {
+    // Safety fallback if splash element is missing in index.html
+    startRoundCountdown();
+  }
+}
+
+function startRoundCountdown() {
+  gameState.roundPhase = 'INPUT';
+  resetTurnInputState();
+  updateHUD();
+
+  const battleMsg = document.getElementById('battle-message');
+  battleMsg.hidden = false;
+  battleMsg.textContent = `ROUND ${gameState.roundCounter}: READY!`;
+
+  setTimeout(() => {
+    if (gameState.roundPhase === 'INPUT') {
+      battleMsg.hidden = true;
+    }
+  }, 1200);
+
   clearInterval(gameState.timerInterval);
   gameState.turnTimerSeconds = 5;
   document.getElementById('turn-timer').textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
   gameState.timerInterval = setInterval(() => {
+    if (gameState.roundPhase !== 'INPUT') return;
+
     gameState.turnTimerSeconds--;
     document.getElementById('turn-timer').textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
-      
-      // Fallback to "DO NOTHING" if no action locked in
+
+      // Auto fallback to "DO NOTHING" on timeout
       if (!gameState.input.isConfirmed && !gameState.p1.isCPU) {
         confirmPlayerAction('DO_NOTHING');
       }
-      executeTurnCycle();
+      executeTurnResolutionPhase();
     }
   }, 1000);
 }
@@ -83,11 +124,12 @@ function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toUpperCase();
 
-    // Light up corresponding UI button element on key press
+    // Light up controller buttons
     const keyEl = document.getElementById(`key-${key}`);
     if (keyEl) keyEl.classList.add('active');
 
-    if (gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
+    // Restrict inputs to active INPUT phase
+    if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
     // 1. Directional Hold Engine (A, D, W, S)
     if (['A', 'D', 'W', 'S'].includes(key)) {
@@ -101,12 +143,8 @@ function bindKeyboardInputs() {
 
     // 2. Action Triggering (J, K, L, I)
     if (['J', 'K', 'L', 'I'].includes(key)) {
-      // Ignore key press completely if % charge is 0 or direction not held
-      if (!gameState.input.heldDirection || gameState.input.currentPercent <= 0) {
-        return;
-      }
+      if (!gameState.input.heldDirection || gameState.input.currentPercent <= 0) return;
 
-      // Execute lock-in if fully charged to 100%
       if (gameState.input.currentPercent >= 100) {
         confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
       }
@@ -116,18 +154,17 @@ function bindKeyboardInputs() {
   window.addEventListener('keyup', (e) => {
     const key = e.key.toUpperCase();
 
-    // Turn off lighting FX
     const keyEl = document.getElementById(`key-${key}`);
     if (keyEl) keyEl.classList.remove('active');
 
     if (key === gameState.input.heldDirection && !gameState.input.isConfirmed) {
-      resetCharge(); // Instant 0% reset on direction release
+      resetCharge();
     }
   });
 }
 
 function updateChargeProgress() {
-  if (!gameState.input.heldDirection) return;
+  if (!gameState.input.heldDirection || gameState.roundPhase !== 'INPUT') return;
 
   const duration = CHARGE_TIMES[gameState.input.heldDirection];
   const elapsed = Date.now() - gameState.input.chargeStartTime;
@@ -161,7 +198,6 @@ function confirmPlayerAction(moveKey) {
 }
 
 function bindCommandButtons() {
-  // Support on-screen clicks for controller elements if needed
   const buttons = document.querySelectorAll('.pad-btn');
   buttons.forEach(btn => {
     btn.onmousedown = () => {
@@ -175,7 +211,9 @@ function bindCommandButtons() {
   });
 }
 
-function executeTurnCycle() {
+function executeTurnResolutionPhase() {
+  gameState.roundPhase = 'RESOLUTION';
+
   let p1Time = gameState.input.lockInTime || 0;
   let p2Time = gameState.p2.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.p2LockInTime || 0);
 
@@ -187,11 +225,16 @@ function executeTurnCycle() {
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
+  // Display Selected Actions Banner
+  const battleMsg = document.getElementById('battle-message');
+  battleMsg.hidden = false;
+  battleMsg.innerHTML = `P1: ${p1Move.name}<br>VS<br>P2: ${p2Move.name}`;
+
   // Deduct CHI Costs
   gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
   gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
 
-  // Charge CHI Action
+  // Charge CHI Actions
   if (p1MoveKey === 'S+J') gameState.p1.chi = Math.min(20, gameState.p1.chi + (gameState.p1.chiRegen || 5));
   if (p2MoveKey === 'S+J') gameState.p2.chi = Math.min(20, gameState.p2.chi + (gameState.p2.chiRegen || 5));
 
@@ -199,30 +242,23 @@ function executeTurnCycle() {
   if (p1MoveKey === 'W+J' && gameState.p1.forms) cycleRiderForm(gameState.p1);
   if (p2MoveKey === 'W+J' && gameState.p2.forms) cycleRiderForm(gameState.p2);
 
-  // Handle Airborne Timers
+  // Airborne Stance Tracking
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // Initiative Logic with Defensive Priority & P1 Tie-Breaker
+  // Determine Initiative
   let p1IsDefensive = p1Move.type === 'DEFENSE';
   let p2IsDefensive = p2Move.type === 'DEFENSE';
   let p1GoesFirst = false;
 
   if (p1IsDefensive && !p2IsDefensive) {
-    p1GoesFirst = false; // Defensive skill executes AFTER opponent's attack
+    p1GoesFirst = false;
   } else if (!p1IsDefensive && p2IsDefensive) {
-    p1GoesFirst = true;  // Opponent is defending, P1 attacks first
+    p1GoesFirst = true;
   } else {
-    // Both attacking or both defending/doing nothing:
-    // Higher remaining timer goes first. On tie, default to Player 1
-    if (p1Time === p2Time) {
-      p1GoesFirst = true;
-    } else {
-      p1GoesFirst = p1Time > p2Time;
-    }
+    p1GoesFirst = p1Time >= p2Time; // P1 tie-breaker
   }
 
-  // Assign Attacker/Defender Roles
   let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
   let defender1 = p1GoesFirst ? gameState.p2 : gameState.p1;
   let move1 = p1GoesFirst ? p1Move : p2Move;
@@ -231,36 +267,39 @@ function executeTurnCycle() {
   let defender2 = p1GoesFirst ? gameState.p1 : gameState.p2;
   let move2 = p1GoesFirst ? p2Move : p1Move;
 
-  // Execute First Action
+  // Execute Combat Math
   let hit1Landed = resolveAttack(attacker1, defender1, move1, move2);
-
-  // Execute Second Action (Canceled if interrupted by faster clean melee hit)
   let hit2Landed = false;
   if (!hit1Landed || move1.type !== 'MELEE') {
     hit2Landed = resolveAttack(attacker2, defender2, move2, move1);
   }
 
-  // Faint Mechanics Processing
   updateFaintTracker(attacker1, defender1, hit1Landed, p1GoesFirst ? 'p2' : 'p1');
   updateFaintTracker(attacker2, defender2, hit2Landed, p1GoesFirst ? 'p1' : 'p2');
 
-  // Items Lifecycle
-  if (typeof checkItemSpawn === 'function') checkItemSpawn(gameState.turnCounter);
+  if (typeof checkItemSpawn === 'function') checkItemSpawn(gameState.roundCounter);
   if (typeof resolveItemPickup === 'function') {
     resolveItemPickup(p1GoesFirst ? hit1Landed : hit2Landed, p1GoesFirst ? hit2Landed : hit1Landed, gameState.p1, gameState.p2);
   }
 
-  // Cleanup Turn
-  gameState.turnCounter++;
-  resetTurnState();
   updateHUD();
 
-  if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
-    startTurnCountdown();
-  }
+  // Phase 3: Hold Action Display for 2.5s, then advance to Next Round
+  setTimeout(() => {
+    battleMsg.hidden = true;
+
+    if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
+      gameState.roundCounter++;
+      startRoundCountdown(); // Loop back to 5s input phase for next round
+    } else {
+      let winnerName = gameState.p1.lp > 0 ? gameState.p1.name : gameState.p2.name;
+      battleMsg.hidden = false;
+      battleMsg.textContent = `KO! ${winnerName} WINS!`;
+    }
+  }, 2500);
 }
 
-function resetTurnState() {
+function resetTurnInputState() {
   resetCharge();
   gameState.input.isConfirmed = false;
   gameState.input.selectedMoveKey = null;
@@ -282,6 +321,7 @@ function handleAirborneState(player, moveKey) {
 }
 
 function cycleRiderForm(player) {
+  if (!player.forms) return;
   const formKeys = Object.keys(player.forms);
   let nextIndex = (formKeys.indexOf(player.currentFormKey) + 1) % formKeys.length;
   player.currentFormKey = formKeys[nextIndex];
@@ -337,5 +377,5 @@ function updateHUD() {
   document.getElementById('p1-chi').textContent = gameState.p1.chi;
   document.getElementById('p2-lp').textContent = gameState.p2.lp;
   document.getElementById('p2-chi').textContent = gameState.p2.chi;
-  document.getElementById('turn-display').textContent = `TURN ${gameState.turnCounter}`;
+  document.getElementById('turn-display').textContent = `ROUND ${gameState.roundCounter}`;
 }
