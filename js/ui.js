@@ -1,20 +1,56 @@
+// Background Music Tracks for Character Selection Screen
+const MATCHUP_BGM_TRACKS = [
+  'assets/sounds/matchup1.mp3',
+  'assets/sounds/matchup2.mp3'
+];
+
+let activeMatchupBGM = null;
+
+function playRandomMatchupBGM() {
+  if (activeMatchupBGM) return;
+
+  const randomIndex = Math.floor(Math.random() * MATCHUP_BGM_TRACKS.length);
+  activeMatchupBGM = new Audio(MATCHUP_BGM_TRACKS[randomIndex]);
+  activeMatchupBGM.loop = true;
+  activeMatchupBGM.volume = 0.5;
+
+  activeMatchupBGM.play().catch(() => {
+    // Chrome/Safari require a user click before playing audio
+  });
+}
+
+function stopMatchupBGM() {
+  if (activeMatchupBGM) {
+    activeMatchupBGM.pause();
+    activeMatchupBGM.currentTime = 0;
+    activeMatchupBGM = null;
+  }
+}
+
+// Character Selection Screen State
 const AVAILABLE_RIDERS = [
   { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 },
   { id: 'black', name: 'Kamen Rider Black', icon: 'assets/images/icons/black.png', maxLp: 1050 },
   { id: 'stronger', name: 'Kamen Rider Stronger', icon: 'assets/images/icons/stronger.png', maxLp: 1100 },
-  { id: 'zx', name: 'Kamen Rider ZX', icon: 'assets/images/icons/zx.png', maxLp: 1080 }
+  { id: 'zx', name: 'Kamen Rider ZX', icon: 'assets/images/icons/zx.png', maxLp: 1080 },
+  { id: 'shadowmoon', name: 'Shadow Moon', icon: 'assets/images/icons/shadow.png', maxLp: 1120 }
 ];
 
 let vsSelectionState = {
-  step: 1, // 1: Choosing P1, 2: Choosing P2, 3: Ready to Fight
+  step: 1, // 1: Select P1, 2: Select P2, 3: Ready
   p1Index: 0,
   p1IsCPU: false,
-  p2Index: 3, // Defaults to ZX for P2
+  p2Index: 4,
   p2IsCPU: true
 };
 
 document.addEventListener('DOMContentLoaded', () => {
   updateSelectionUI();
+
+  // Play random music on the user's first click on the page
+  document.body.addEventListener('click', () => {
+    playRandomMatchupBGM();
+  }, { once: true });
 });
 
 function cycleRider(playerKey, direction) {
@@ -42,7 +78,6 @@ function handleConfirmStep() {
   if (vsSelectionState.step === 1) {
     vsSelectionState.step = 2;
   } else if (vsSelectionState.step === 2) {
-    // Validate that at least one player is CPU (Local 2P restraint)
     if (!vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU) {
       if (errorBanner) errorBanner.hidden = false;
       return;
@@ -66,17 +101,14 @@ function updateSelectionUI() {
   const p1 = AVAILABLE_RIDERS[vsSelectionState.p1Index];
   const p2 = AVAILABLE_RIDERS[vsSelectionState.p2Index];
 
-  // Update P1 Card Display
   document.getElementById('p1-img').src = p1.icon;
   document.getElementById('p1-name-display').textContent = p1.name;
   document.getElementById('p1-type-display').textContent = vsSelectionState.p1IsCPU ? 'CPU' : 'HUMAN';
 
-  // Update P2 Card Display
   document.getElementById('p2-img').src = p2.icon;
   document.getElementById('p2-name-display').textContent = p2.name;
   document.getElementById('p2-type-display').textContent = vsSelectionState.p2IsCPU ? 'CPU' : 'HUMAN';
 
-  // Manage Step Controls & Cards Focus
   const p1Card = document.getElementById('p1-card');
   const p2Card = document.getElementById('p2-card');
   const headerText = document.getElementById('vs-header-text');
@@ -144,6 +176,9 @@ function updateSelectionUI() {
 }
 
 function validateAndStartMatch() {
+  // Stop selection music when entering combat
+  stopMatchupBGM();
+
   document.getElementById('vs-select-screen').hidden = true;
 
   const matchConfig = {
