@@ -465,6 +465,7 @@ function hideCenterScreen() {
 }
 
 // MAIN SEQUENTIAL RESOLUTION PHASE
+// MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -503,22 +504,35 @@ async function executeTurnResolutionPhase() {
 
   setSideBoxesBlank(true);
 
-  if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
-  if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
+  // TYPHOON CHARGE (W+J): Boosts all D and S skills damage by 25% for 2 rounds
+  if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'typhoon', 'D&S ATK +25%', 'attack', 2);
+  if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'typhoon', 'D&S ATK +25%', 'attack', 2);
+  
   if (p1MoveKey === 'W+K') applyBuff(gameState.p1, 'focus', 'S-ATK +20%', 'attack', 2);
   if (p2MoveKey === 'W+K') applyBuff(gameState.p2, 'focus', 'S-ATK +20%', 'attack', 2);
 
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // TURN PRIORITY CALCULATION (ACTION OVER IDLE PRIORITY)
+  // TURN PRIORITY CALCULATION
   let p1IsIdle = p1MoveKey === 'DO_NOTHING';
   let p2IsIdle = p2MoveKey === 'DO_NOTHING';
   let p1GoesFirst = false;
 
+  let p1IsS = p1MoveKey.startsWith('S');
+  let p2IsS = p2MoveKey.startsWith('S');
+  let p1IsD = p1MoveKey.startsWith('D');
+  let p2IsD = p2MoveKey.startsWith('D');
+
   if (!p1IsIdle && p2IsIdle) {
     p1GoesFirst = true;
   } else if (p1IsIdle && !p2IsIdle) {
+    p1GoesFirst = false;
+  } 
+  // S-SKILL PRIORITY OVER D-SKILLS
+  else if (p1IsS && p2IsD) {
+    p1GoesFirst = true;
+  } else if (p1IsD && p2IsS) {
     p1GoesFirst = false;
   } else {
     let p1IsDefensive = p1Move.type === 'DEFENSE';
@@ -562,29 +576,25 @@ async function executeTurnResolutionPhase() {
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
   updateHUD();
 
-  // --- STEP 2 EXECUTION ---
+  // STEP 2 EXECUTION
   if (defender2.lp > 0) {
     if (hit1Landed && !isGlancing1 && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
-      // Clean hit from Step 1 interrupts defender
-      const hitVid = key1.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
+      // S-skills trigger hit.mp4 | D-skills trigger hit_physical.mp4
+      const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
       await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
     } else {
-      // Counter-attack proceeds if Step 1 missed OR was only a 10% scratch
       attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
       updateHUD();
 
-      // 1. Play Attacker 2's move video
       await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
-      
-      // 2. Resolve damage & hit probability
       let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
       if (attack2Result.hitLanded && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
       updateHUD();
 
-      // 3. PLAY DEFENDER 2 HIT REACTION VIDEO IF STEP 2 LANDED A CLEAN HIT!
       if (attack2Result.hitLanded && !attack2Result.isGlancing && (move2.type === 'MELEE' || move2.type === 'PROJECTILE' || move2.type === 'SPECIAL' || move2.type === 'PHYSICAL')) {
-        const hitVid = key2.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
+        // S-skills trigger hit.mp4 | D-skills trigger hit_physical.mp4
+        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
       }
     }
@@ -603,16 +613,13 @@ async function executeTurnResolutionPhase() {
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
       if (player) {
-        // Reset faint state after a fainted round ends
         if (player.isFainted) {
           player.isFainted = false;
           player.faintMeter = 0;
         } else if (!player.tookCleanHitThisRound) {
-          // Reduce 20 points if no clean hit was taken this round
           player.faintMeter = Math.max(0, player.faintMeter - 20);
         }
-
-        player.tookCleanHitThisRound = false; // Reset round flag
+        player.tookCleanHitThisRound = false;
       }
     });
 
