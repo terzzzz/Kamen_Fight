@@ -1,11 +1,12 @@
-const CHARGE_TIMES = {
+// SAFE GLOBAL DECLARATIONS (Prevents ES6 redeclaration SyntaxError)
+var CHARGE_TIMES = CHARGE_TIMES || {
   'A': 800,   // Defense
   'D': 1300,  // Offense
   'W': 2000,  // Air/Buffs
   'S': 2600   // Energy/Specials
 };
 
-const DO_NOTHING_MOVE = {
+var DO_NOTHING_MOVE = DO_NOTHING_MOVE || {
   name: "Do Nothing",
   type: "IDLE",
   chiCost: 0,
@@ -13,6 +14,8 @@ const DO_NOTHING_MOVE = {
   hitChance: 100,
   video: "idle.mp4"
 };
+
+ 
 
 let gameState = {
   roundCounter: 1,
