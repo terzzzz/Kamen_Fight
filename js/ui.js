@@ -38,13 +38,9 @@ function stopBattleBGM() {
   }
 }
 
-// Roster Configuration (P1 and P2 default to Ichigo at Index 0)
+// Roster Configuration (Locked exclusively to Ichigo)
 const AVAILABLE_RIDERS = [
-  { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 },
-  { id: 'black', name: 'Kamen Rider Black', icon: 'assets/images/icons/black.png', maxLp: 1050 },
-  { id: 'stronger', name: 'Kamen Rider Stronger', icon: 'assets/images/icons/stronger.png', maxLp: 1100 },
-  { id: 'zx', name: 'Kamen Rider ZX', icon: 'assets/images/icons/zx.png', maxLp: 1080 },
-  { id: 'shadowmoon', name: 'Shadow Moon', icon: 'assets/images/icons/shadow.png', maxLp: 1120 }
+  { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 }
 ];
 
 let vsSelectionState = {
@@ -124,7 +120,7 @@ function updateSelectionUI() {
   const p2ImgEl = document.getElementById('p2-img');
   if (p2ImgEl) {
     p2ImgEl.src = p2.icon;
-    // Palette Swap P2 Portrait if Mirror Match
+    // Palette Swap P2 Portrait for Mirror Match
     p2ImgEl.classList.toggle('p2-mirror-palette', p1.id === p2.id);
   }
 
@@ -145,15 +141,17 @@ function updateSelectionUI() {
   const p2TypeLeft = document.getElementById('p2-type-left');
   const p2TypeRight = document.getElementById('p2-type-right');
 
+  // Cycle buttons disabled at all times since only 1 rider is available
+  if (p1LeftBtn) p1LeftBtn.disabled = true;
+  if (p1RightBtn) p1RightBtn.disabled = true;
+  if (p2LeftBtn) p2LeftBtn.disabled = true;
+  if (p2RightBtn) p2RightBtn.disabled = true;
+
   if (vsSelectionState.step === 1) {
-    headerText.textContent = 'STEP 1: SELECT PLAYER 1 RIDER';
+    headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
     p1Card.className = 'rider-card active-slot';
     p2Card.className = 'rider-card locked-slot';
 
-    p1LeftBtn.disabled = false;
-    p1RightBtn.disabled = false;
-    p2LeftBtn.disabled = true;
-    p2RightBtn.disabled = true;
     if (p2TypeLeft) p2TypeLeft.disabled = true;
     if (p2TypeRight) p2TypeRight.disabled = true;
 
@@ -163,14 +161,10 @@ function updateSelectionUI() {
     backBtn.disabled = true;
 
   } else if (vsSelectionState.step === 2) {
-    headerText.textContent = 'STEP 2: SELECT PLAYER 2 RIDER';
+    headerText.textContent = 'STEP 2: CONFIRM PLAYER 2 RIDER';
     p1Card.className = 'rider-card locked-slot';
     p2Card.className = 'rider-card active-slot';
 
-    p1LeftBtn.disabled = true;
-    p1RightBtn.disabled = true;
-    p2LeftBtn.disabled = false;
-    p2RightBtn.disabled = false;
     if (p2TypeLeft) p2TypeLeft.disabled = false;
     if (p2TypeRight) p2TypeRight.disabled = false;
 
@@ -184,10 +178,6 @@ function updateSelectionUI() {
     p1Card.className = 'rider-card active-slot';
     p2Card.className = 'rider-card active-slot';
 
-    p1LeftBtn.disabled = true;
-    p1RightBtn.disabled = true;
-    p2LeftBtn.disabled = true;
-    p2RightBtn.disabled = true;
     if (p2TypeLeft) p2TypeLeft.disabled = true;
     if (p2TypeRight) p2TypeRight.disabled = true;
 
