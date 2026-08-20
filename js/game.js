@@ -1,4 +1,4 @@
-// SAFE GLOBAL DECLARATIONS (Prevents ES6 redeclaration SyntaxError)
+// SAFE GLOBAL DECLARATIONS
 var CHARGE_TIMES = CHARGE_TIMES || {
   'A': 800,   // Defense
   'D': 1300,  // Offense
@@ -15,17 +15,16 @@ var DO_NOTHING_MOVE = DO_NOTHING_MOVE || {
   video: "idle.mp4"
 };
 
- 
-
 let gameState = {
   roundCounter: 1,
   roundPhase: 'IDLE',
   turnTimerSeconds: 5,
   timerInterval: null,
   movesData: {},
+  videoCache: {}, // Memory cache for preloaded MP4 blobs
   p1: null,
   p2: null,
-  p2AlwaysIdle: false, // Test/Dummy Mode Toggle Flag (Key '0')
+  p2AlwaysIdle: false, // Dummy Mode Toggle (Key '0')
   input: {
     heldDirection: null,
     chargeStartTime: 0,
@@ -37,12 +36,38 @@ let gameState = {
   }
 };
 
+// PRELOAD MP4 CLIPS INTO MEMORY BLOBS
+async function preloadRiderVideos(riderId) {
+  const videoFiles = [
+    'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
+    'hit.mp4', 'hit_physical.mp4', 'punch.mp4', 'kick.mp4', 'combo_punch.mp4',
+    'combo_kick.mp4', 'power_chop.mp4', 'head_crusher.mp4', 'rider_kick.mp4',
+    'kirimomi_kick.mp4', 'windmill_guard.mp4', 'guard.mp4', 'jump.mp4', 'charge_up.mp4'
+  ];
+
+  const promises = videoFiles.map(async (file) => {
+    const rawUrl = `assets/videos/${riderId}/${file}`;
+    if (gameState.videoCache[rawUrl]) return;
+
+    try {
+      const res = await fetch(rawUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+      }
+    } catch (e) {
+      gameState.videoCache[rawUrl] = rawUrl;
+    }
+  });
+
+  await Promise.all(promises);
+}
+
 async function startBattle(config) {
   try {
     const response = await fetch('data/moves.json');
     const fullRoster = await response.json();
     
-    // Extract moves specifically for selected rider (defaults to ichigo)
     const riderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
     gameState.movesData = fullRoster[riderId] || fullRoster['ichigo'];
   } catch (err) {
@@ -57,14 +82,37 @@ async function startBattle(config) {
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
+  // 1. UNHIDE TRANSITION SPLASH IMMEDIATELY DURING PRELOAD
+  const splashScreen = document.getElementById('match-transition-screen');
+  const splashRound = document.getElementById('splash-round-text');
+  const splashNames = document.getElementById('splash-names-text');
+
+  if (splashScreen) {
+    if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
+    if (splashNames) splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
+    splashScreen.hidden = false;
+  }
+
   bindKeyboardInputs();
   bindCommandButtons();
   updateHUD();
 
+  // 2. PRELOAD ASSETS WHILE SPLASH SCREEN IS ACTIVE
+  const p1RiderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
+  const p2RiderId = (config.p2Rider && config.p2Rider.id) || 'ichigo';
+  await preloadRiderVideos(p1RiderId);
+  if (p1RiderId !== p2RiderId) await preloadRiderVideos(p2RiderId);
+
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
-  triggerMatchTransition();
+  // 3. TRANSITION TO GET READY & START ROUND
+  if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
+
+  setTimeout(() => {
+    if (splashScreen) splashScreen.hidden = true;
+    startRoundCountdown();
+  }, 1800);
 }
 
 function createPlayerState(riderConfig, isCPU) {
@@ -82,26 +130,6 @@ function createPlayerState(riderConfig, isCPU) {
     activeChargePercent: 100,
     activeBuffs: []
   };
-}
-
-function triggerMatchTransition() {
-  gameState.roundPhase = 'TRANSITION';
-  const splashScreen = document.getElementById('match-transition-screen');
-  const splashRound = document.getElementById('splash-round-text');
-  const splashNames = document.getElementById('splash-names-text');
-
-  if (splashScreen) {
-    if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
-    if (splashNames) splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
-    splashScreen.hidden = false;
-
-    setTimeout(() => {
-      splashScreen.hidden = true;
-      startRoundCountdown();
-    }, 2200);
-  } else {
-    startRoundCountdown();
-  }
 }
 
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
@@ -148,7 +176,7 @@ function startRoundCountdown() {
     if (player.willBeFaintedNextRound) {
       player.isFainted = true;
       player.willBeFaintedNextRound = false;
-      player.faintMeter = 0; // Reset faint level to 0 upon entering faint state
+      player.faintMeter = 0;
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -225,7 +253,6 @@ function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toUpperCase();
 
-    // Toggle P2 Dummy Mode with Key '0'
     if (e.key === '0') {
       gameState.p2AlwaysIdle = !gameState.p2AlwaysIdle;
       const statusEl = document.getElementById('p2-status');
@@ -392,7 +419,6 @@ function renderBuffTrays() {
 
     tray.innerHTML = '';
 
-    // Render Airborne Badge
     if (player.airborneTicks > 0) {
       const airTag = document.createElement('div');
       airTag.className = 'buff-tag airborne';
@@ -400,7 +426,6 @@ function renderBuffTrays() {
       tray.appendChild(airTag);
     }
 
-    // Render Active Buffs
     player.activeBuffs.forEach(b => {
       const tag = document.createElement('div');
       tag.className = `buff-tag ${b.type}`;
@@ -427,8 +452,10 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const player = gameState[playerKey];
     if (!player) return resolve();
 
+    // UPDATED: ADD P1/P2 PREFIX TO ACTION LABELS
     if (actionLabel) {
-      actionLabel.textContent = actionName ? `${player.name} : ${actionName}!` : '';
+      const slotPrefix = playerKey.toUpperCase(); // 'P1' or 'P2'
+      actionLabel.textContent = actionName ? `[${slotPrefix}] ${player.name} : ${actionName}!` : '';
       actionLabel.hidden = !actionName;
     }
 
@@ -466,7 +493,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.addEventListener('ended', cleanUpAndResolve);
     centerVid.addEventListener('error', cleanUpAndResolve);
 
-    const videoUrl = `assets/videos/${player.id}/${videoFile}`;
+    const rawUrl = `assets/videos/${player.id}/${videoFile}`;
+    const videoUrl = gameState.videoCache[rawUrl] || rawUrl;
     centerVid.src = videoUrl;
     centerVid.load();
 
@@ -520,19 +548,15 @@ async function executeTurnResolutionPhase() {
 
   setSideBoxesBlank(true);
 
-  // APPLY MOVE BUFFS
-  // Typhoon Charge (W+J): Boosts all D and S skills damage by 25% for 3 rounds
   if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'typhoon', 'D&S ATK +25%', 'attack', 3);
   if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'typhoon', 'D&S ATK +25%', 'attack', 3);
   
-  // Typhoon Focus (W+K): Boosts Special Attack damage by 20% for 2 rounds
   if (p1MoveKey === 'W+K') applyBuff(gameState.p1, 'focus', 'S-ATK +20%', 'attack', 2);
   if (p2MoveKey === 'W+K') applyBuff(gameState.p2, 'focus', 'S-ATK +20%', 'attack', 2);
 
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // TURN PRIORITY CALCULATION
   let p1IsIdle = p1MoveKey === 'DO_NOTHING';
   let p2IsIdle = p2MoveKey === 'DO_NOTHING';
   let p1GoesFirst = false;
@@ -547,7 +571,6 @@ async function executeTurnResolutionPhase() {
   } else if (p1IsIdle && !p2IsIdle) {
     p1GoesFirst = false;
   } 
-  // S-SKILL PRIORITY OVER D-SKILLS
   else if (p1IsS && p2IsD) {
     p1GoesFirst = true;
   } else if (p1IsD && p2IsS) {
@@ -582,7 +605,6 @@ async function executeTurnResolutionPhase() {
   // STEP 1 EXECUTION
   let attack1Result = { hitLanded: false, isGlancing: false };
 
-  // Deduct Attacker 1 Chi Cost
   attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
   updateHUD();
 
@@ -596,7 +618,6 @@ async function executeTurnResolutionPhase() {
   let hit1Landed = attack1Result.hitLanded;
   let isGlancing1 = attack1Result.isGlancing;
 
-  // DYNAMIC CHI RECOVERY (+2 for DJ/DK, +3 for DL/DI)
   if (hit1Landed && key1.startsWith('D')) {
     const chiGain = (key1 === 'D+J' || key1 === 'D+K') ? 2 : 3;
     attacker1.chi = Math.min(16, attacker1.chi + chiGain);
@@ -606,18 +627,15 @@ async function executeTurnResolutionPhase() {
   // STEP 2 EXECUTION
   if (defender2.lp > 0) {
     if (hit1Landed && !isGlancing1 && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
-      // S-skills trigger hit.mp4 | D-skills trigger hit_physical.mp4
       const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
       await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
     } else {
-      // Counter-attack proceeds if Step 1 missed OR was only a scratch
       attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
       updateHUD();
 
       await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
       let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
-      // Dynamic Chi Recovery for Attacker 2
       if (attack2Result.hitLanded && key2.startsWith('D')) {
         const chiGain = (key2 === 'D+J' || key2 === 'D+K') ? 2 : 3;
         attacker2.chi = Math.min(16, attacker2.chi + chiGain);
@@ -625,7 +643,6 @@ async function executeTurnResolutionPhase() {
       updateHUD();
 
       if (attack2Result.hitLanded && !attack2Result.isGlancing && (move2.type === 'MELEE' || move2.type === 'PROJECTILE' || move2.type === 'SPECIAL' || move2.type === 'PHYSICAL')) {
-        // S-skills trigger hit.mp4 | D-skills trigger hit_physical.mp4
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
       }
@@ -720,7 +737,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
-  // BUFF MULTIPLIERS
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
   let typhoonMultiplier = (isDOrS && attacker.activeBuffs.some(b => b.id === 'typhoon')) ? 1.25 : 1.0;
   let sSkillMultiplier = (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
@@ -800,7 +816,8 @@ function updateCharacterMedia(playerKey, stateType) {
   videoEl.loop = isLoopingState;
 
   const riderId = player.id || 'ichigo';
-  const videoUrl = `assets/videos/${riderId}/${fileName}`;
+  const rawUrl = `assets/videos/${riderId}/${fileName}`;
+  const videoUrl = gameState.videoCache[rawUrl] || rawUrl;
 
   if (videoEl.dataset.currentFile !== videoUrl || videoEl.paused || videoEl.readyState === 0) {
     videoEl.dataset.currentFile = videoUrl;
@@ -859,7 +876,6 @@ function updateHUD() {
     if (p2Chi) p2Chi.textContent = gameState.p2.chi;
   }
 
-  // Render vertical faint meter fill height (0% to 100%)
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     const fillEl = document.getElementById(`${slot}-faint-fill`);
