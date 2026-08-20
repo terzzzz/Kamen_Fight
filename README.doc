@@ -33,4 +33,4 @@ Setup & Deployment InstructionsLocal Execution: Clone or download the repository
 About menu: Can choose CPU/Player, 1-player game only, no difficulty.
 Riders: Include all showga riders + shadow moon.
 19/8/26: Add game transaction screens after selected riders to the matchup screen. Added button indicators on what are pressed.
-20/8/26: Bug fixing, ensure the matchup works, add damage labels. Development mode.
+20/8/26: Bug fixing, ensure the matchup works, add damage labels. Development mode. Revise the faint system on how to count fainting condition. 
