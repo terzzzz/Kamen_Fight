@@ -3,7 +3,7 @@ const CHARGE_TIMES = {
   'D': 1300,  // Offense
   'W': 2000,  // Air/Buffs
   'S': 2600   // Energy/Specials
-};
+}; 
 
 const DO_NOTHING_MOVE = {
   name: "Do Nothing",
@@ -314,7 +314,6 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
     const centerVid = document.getElementById('center-video');
     if (!centerBox || !centerVid) return resolve();
 
-    // FIX 3: Safety check if player exists
     const player = gameState[playerKey];
     if (!player) return resolve();
 
@@ -324,33 +323,47 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
     centerVid.muted = true;
     centerVid.playsInline = true;
 
-    // Apply Palette Swap & Flip if Player 2 is performing on Center Screen
+    // Apply Palette Swap & Flip if Player 2 is performing
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
     centerVid.style.transform = playerKey === 'p2' ? 'scaleX(-1)' : 'scaleX(1)';
 
+    let resolved = false;
+    let fallbackTimer = null;
+
+    const cleanUpAndResolve = () => {
+      if (resolved) return;
+      resolved = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+
+      centerVid.removeEventListener('ended', cleanUpAndResolve);
+      centerVid.removeEventListener('error', cleanUpAndResolve);
+      centerVid.removeEventListener('timeupdate', checkNearEnd);
+      resolve();
+    };
+
+    const checkNearEnd = () => {
+      // Direct timestamp check: resolve as soon as video hits the last frame (within 0.1 seconds)
+      if (centerVid.duration > 0 && centerVid.currentTime >= centerVid.duration - 0.1) {
+        cleanUpAndResolve();
+      }
+    };
+
+    // 1. Attach listeners FIRST
+    centerVid.addEventListener('ended', cleanUpAndResolve);
+    centerVid.addEventListener('error', cleanUpAndResolve);
+    centerVid.addEventListener('timeupdate', checkNearEnd);
+
+    // 2. Set source and load file
     const videoUrl = `assets/videos/${player.id}/${videoFile}`;
     centerVid.src = videoUrl;
     centerVid.load();
 
-    let resolved = false;
-    const cleanUpAndResolve = () => {
-      if (resolved) return;
-      resolved = true;
-      centerVid.removeEventListener('ended', cleanUpAndResolve);
-      centerVid.removeEventListener('error', cleanUpAndResolve);
-      resolve();
-    };
-
-    centerVid.addEventListener('ended', cleanUpAndResolve);
-    centerVid.addEventListener('error', cleanUpAndResolve);
-
+    // 3. Play action
     centerVid.play().catch(() => cleanUpAndResolve());
 
-    if (maxDurationMs) {
-      setTimeout(() => cleanUpAndResolve(), maxDurationMs);
-    } else {
-      setTimeout(() => cleanUpAndResolve(), 5000); // 5s safety fallback
-    }
+    // 4. Fallback timeout safety
+    const timeoutDuration = maxDurationMs || 5000;
+    fallbackTimer = setTimeout(cleanUpAndResolve, timeoutDuration);
   });
 }
 
