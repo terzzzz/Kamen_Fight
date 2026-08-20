@@ -45,7 +45,6 @@ async function startBattle(config) {
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
   gameState.roundCounter = 1;
 
-  // Unhide battle screen container when battle starts
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
@@ -68,6 +67,7 @@ function createPlayerState(riderConfig, isCPU) {
     maxChi: 16,
     consecutiveHitsLanded: 0,
     isFainted: false,
+    willBeFaintedNextRound: false,
     airborneTicks: 0,
     activeChargePercent: 100,
     activeBuffs: []
@@ -97,13 +97,41 @@ function triggerMatchTransition() {
 function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
-  updateHUD();
 
+  // Apply scheduled faint status for current round
+  ['p1', 'p2'].forEach(slot => {
+    const player = gameState[slot];
+    if (!player) return;
+
+    if (player.willBeFaintedNextRound) {
+      player.isFainted = true;
+      player.willBeFaintedNextRound = false;
+    }
+
+    const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
+    const statusEl = document.getElementById(`${slot}-status`);
+
+    if (player.isFainted) {
+      if (stunOverlay) stunOverlay.hidden = false;
+      if (statusEl) statusEl.textContent = 'FAINTED';
+    } else {
+      if (stunOverlay) stunOverlay.hidden = true;
+      if (statusEl) statusEl.textContent = 'NORMAL';
+    }
+  });
+
+  updateHUD();
   setSideBoxesBlank(false);
   hideCenterScreen();
 
+  // Displays faint.mp4 for fainted riders during 5s countdown
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
+
+  // Auto-lock DO_NOTHING for fainted human P1
+  if (gameState.p1 && gameState.p1.isFainted && !gameState.p1.isCPU) {
+    confirmPlayerAction('DO_NOTHING');
+  }
 
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
@@ -141,6 +169,7 @@ function startRoundCountdown() {
 }
 
 function getCPUMoveChoice(cpuPlayer, opponentPlayer) {
+  if (cpuPlayer.isFainted) return 'DO_NOTHING';
   if (typeof selectCPUMove === 'function') {
     return selectCPUMove(cpuPlayer, opponentPlayer, gameState.movesData) || 'D+J';
   }
@@ -155,6 +184,7 @@ function bindKeyboardInputs() {
     const keyEl = document.getElementById(`key-${key}`);
     if (keyEl) keyEl.classList.add('active');
 
+    // Block key inputs if input phase is over, player is CPU, confirmed, or fainted
     if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
     if (['A', 'D', 'W', 'S'].includes(key)) {
@@ -185,7 +215,7 @@ function bindKeyboardInputs() {
 }
 
 function updateChargeProgress() {
-  if (!gameState.input.heldDirection || gameState.roundPhase !== 'INPUT') return;
+  if (!gameState.input.heldDirection || gameState.roundPhase !== 'INPUT' || gameState.p1.isFainted) return;
 
   let duration = CHARGE_TIMES[gameState.input.heldDirection];
   
@@ -300,7 +330,6 @@ function renderBuffTrays() {
   });
 }
 
-// Center Display & Mirror Palette Control Helpers
 function setSideBoxesBlank(isBlank) {
   const p1Box = document.getElementById('p1-box');
   const p2Box = document.getElementById('p2-box');
@@ -318,7 +347,6 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const player = gameState[playerKey];
     if (!player) return resolve();
 
-    // Display Rider Name and Action Label
     if (actionLabel) {
       actionLabel.textContent = actionName ? `${player.name} : ${actionName}!` : '';
       actionLabel.hidden = !actionName;
@@ -408,7 +436,6 @@ async function executeTurnResolutionPhase() {
     battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}%) VS P2: ${p2Move.name} (${gameState.p2.activeChargePercent}%)`;
   }
 
-  // Blank side boxes during action playback
   setSideBoxesBlank(true);
 
   if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
@@ -419,7 +446,6 @@ async function executeTurnResolutionPhase() {
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  // TURN PRIORITY CALCULATION
   let p1IsDefensive = p1Move.type === 'DEFENSE';
   let p2IsDefensive = p2Move.type === 'DEFENSE';
   let p1GoesFirst = false;
@@ -494,6 +520,15 @@ async function executeTurnResolutionPhase() {
 
     processRoundBuffs(gameState.p1);
     processRoundBuffs(gameState.p2);
+
+    // Clear faint status at end of round execution and reset hit counter
+    ['p1', 'p2'].forEach(slot => {
+      const player = gameState[slot];
+      if (player && player.isFainted) {
+        player.isFainted = false;
+        player.consecutiveHitsLanded = 0;
+      }
+    });
 
     if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
       gameState.roundCounter++;
@@ -636,33 +671,18 @@ function handleAirborneState(player, moveKey) {
 }
 
 function updateFaintTracker(attacker, defender, hitLanded, defenderSlot) {
+  // Do not count hits or trigger faint if defender is ALREADY fainted
+  if (defender.isFainted || defender.willBeFaintedNextRound) return;
+
   if (hitLanded) {
     attacker.consecutiveHitsLanded++;
-    if (attacker.consecutiveHitsLanded >= 3 && !defender.isFainted) {
-      triggerFaint(defender, defenderSlot);
+    if (attacker.consecutiveHitsLanded >= 4) {
+      defender.willBeFaintedNextRound = true;
       attacker.consecutiveHitsLanded = 0;
     }
   } else {
     attacker.consecutiveHitsLanded = 0;
   }
-}
-
-function triggerFaint(targetPlayer, slotKey) {
-  targetPlayer.isFainted = true;
-  const stunOverlay = document.getElementById(`${slotKey}-stun-overlay`);
-  const statusEl = document.getElementById(`${slotKey}-status`);
-
-  if (stunOverlay) stunOverlay.hidden = false;
-  if (statusEl) statusEl.textContent = 'FAINTED (5s)';
-
-  updateCharacterMedia(slotKey, 'faint.mp4');
-
-  setTimeout(() => {
-    targetPlayer.isFainted = false;
-    if (stunOverlay) stunOverlay.hidden = true;
-    if (statusEl) statusEl.textContent = 'NORMAL';
-    updateCharacterMedia(slotKey, 'IDLE');
-  }, 5000);
 }
 
 function updateHUD() {
