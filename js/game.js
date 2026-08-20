@@ -3,7 +3,7 @@ const CHARGE_TIMES = {
   'D': 1300,  // Offense
   'W': 2000,  // Air/Buffs
   'S': 2600   // Energy/Specials
-}; 
+};
 
 const DO_NOTHING_MOVE = {
   name: "Do Nothing",
@@ -45,7 +45,7 @@ async function startBattle(config) {
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
   gameState.roundCounter = 1;
 
-  // FIX 1: Unhide battle screen container when battle starts
+  // Unhide battle screen container when battle starts
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
@@ -446,7 +446,7 @@ async function executeTurnResolutionPhase() {
   let atkKey2 = p1GoesFirst ? 'p2' : 'p1';
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
- // --- STEP 1: FIRST PLAYER EXECUTION ---
+  // --- STEP 1: FIRST PLAYER EXECUTION ---
   attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
   updateHUD();
 
@@ -456,7 +456,7 @@ async function executeTurnResolutionPhase() {
     await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000);
   } else {
     await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name);
-    hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, defKey1);
+    hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
   }
 
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
@@ -476,7 +476,7 @@ async function executeTurnResolutionPhase() {
         updateHUD();
 
         await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
-        let hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
+        let hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
         if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
         updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
@@ -518,7 +518,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defenderKey) {
+function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return false;
 
   const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
@@ -568,7 +568,6 @@ function updateCharacterMedia(playerKey, stateType) {
   videoEl.muted = true;
   videoEl.playsInline = true;
 
-  // Mirror Match Color Palette & Horizontal Flip for P2
   if (playerKey === 'p2') {
     videoEl.classList.toggle('p2-mirror-palette', isMirrorMatch);
   }
