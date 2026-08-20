@@ -22,7 +22,7 @@ let gameState = {
   movesData: {},
   p1: null,
   p2: null,
-  p2AlwaysIdle: false, // Practice/Test Mode Toggle Flag
+  p2AlwaysIdle: false,
   input: {
     heldDirection: null,
     chargeStartTime: 0,
@@ -44,7 +44,7 @@ async function startBattle(config) {
 
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
-  gameState.p2AlwaysIdle = false; // Reset toggle on new match
+  gameState.p2AlwaysIdle = false;
   gameState.roundCounter = 1;
 
   const battleScreen = document.getElementById('battle-screen');
@@ -96,11 +96,28 @@ function triggerMatchTransition() {
   }
 }
 
+function triggerFloatingNumber(slotKey, amount, isHeal = false) {
+  const hudEl = document.querySelector(`.${slotKey}-hud`);
+  if (!hudEl) return;
+
+  const roundedAmount = Math.round(amount);
+  if (roundedAmount <= 0) return;
+
+  const popup = document.createElement('div');
+  popup.className = `damage-popup ${isHeal ? 'heal' : 'damage'}`;
+  popup.textContent = isHeal ? `+${roundedAmount}` : `-${roundedAmount}`;
+
+  hudEl.appendChild(popup);
+
+  setTimeout(() => {
+    popup.remove();
+  }, 1200);
+}
+
 function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // Apply scheduled faint status for current round
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
@@ -184,7 +201,6 @@ function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toUpperCase();
 
-    // TEST MODE TOGGLE: Press '0' to freeze/unfreeze P2 into constant IDLE
     if (e.key === '0') {
       gameState.p2AlwaysIdle = !gameState.p2AlwaysIdle;
       const statusEl = document.getElementById('p2-status');
@@ -433,7 +449,6 @@ async function executeTurnResolutionPhase() {
     ? getCPUMoveChoice(gameState.p1, gameState.p2)
     : (gameState.input.selectedMoveKey || 'DO_NOTHING');
 
-  // Force DO_NOTHING for P2 if Test Mode (Key 0) is active
   let p2MoveKey = gameState.p2AlwaysIdle
     ? 'DO_NOTHING'
     : (gameState.p2.isCPU 
@@ -609,7 +624,11 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let baseDamage = atkMove.baseDamage || 0;
   let finalDmg = Math.floor(baseDamage * sSkillMultiplier * damageRatio);
 
-  defender.lp = Math.max(0, defender.lp - finalDmg);
+  if (finalDmg > 0) {
+    defender.lp = Math.max(0, defender.lp - finalDmg);
+    triggerFloatingNumber(defenderKey, finalDmg, false);
+  }
+
   return finalDmg > 0;
 }
 
