@@ -654,7 +654,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
   const defChargeRatio = (defender.activeChargePercent || 100) / 100;
 
-  // JUMP EVASION: If defender is airborne, attacker's hit chance is reduced by 20%
   let jumpEvasionBonus = defender.airborneTicks > 0 ? 20 : 0;
 
   let rolledHit = false;
@@ -665,13 +664,11 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
-  // --- FULL MISS POPUP ---
   if (!rolledHit) {
     triggerFloatingText(defenderKey, 'MISS!!', 'miss');
     return { hitLanded: false, isGlancing: false };
   }
 
-  // GLANCING HIT ("SCRATCH") MECHANIC: 15% chance to deal only 10% damage without interrupting the opponent
   let isGlancing = Math.random() * 100 < 15; 
 
   let damageRatio = 1.0;
@@ -691,17 +688,17 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
-  // JUMP ATTACK STRENGTH: If attacker is airborne, deal +15% damage multiplier
+  // BUFF MULTIPLIERS
+  let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
+  let typhoonMultiplier = (isDOrS && attacker.activeBuffs.some(b => b.id === 'typhoon')) ? 1.25 : 1.0;
+  let sSkillMultiplier = (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
   let jumpAtkMultiplier = attacker.airborneTicks > 0 ? 1.15 : 1.0;
-  let sSkillMultiplier = (atkMoveKey && atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
   
   let baseDamage = atkMove.baseDamage || 0;
-  let calculatedDmg = baseDamage * sSkillMultiplier * jumpAtkMultiplier * damageRatio;
+  let calculatedDmg = baseDamage * typhoonMultiplier * sSkillMultiplier * jumpAtkMultiplier * damageRatio;
 
-  // Reduce damage to 10% if it's a scratch/glancing hit
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
 
-  // --- NEAR-MISS (SCRATCH) POPUP ---
   if (isGlancing) {
     triggerFloatingText(defenderKey, 'Near-miss!!', 'scratch');
   }
@@ -710,7 +707,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     defender.lp = Math.max(0, defender.lp - finalDmg);
     triggerFloatingNumber(defenderKey, finalDmg, false);
 
-    // CLEAN HIT: +25 Points to Faint Meter | SCRATCH: +0 Points
     if (!isGlancing && !defender.isFainted && !defender.willBeFaintedNextRound) {
       defender.tookCleanHitThisRound = true;
       defender.faintMeter = Math.min(100, defender.faintMeter + 25);
