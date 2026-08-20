@@ -562,22 +562,31 @@ async function executeTurnResolutionPhase() {
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
   updateHUD();
 
-  // STEP 2 EXECUTION (Counter-punch allowed if P1 missed OR only landed a Glancing Scratch)
+  // --- STEP 2 EXECUTION ---
   if (defender2.lp > 0) {
     if (hit1Landed && !isGlancing1 && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
-      // Clean hit interrupts defender
+      // Clean hit from Step 1 interrupts defender
       const hitVid = key1.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
       await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
     } else {
-      // Counter-attack proceeds if hit missed OR was only a 10% scratch
+      // Counter-attack proceeds if Step 1 missed OR was only a 10% scratch
       attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
       updateHUD();
 
+      // 1. Play Attacker 2's move video
       await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
+      
+      // 2. Resolve damage & hit probability
       let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
       if (attack2Result.hitLanded && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
       updateHUD();
+
+      // 3. PLAY DEFENDER 2 HIT REACTION VIDEO IF STEP 2 LANDED A CLEAN HIT!
+      if (attack2Result.hitLanded && !attack2Result.isGlancing && (move2.type === 'MELEE' || move2.type === 'PROJECTILE' || move2.type === 'SPECIAL' || move2.type === 'PHYSICAL')) {
+        const hitVid = key2.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
+        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+      }
     }
   }
 
