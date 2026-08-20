@@ -408,8 +408,17 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.muted = true;
     centerVid.playsInline = true;
 
+    // Palette swap for P2 mirror match
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
-    centerVid.style.transform = playerKey === 'p2' ? 'scaleX(-1)' : 'scaleX(1)';
+
+    // Dynamic Ichigo Video Direction Logic
+    const isIchigo = player.id === 'ichigo';
+    const isUnmirrored = videoFile.includes('windmill_guard') || videoFile.includes('combo_kick');
+    const sourceFacingLeft = isIchigo && !isUnmirrored;
+
+    // P1 flips source-left videos to face right; P2 flips source-right videos to face left
+    const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
+    centerVid.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
 
     let resolved = false;
     let fallbackTimer = null;
@@ -650,6 +659,14 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 }
 
 function updateCharacterMedia(playerKey, stateType) {
+  // Dynamic Ichigo Video Direction Logic for Side HUD Boxes
+  const isIchigo = player.id === 'ichigo';
+  const isUnmirrored = fileName.includes('windmill_guard') || fileName.includes('combo_kick');
+  const sourceFacingLeft = isIchigo && !isUnmirrored;
+
+  const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
+  videoEl.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
+  
   const player = gameState[playerKey];
   if (!player) return;
 
