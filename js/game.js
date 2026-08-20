@@ -1,8 +1,8 @@
 const CHARGE_TIMES = {
-  'A': 800,   // Defense: 0.8s
-  'D': 1300,  // Offense: 1.3s
-  'W': 2000,  // Air/Buffs: 2.0s
-  'S': 2600   // Energy/Specials: 2.6s
+  'A': 800,   // Defense
+  'D': 1300,  // Offense
+  'W': 2000,  // Air/Buffs
+  'S': 2600   // Energy/Specials
 };
 
 const DO_NOTHING_MOVE = {
@@ -95,15 +95,15 @@ function startRoundCountdown() {
   resetTurnInputState();
   updateHUD();
 
+  setSideBoxesBlank(false);
+  hideCenterScreen();
+
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
-    battleMsg.style.position = 'static';
-    battleMsg.style.transform = 'none';
-    battleMsg.style.margin = '10px auto';
     battleMsg.textContent = `ROUND ${gameState.roundCounter}: READY!`;
   }
 
@@ -296,41 +296,63 @@ function renderBuffTrays() {
   });
 }
 
-// Promise Helper: Plays video and awaits explicit completion before resolving
-function playVideoAndWait(playerKey, stateType) {
+// Center Display & Mirror Palette Control Helpers
+function setSideBoxesBlank(isBlank) {
+  const p1Box = document.getElementById('p1-box');
+  const p2Box = document.getElementById('p2-box');
+  if (p1Box) p1Box.classList.toggle('blanked', isBlank);
+  if (p2Box) p2Box.classList.toggle('blanked', isBlank);
+}
+
+function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
   return new Promise((resolve) => {
-    updateCharacterMedia(playerKey, stateType);
-    const videoEl = document.getElementById(`${playerKey}-video`);
+    const centerBox = document.getElementById('center-box');
+    const centerVid = document.getElementById('center-video');
+    if (!centerBox || !centerVid) return resolve();
 
-    if (!videoEl || stateType === 'IDLE') {
+    const player = gameState[playerKey];
+    const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
+
+    centerBox.hidden = false;
+    centerVid.muted = true;
+    centerVid.playsInline = true;
+
+    // Apply Palette Swap & Flip if Player 2 is performing on Center Screen
+    centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
+    centerVid.style.transform = playerKey === 'p2' ? 'scaleX(-1)' : 'scaleX(1)';
+
+    const videoUrl = `assets/videos/${player.id}/${videoFile}`;
+    centerVid.src = videoUrl;
+    centerVid.load();
+
+    let resolved = false;
+    const cleanUpAndResolve = () => {
+      if (resolved) return;
+      resolved = true;
+      centerVid.removeEventListener('ended', cleanUpAndResolve);
+      centerVid.removeEventListener('error', cleanUpAndResolve);
       resolve();
-      return;
+    };
+
+    centerVid.addEventListener('ended', cleanUpAndResolve);
+    centerVid.addEventListener('error', cleanUpAndResolve);
+
+    centerVid.play().catch(() => cleanUpAndResolve());
+
+    if (maxDurationMs) {
+      setTimeout(() => cleanUpAndResolve(), maxDurationMs);
+    } else {
+      setTimeout(() => cleanUpAndResolve(), 5000); // 5s safety fallback
     }
-
-    const onEnded = () => {
-      videoEl.removeEventListener('ended', onEnded);
-      videoEl.removeEventListener('error', onError);
-      resolve();
-    };
-
-    const onError = () => {
-      videoEl.removeEventListener('ended', onEnded);
-      videoEl.removeEventListener('error', onError);
-      resolve();
-    };
-
-    videoEl.addEventListener('ended', onEnded);
-    videoEl.addEventListener('error', onError);
-
-    // Safety timeout fallback (5 seconds max)
-    setTimeout(() => {
-      videoEl.removeEventListener('ended', onEnded);
-      videoEl.removeEventListener('error', onError);
-      resolve();
-    }, 5000);
   });
 }
 
+function hideCenterScreen() {
+  const centerBox = document.getElementById('center-box');
+  if (centerBox) centerBox.hidden = true;
+}
+
+// MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -357,25 +379,24 @@ async function executeTurnResolutionPhase() {
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
   let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
 
-  // Non-blocking status announcement below top HUD
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
     battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}%) VS P2: ${p2Move.name} (${gameState.p2.activeChargePercent}%)`;
   }
 
-  gameState.p1.chi = Math.max(0, gameState.p1.chi - p1Move.chiCost);
-  gameState.p2.chi = Math.max(0, gameState.p2.chi - p2Move.chiCost);
+  // Blank side boxes during action playback
+  setSideBoxesBlank(true);
 
   if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
   if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'charge_speed', 'CHG SPEED +25%', 'speed', 2);
-
   if (p1MoveKey === 'W+K') applyBuff(gameState.p1, 'focus', 'S-ATK +20%', 'attack', 2);
   if (p2MoveKey === 'W+K') applyBuff(gameState.p2, 'focus', 'S-ATK +20%', 'attack', 2);
 
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
+  // TURN PRIORITY CALCULATION
   let p1IsDefensive = p1Move.type === 'DEFENSE';
   let p2IsDefensive = p2Move.type === 'DEFENSE';
   let p1GoesFirst = false;
@@ -402,30 +423,53 @@ async function executeTurnResolutionPhase() {
   let atkKey2 = p1GoesFirst ? 'p2' : 'p1';
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
-  // --- SEQUENTIAL ATTACK STEP 1 ---
-  await playVideoAndWait(atkKey1, move1.video || 'idle.mp4');
-  let hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, defKey1);
+  // --- STEP 1: FIRST PLAYER EXECUTION ---
+  // Deduct CHI right at the moment action begins
+  attacker1.chi = Math.max(0, attacker1.chi - move1.chiCost);
+  updateHUD();
+
+  let hit1Landed = false;
+
+  // A-Tree vs W-Tree: 1 second guard preview
+  if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF')) {
+    await playCenterVideo(atkKey1, move1.video || 'guard.mp4', 1000);
+  } else {
+    await playCenterVideo(atkKey1, move1.video || 'idle.mp4');
+    hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, defKey1);
+  }
 
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
   updateFaintTracker(attacker1, defender1, hit1Landed, defKey1);
   updateHUD();
 
-  // Short pause before second attack
-  await new Promise(r => setTimeout(r, 600));
+  // --- STEP 2: SECOND PLAYER EXECUTION ---
+  if (defender2.lp > 0) {
+    // CANCEL RULE: If hit by attack, Player 2 action canceled (No CHI deducted)
+    if (hit1Landed && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
+      const hitVid = key1.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
+      await playCenterVideo(defKey1, hitVid);
+    } else {
+      if (move2.type === 'DEFENSE' && (move1.type === 'IDLE' || move1.type === 'BUFF')) {
+        await playCenterVideo(atkKey2, move2.video || 'guard.mp4', 1000);
+      } else {
+        attacker2.chi = Math.max(0, attacker2.chi - move2.chiCost);
+        updateHUD();
 
-  // --- SEQUENTIAL ATTACK STEP 2 ---
-  let hit2Landed = false;
-  if (defender2.lp > 0 && (!hit1Landed || move1.type !== 'MELEE')) {
-    await playVideoAndWait(atkKey2, move2.video || 'idle.mp4');
-    hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
+        await playCenterVideo(atkKey2, move2.video || 'idle.mp4');
+        let hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
 
-    if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
-    updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
-    updateHUD();
+        if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
+        updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
+        updateHUD();
+      }
+    }
   }
 
   // --- ROUND CONCLUSION ---
   setTimeout(() => {
+    hideCenterScreen();
+    setSideBoxesBlank(false);
+
     if (battleMsg) battleMsg.hidden = true;
 
     processRoundBuffs(gameState.p1);
@@ -488,17 +532,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defende
   let finalDmg = Math.floor(baseDamage * sSkillMultiplier * damageRatio);
 
   defender.lp = Math.max(0, defender.lp - finalDmg);
-
-  if (finalDmg > 0) {
-    if (atkMoveKey && atkMoveKey.startsWith('D')) {
-      updateCharacterMedia(defenderKey, 'hit_physical.mp4');
-    } else {
-      updateCharacterMedia(defenderKey, 'hit.mp4');
-    }
-  } else if (defMove.type === 'DEFENSE' && defMove.video) {
-    updateCharacterMedia(defenderKey, defMove.video);
-  }
-
   return finalDmg > 0;
 }
 
@@ -510,8 +543,15 @@ function updateCharacterMedia(playerKey, stateType) {
   const spriteEl = document.getElementById(`${playerKey}-sprite`);
   if (!videoEl) return;
 
+  const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
+
   videoEl.muted = true;
   videoEl.playsInline = true;
+
+  // Mirror Match Color Palette & Horizontal Flip for P2
+  if (playerKey === 'p2') {
+    videoEl.classList.toggle('p2-mirror-palette', isMirrorMatch);
+  }
 
   let fileName = stateType;
 
@@ -551,10 +591,6 @@ function updateCharacterMedia(playerKey, stateType) {
   const playPromise = videoEl.play();
   if (playPromise !== undefined) {
     playPromise.catch(() => {});
-  }
-
-  if (playerKey === 'p2') {
-    videoEl.classList.add('mirrored');
   }
 }
 
