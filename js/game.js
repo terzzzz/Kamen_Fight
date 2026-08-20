@@ -22,7 +22,7 @@ let gameState = {
   movesData: {},
   p1: null,
   p2: null,
-  p2AlwaysIdle: false,
+  p2AlwaysIdle: false, // Test/Dummy Mode Toggle Flag (Key '0')
   input: {
     heldDirection: null,
     chargeStartTime: 0,
@@ -118,6 +118,7 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
+  // Apply scheduled faint status for current round
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
@@ -201,6 +202,7 @@ function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toUpperCase();
 
+    // Toggle P2 Dummy Mode with Key '0'
     if (e.key === '0') {
       gameState.p2AlwaysIdle = !gameState.p2AlwaysIdle;
       const statusEl = document.getElementById('p2-status');
@@ -406,22 +408,14 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
       centerVid.removeEventListener('ended', cleanUpAndResolve);
       centerVid.removeEventListener('error', cleanUpAndResolve);
-      centerVid.removeEventListener('timeupdate', checkNearEnd);
 
       centerBox.hidden = true;
       if (actionLabel) actionLabel.hidden = true;
       resolve();
     };
 
-    const checkNearEnd = () => {
-      if (centerVid.duration > 0 && centerVid.currentTime >= centerVid.duration - 0.1) {
-        cleanUpAndResolve();
-      }
-    };
-
     centerVid.addEventListener('ended', cleanUpAndResolve);
     centerVid.addEventListener('error', cleanUpAndResolve);
-    centerVid.addEventListener('timeupdate', checkNearEnd);
 
     const videoUrl = `assets/videos/${player.id}/${videoFile}`;
     centerVid.src = videoUrl;
@@ -429,7 +423,7 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
     centerVid.play().catch(() => cleanUpAndResolve());
 
-    fallbackTimer = setTimeout(cleanUpAndResolve, maxDurationMs || 3500);
+    fallbackTimer = setTimeout(cleanUpAndResolve, maxDurationMs || 8000);
   });
 }
 
@@ -491,11 +485,10 @@ async function executeTurnResolutionPhase() {
   let p1GoesFirst = false;
 
   if (!p1IsIdle && p2IsIdle) {
-    p1GoesFirst = true; // Active action overrides Idle
+    p1GoesFirst = true;
   } else if (p1IsIdle && !p2IsIdle) {
-    p1GoesFirst = false; // Active action overrides Idle
+    p1GoesFirst = false;
   } else {
-    // Both active OR both idle -> Defense priority, then lock-in time check
     let p1IsDefensive = p1Move.type === 'DEFENSE';
     let p2IsDefensive = p2Move.type === 'DEFENSE';
 
@@ -601,6 +594,7 @@ async function executeTurnResolutionPhase() {
     }
   }, 1000);
 }
+
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return false;
 
@@ -685,7 +679,7 @@ function updateCharacterMedia(playerKey, stateType) {
   const riderId = player.id || 'ichigo';
   const videoUrl = `assets/videos/${riderId}/${fileName}`;
 
-  if (videoEl.dataset.currentFile !== videoUrl) {
+  if (videoEl.dataset.currentFile !== videoUrl || videoEl.paused || videoEl.readyState === 0) {
     videoEl.dataset.currentFile = videoUrl;
     videoEl.src = videoUrl;
     videoEl.load();
