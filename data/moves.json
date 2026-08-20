@@ -1,141 +1,142 @@
 {
-  "W+I": {
-    "name": "Rider High Jump",
-    "type": "UTILITY",
-    "chiCost": 1,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "jump.mp4",
-    "description": "Grants Airborne status for 2 turns; shifts idle animation to mid-air.mp4"
-  },
-  "W+J": {
-    "name": "Typhoon Charge",
-    "type": "UTILITY",
-    "chiCost": 0,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "charge_up.mp4",
-    "description": "+25% Charge Speed for 2 turns"
-  },
-  "W+K": {
-    "name": "Rider Focus",
-    "type": "UTILITY",
-    "chiCost": 0,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "charge_up.mp4",
-    "description": "+20% Special Attack Damage for 2 turns"
-  },
+  "ichigo": {
+    "W+I": {
+      "name": "Rider High Jump",
+      "type": "UTILITY",
+      "chiCost": 3,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "jump.mp4",
+      "description": "Grants Airborne status for 2 turns; shifts idle animation to mid-air.mp4"
+    },
+    "W+J": {
+      "name": "Typhoon Charge",
+      "type": "UTILITY",
+      "chiCost": 3,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "charge_up.mp4",
+      "description": "+30% Charge Speed for 3 turns"
+    },
+    "W+K": {
+      "name": "Typhoon Focus",
+      "type": "UTILITY",
+      "chiCost": 2,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "charge_up.mp4",
+      "description": "+20% Special Attack Damage for 2 turns"
+    },
 
-  "D+J": {
-    "name": "Rider Punch",
-    "type": "PHYSICAL",
-    "chiCost": 0,
-    "baseDamage": 40,
-    "hitChance": 85,
-    "video": "punch.mp4",
-    "description": "Fast high-accuracy jab; restores +3 CHI on hit"
-  },
-  "D+K": {
-    "name": "Rider Kick",
-    "type": "PHYSICAL",
-    "chiCost": 0,
-    "baseDamage": 55,
-    "hitChance": 80,
-    "video": "kick.mp4",
-    "description": "Mid-range front kick; restores +3 CHI on hit"
-  },
-  "D+L": {
-    "name": "Combo Punch",
-    "type": "PHYSICAL",
-    "chiCost": 0,
-    "baseDamage": 65,
-    "hitChance": 80,
-    "video": "combo_punch.mp4",
-    "description": "Rapid multi-fist flurry; restores +3 CHI on hit"
-  },
-  "D+I": {
-    "name": "Combo Kick",
-    "type": "PHYSICAL",
-    "chiCost": 0,
-    "baseDamage": 75,
-    "hitChance": 75,
-    "video": "combo_kick.mp4",
-    "description": "Heavy double-leg kick; restores +3 CHI on hit"
-  },
+    "D+J": {
+      "name": "Rider Punch",
+      "type": "PHYSICAL",
+      "chiCost": 0,
+      "baseDamage": 60,
+      "hitChance": 75,
+      "video": "punch.mp4",
+      "description": "Fast high-accuracy jab; restores +2 CHI on hit"
+    },
+    "D+K": {
+      "name": "Rider Kick",
+      "type": "PHYSICAL",
+      "chiCost": 0,
+      "baseDamage": 70,
+      "hitChance": 78,
+      "video": "kick.mp4",
+      "description": "Mid-range front kick; restores +2 CHI on hit"
+    },
+    "D+L": {
+      "name": "Combo Punch",
+      "type": "PHYSICAL",
+      "chiCost": 1,
+      "baseDamage": 120,
+      "hitChance": 72,
+      "video": "combo_punch.mp4",
+      "description": "Rapid multi-fist flurry; restores +3 CHI on hit"
+    },
+    "D+I": {
+      "name": "Combo Kick",
+      "type": "PHYSICAL",
+      "chiCost": 1,
+      "baseDamage": 110,
+      "hitChance": 75,
+      "video": "combo_kick.mp4",
+      "description": "Heavy double-leg kick; restores +3 CHI on hit"
+    },
 
-  "S+J": {
-    "name": "Rider Power Chop",
-    "type": "SPECIAL",
-    "chiCost": 2,
-    "baseDamage": 90,
-    "hitChance": 85,
-    "video": "power_chop.mp4",
-    "description": "Fast energy chop"
-  },
-  "S+K": {
-    "name": "Rider Head Crusher",
-    "type": "SPECIAL",
-    "chiCost": 5,
-    "baseDamage": 140,
-    "hitChance": 85,
-    "video": "head_crusher.mp4",
-    "description": "Mid-air acrobatic vault and downward dive slam"
-  },
-  "S+L": {
-    "name": "Rider Kick",
-    "type": "SPECIAL",
-    "chiCost": 9,
-    "baseDamage": 230,
-    "hitChance": 75,
-    "video": "rider_kick.mp4",
-    "description": "Signature flying kick; high single-hit damage"
-  },
-  "S+I": {
-    "name": "Kirimomi Kick",
-    "type": "SPECIAL",
-    "chiCost": 15,
-    "baseDamage": 400,
-    "hitChance": 70,
-    "video": "kirimomi_kick.mp4",
-    "unblockable": true,
-    "description": "Ultimate tailspin kick; unblockable by Windmill Guard"
-  },
+    "S+J": {
+      "name": "Rider Power Chop",
+      "type": "SPECIAL",
+      "chiCost": 3,
+      "baseDamage": 200,
+      "hitChance": 70,
+      "video": "power_chop.mp4",
+      "description": "Fast energy chop"
+    },
+    "S+K": {
+      "name": "Rider Head Crusher",
+      "type": "SPECIAL",
+      "chiCost": 4,
+      "baseDamage": 240,
+      "hitChance": 65,
+      "video": "head_crusher.mp4",
+      "description": "Mid-air acrobatic vault and downward dive slam"
+    },
+    "S+L": {
+      "name": "Rider Kick",
+      "type": "SPECIAL",
+      "chiCost": 6,
+      "baseDamage": 430,
+      "hitChance": 60,
+      "video": "rider_kick.mp4",
+      "description": "Signature flying kick; high single-hit damage"
+    },
+    "S+I": {
+      "name": "Kirimomi Kick",
+      "type": "SPECIAL",
+      "chiCost": 10,
+      "baseDamage": 550,
+      "hitChance": 66,
+      "video": "kirimomi_kick.mp4",
+      "description": "Ultimate tailspin kick"
+    },
 
-  "A+I": {
-    "name": "Windmill Guard",
-    "type": "DEFENSE",
-    "chiCost": 2,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "windmill_guard.mp4",
-    "description": "Full counter guard; evades damage except against Kirimomi Kick"
-  },
-  "A+J": {
-    "name": "High Guard",
-    "type": "DEFENSE",
-    "chiCost": 0,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "guard.mp4",
-    "description": "Directional block against J attacks"
-  },
-  "A+K": {
-    "name": "Mid Guard",
-    "type": "DEFENSE",
-    "chiCost": 0,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "guard.mp4",
-    "description": "Directional block against K attacks"
-  },
-  "A+L": {
-    "name": "Side Guard",
-    "type": "DEFENSE",
-    "chiCost": 0,
-    "baseDamage": 0,
-    "hitChance": 100,
-    "video": "guard.mp4",
-    "description": "Directional block against L attacks"
+    "A+I": {
+      "name": "Windmill Guard",
+      "type": "DEFENSE",
+      "chiCost": 3,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "windmill_guard.mp4",
+      "description": "Full counter guard; block attacks of all types"
+    },
+    "A+J": {
+      "name": "High Guard",
+      "type": "DEFENSE",
+      "chiCost": 0,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "guard.mp4",
+      "description": "Directional block against J attacks"
+    },
+    "A+K": {
+      "name": "Mid Guard",
+      "type": "DEFENSE",
+      "chiCost": 0,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "guard.mp4",
+      "description": "Directional block against K attacks"
+    },
+    "A+L": {
+      "name": "Side Guard",
+      "type": "DEFENSE",
+      "chiCost": 0,
+      "baseDamage": 0,
+      "hitChance": 100,
+      "video": "guard.mp4",
+      "description": "Directional block against L attacks"
+    }
   }
 }
