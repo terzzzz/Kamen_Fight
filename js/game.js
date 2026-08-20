@@ -485,16 +485,27 @@ async function executeTurnResolutionPhase() {
   handleAirborneState(gameState.p1, p1MoveKey);
   handleAirborneState(gameState.p2, p2MoveKey);
 
-  let p1IsDefensive = p1Move.type === 'DEFENSE';
-  let p2IsDefensive = p2Move.type === 'DEFENSE';
+  // TURN PRIORITY CALCULATION (ACTION OVER IDLE PRIORITY)
+  let p1IsIdle = p1MoveKey === 'DO_NOTHING';
+  let p2IsIdle = p2MoveKey === 'DO_NOTHING';
   let p1GoesFirst = false;
 
-  if (p1IsDefensive && !p2IsDefensive) {
-    p1GoesFirst = false;
-  } else if (!p1IsDefensive && p2IsDefensive) {
-    p1GoesFirst = true;
+  if (!p1IsIdle && p2IsIdle) {
+    p1GoesFirst = true; // Active action overrides Idle
+  } else if (p1IsIdle && !p2IsIdle) {
+    p1GoesFirst = false; // Active action overrides Idle
   } else {
-    p1GoesFirst = p1Time >= p2Time;
+    // Both active OR both idle -> Defense priority, then lock-in time check
+    let p1IsDefensive = p1Move.type === 'DEFENSE';
+    let p2IsDefensive = p2Move.type === 'DEFENSE';
+
+    if (p1IsDefensive && !p2IsDefensive) {
+      p1GoesFirst = false;
+    } else if (!p1IsDefensive && p2IsDefensive) {
+      p1GoesFirst = true;
+    } else {
+      p1GoesFirst = p1Time >= p2Time;
+    }
   }
 
   let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
@@ -590,7 +601,6 @@ async function executeTurnResolutionPhase() {
     }
   }, 1000);
 }
-
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return false;
 
