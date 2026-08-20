@@ -1,6 +1,36 @@
+ver. 20260820-
+
+Kamen Fight - Project DocumentationKamen Fight is a Web-based, turn-based Kamen Rider fighting game built with vanilla JavaScript, HTML5 Video, and CSS3. 
+The game features simultaneous command selection, directional charge mechanics, sequential video-driven combat resolution, and full mirror-match support.
+Key FeaturesDirectional Charge System: Players hold directional keys (A, D, W, S) to build charge percentage ($10\% - 100\%$) before locking in an attack using command keys (J, K, L, I).
+Sequential Video Combat Resolution: Turn resolution plays character video clips in center stage with dynamic overlay banners ([Rider Name] : [Move Name]!).
+
+Action-Over-Idle Turn Priority: Active moves automatically take precedence over DO_NOTHING. Attacks hit idle opponents directly and bypass the defender's idle animation.
+4-Hit Faint & Stun System: Landing 4 consecutive hits schedules a faint state for the defender in the following round. Fainted riders loop faint.mp4 during the 5-second countdown, have their controls locked, and auto-execute DO_NOTHING. Hits landed against a fainted target do not stack toward another faint.
+Dynamic Floating Damage & Heal Popups: Exact integer damage deals appear as red floating popups (-150) and health recoveries as green popups (+100) directly above the LP bar.
+
+Developer Practice / Dummy Mode: Pressing key 0 at any point during battle toggles Player 2 into constant IDLE mode (DO_NOTHING) for move testing.
+Mirror Match & Vertical Scaling Support: Handles duplicate rider matches via horizontal CSS transforms (scaleX(-1)) and hue-rotate color palette swaps. Standardizes 9:16 vertical video assets using object-fit: contain.
+Controls & Input MappingInputFunctionDetailsA (Hold)Defense ChargeBase Charge Speed: $800\text{ms}$D (Hold)Offense ChargeBase Charge Speed: $1300\text{ms}$W (Hold)Air / Buff ChargeBase Charge Speed: $2000\text{ms}$S (Hold)Energy / Special ChargeBase Charge Speed: $2600\text{ms}$J, K, L, I
+Action KeysPress while holding a direction to confirm moveKey 0Developer ToggleToggles P2 into/out of constant Dummy Idle modeFile & Directory StructurePlaintextKamen_Fight/
+
+├── index.html              # Main game layout and video elements
+├── css/
+│   └── style.css           # Styling, HUD layout, floating popups, video scaling
+├── js/
+│   └── game.js             # Core game state, priority logic, video handler, HUD
+├── data/
+│   └── moves.json          # Move definitions, CHI costs, damage ratios, video mappings
+└── assets/
+    └── videos/
+        └── ichigo/         # Rider video clips (idle.mp4, faint.mp4, hit.mp4, etc.)
+Setup & Deployment InstructionsLocal Execution: Clone or download the repository folder and open index.html directly in any modern Web browser (Chrome, Firefox, Edge, Safari). No external dependencies or build steps are required.GitHub Pages Deployment: Push the repository to GitHub and enable GitHub Pages under Settings > Pages.Asset Naming Warning: Ensure all file paths and video filenames inside assets/videos/<rider_id>/ are strictly lowercase (e.g., idle.mp4, faint.mp4) to prevent 404 errors on case-sensitive Linux host servers like GitHub Pages.
+
+
 # Kamen_Fight game development timeline
 
 18/8/26: Kick-start, create portrait photos, player selection screen; follow yu yu hakusho Super Nintendo game style. 
 About menu: Can choose CPU/Player, 1-player game only, no difficulty.
 Riders: Include all showga riders + shadow moon.
 19/8/26: Add game transaction screens after selected riders to the matchup screen. Added button indicators on what are pressed.
+20/8/26: Bug fixing, ensure the matchup works, add damage labels.
