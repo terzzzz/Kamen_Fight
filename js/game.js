@@ -67,8 +67,8 @@ function createPlayerState(riderConfig, isCPU) {
     lp: riderConfig.maxLp || 1050,
     chi: 10,
     maxChi: 16,
-    faintMeter: 0,               // 100 Point Faint Meter
-    tookCleanHitThisRound: false, // Tracks if a clean hit was suffered this round
+    faintMeter: 0,               // 100-Point Faint Meter
+    tookCleanHitThisRound: false, // Round damage tracker
     isFainted: false,
     willBeFaintedNextRound: false,
     airborneTicks: 0,
@@ -115,6 +115,21 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   }, 1200);
 }
 
+function triggerFloatingText(slotKey, text, customClass = '') {
+  const hudEl = document.querySelector(`.${slotKey}-hud`);
+  if (!hudEl) return;
+
+  const popup = document.createElement('div');
+  popup.className = `damage-popup ${customClass}`;
+  popup.textContent = text;
+
+  hudEl.appendChild(popup);
+
+  setTimeout(() => {
+    popup.remove();
+  }, 1200);
+}
+
 function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
@@ -126,7 +141,7 @@ function startRoundCountdown() {
     if (player.willBeFaintedNextRound) {
       player.isFainted = true;
       player.willBeFaintedNextRound = false;
-      player.faintMeter = 0; // Reset counter to 0 upon entering faint state
+      player.faintMeter = 0; // Reset faint level to 0 upon entering faint state
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -584,7 +599,7 @@ async function executeTurnResolutionPhase() {
           player.isFainted = false;
           player.faintMeter = 0;
         } else if (!player.tookCleanHitThisRound) {
-          // Reduce 20 points if no clean hit taken this round
+          // Reduce 20 points if no clean hit was taken this round
           player.faintMeter = Math.max(0, player.faintMeter - 20);
         }
 
@@ -634,7 +649,11 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
-  if (!rolledHit) return { hitLanded: false, isGlancing: false };
+  // --- FULL MISS POPUP ---
+  if (!rolledHit) {
+    triggerFloatingText(defenderKey, 'MISS!!', 'miss');
+    return { hitLanded: false, isGlancing: false };
+  }
 
   // GLANCING HIT ("SCRATCH") MECHANIC: 15% chance to deal only 10% damage without interrupting the opponent
   let isGlancing = Math.random() * 100 < 15; 
@@ -665,6 +684,11 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   // Reduce damage to 10% if it's a scratch/glancing hit
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
+
+  // --- NEAR-MISS (SCRATCH) POPUP ---
+  if (isGlancing) {
+    triggerFloatingText(defenderKey, 'Near-miss!!', 'scratch');
+  }
 
   if (finalDmg > 0) {
     defender.lp = Math.max(0, defender.lp - finalDmg);
