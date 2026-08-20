@@ -530,42 +530,39 @@ async function executeTurnResolutionPhase() {
   let atkKey2 = p1GoesFirst ? 'p2' : 'p1';
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
-  // --- STEP 1: FIRST PLAYER EXECUTION ---
-  attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
-  updateHUD();
-
-  let hit1Landed = false;
-
+  // STEP 1 EXECUTION
+  let attack1Result = { hitLanded: false, isGlancing: false };
   if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF')) {
     await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000);
   } else {
     await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name);
-    hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
+    attack1Result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
   }
 
+  let hit1Landed = attack1Result.hitLanded;
+  let isGlancing1 = attack1Result.isGlancing;
+
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
-  updateFaintTracker(attacker1, defender1, hit1Landed, defKey1);
+  updateFaintTracker(attacker1, defender1, hit1Landed && !isGlancing1, defKey1);
   updateHUD();
 
-  // --- STEP 2: SECOND PLAYER EXECUTION ---
+  // STEP 2 EXECUTION (Counter-punch allowed if P1 missed OR only landed a Glancing Scratch)
   if (defender2.lp > 0) {
-    if (hit1Landed && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
+    if (hit1Landed && !isGlancing1 && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
+      // Clean hit interrupts defender
       const hitVid = key1.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
       await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
     } else {
-      if (move2.type === 'DEFENSE' && (move1.type === 'IDLE' || move1.type === 'BUFF')) {
-        await playCenterVideo(atkKey2, move2.video || 'guard.mp4', move2.name, 1000);
-      } else {
-        attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
-        updateHUD();
+      // Counter-attack proceeds if hit missed OR was only a 10% scratch
+      attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
+      updateHUD();
 
-        await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
-        let hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
+      await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
+      let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
-        if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
-        updateFaintTracker(attacker2, defender2, hit2Landed, defKey2);
-        updateHUD();
-      }
+      if (attack2Result.hitLanded && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
+      updateFaintTracker(attacker2, defender2, attack2Result.hitLanded && !attack2Result.isGlancing, defKey2);
+      updateHUD();
     }
   }
 
@@ -611,27 +608,30 @@ async function executeTurnResolutionPhase() {
 }
 
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
-  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return false;
+  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return { hitLanded: false, isGlancing: false };
 
   const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
   const defChargeRatio = (defender.activeChargePercent || 100) / 100;
 
-  // Defender is IDLE / DO_NOTHING -> 100% Guaranteed Hit
+  // JUMP EVASION: If defender is airborne, attacker's hit chance is reduced by 20%
+  let jumpEvasionBonus = defender.airborneTicks > 0 ? 20 : 0;
+
   let rolledHit = false;
   if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
     rolledHit = true;
   } else {
-    let effectiveHitChance = (atkMove.hitChance || 80) * atkChargeRatio;
+    let effectiveHitChance = Math.max(0, ((atkMove.hitChance || 80) * atkChargeRatio) - jumpEvasionBonus);
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
-  if (!rolledHit) return false;
+  if (!rolledHit) return { hitLanded: false, isGlancing: false };
+
+  // GLANCING HIT ("SCRATCH") MECHANIC: 15% chance to deal only 10% damage without interrupting the opponent
+  let isGlancing = Math.random() * 100 < 15; 
 
   let damageRatio = 1.0;
-
   if (defMove.type === 'DEFENSE') {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
-
     if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
       let effectiveCounterChance = 70 * defChargeRatio;
       if (atkMove.unblockable) {
@@ -646,16 +646,22 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
+  // JUMP ATTACK STRENGTH: If attacker is airborne, deal +15% damage multiplier
+  let jumpAtkMultiplier = attacker.airborneTicks > 0 ? 1.15 : 1.0;
   let sSkillMultiplier = (atkMoveKey && atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
+  
   let baseDamage = atkMove.baseDamage || 0;
-  let finalDmg = Math.floor(baseDamage * sSkillMultiplier * damageRatio);
+  let calculatedDmg = baseDamage * sSkillMultiplier * jumpAtkMultiplier * damageRatio;
+
+  // Reduce damage to 10% if it's a scratch/glancing hit
+  let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
 
   if (finalDmg > 0) {
     defender.lp = Math.max(0, defender.lp - finalDmg);
     triggerFloatingNumber(defenderKey, finalDmg, false);
   }
 
-  return finalDmg > 0;
+  return { hitLanded: finalDmg > 0, isGlancing: isGlancing };
 }
 
 function updateCharacterMedia(playerKey, stateType) {
