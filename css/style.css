@@ -448,3 +448,47 @@ body {
   font-size: 24px;
   color: #ffcc00;
 }
+
+/* --- FLOATING DAMAGE & HEAL POPUPS --- */
+.player-hud {
+  position: relative;
+}
+
+.damage-popup {
+  position: absolute;
+  top: -15px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 22px;
+  font-weight: bold;
+  pointer-events: none;
+  animation: floatUpFade 1.2s ease-out forwards;
+  z-index: 50;
+}
+
+.p1-hud .damage-popup { left: 40px; }
+.p2-hud .damage-popup { right: 40px; }
+
+.damage-popup.damage {
+  color: #ff3333;
+  text-shadow: 0 0 10px rgba(255, 51, 51, 0.9), 0 0 4px #000;
+}
+
+.damage-popup.heal {
+  color: #00ff66;
+  text-shadow: 0 0 10px rgba(0, 255, 102, 0.9), 0 0 4px #000;
+}
+
+@keyframes floatUpFade {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-22px) scale(1.35);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-45px) scale(1);
+  }
+}
