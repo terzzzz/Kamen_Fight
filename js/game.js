@@ -45,6 +45,10 @@ async function startBattle(config) {
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
   gameState.roundCounter = 1;
 
+  // FIX 1: Unhide battle screen container when battle starts
+  const battleScreen = document.getElementById('battle-screen');
+  if (battleScreen) battleScreen.hidden = false;
+
   bindKeyboardInputs();
   bindCommandButtons();
   updateHUD();
@@ -310,7 +314,10 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
     const centerVid = document.getElementById('center-video');
     if (!centerBox || !centerVid) return resolve();
 
+    // FIX 3: Safety check if player exists
     const player = gameState[playerKey];
+    if (!player) return resolve();
+
     const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
 
     centerBox.hidden = false;
@@ -424,8 +431,8 @@ async function executeTurnResolutionPhase() {
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
   // --- STEP 1: FIRST PLAYER EXECUTION ---
-  // Deduct CHI right at the moment action begins
-  attacker1.chi = Math.max(0, attacker1.chi - move1.chiCost);
+  // FIX 2: Safe Chi deduction with zero fallback
+  attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
   updateHUD();
 
   let hit1Landed = false;
@@ -452,7 +459,7 @@ async function executeTurnResolutionPhase() {
       if (move2.type === 'DEFENSE' && (move1.type === 'IDLE' || move1.type === 'BUFF')) {
         await playCenterVideo(atkKey2, move2.video || 'guard.mp4', 1000);
       } else {
-        attacker2.chi = Math.max(0, attacker2.chi - move2.chiCost);
+        attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
         updateHUD();
 
         await playCenterVideo(atkKey2, move2.video || 'idle.mp4');
@@ -513,14 +520,14 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defende
   if (defMove.type === 'DEFENSE') {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    if (defMove.key === 'A+I' || defMove.name === 'Windmill Guard') {
+    if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
       let effectiveCounterChance = 70 * defChargeRatio;
       if (atkMove.unblockable) {
         damageRatio = 1.0;
       } else if (Math.random() * 100 < effectiveCounterChance) {
         damageRatio = 0.0;
       }
-    } else if (defMove.key === `A+${atkButton}` || defMove.name.includes('Guard')) {
+    } else if (defMoveKey === `A+${atkButton}` || defMove.name.includes('Guard')) {
       let effectiveHighBlockChance = 20 * defChargeRatio;
       let rolledHighBlock = Math.random() * 100 < effectiveHighBlockChance;
       damageRatio = rolledHighBlock ? 0.20 : 0.70;
