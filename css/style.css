@@ -400,6 +400,25 @@ body {
   box-shadow: 0 0 10px #66fcf1;
 }
 
+.action-overlay-label {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 12, 16, 0.85);
+  border: 2px solid #66fcf1;
+  color: #ffcc00;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px #ffcc00;
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+  z-index: 20;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
 /* --- SPLASH SCREEN --- */
 .splash-screen {
   position: absolute;
