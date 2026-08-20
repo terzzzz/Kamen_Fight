@@ -492,3 +492,15 @@ body {
     transform: translateY(-45px) scale(1);
   }
 }
+/* Styling for MISS and Near-miss text popups */
+.damage-popup.miss {
+  color: #00ccff; /* Bright Cyan for Whiffs */
+  font-size: 1.4rem;
+  text-shadow: 0 0 6px #0055ff;
+}
+
+.damage-popup.scratch {
+  color: #ffaa00; /* Yellow/Orange for Scratches */
+  font-size: 1.3rem;
+  text-shadow: 0 0 6px #884400;
+}
