@@ -22,6 +22,7 @@ let gameState = {
   movesData: {},
   p1: null,
   p2: null,
+  p2AlwaysIdle: false, // Practice/Test Mode Toggle Flag
   input: {
     heldDirection: null,
     chargeStartTime: 0,
@@ -43,6 +44,7 @@ async function startBattle(config) {
 
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
+  gameState.p2AlwaysIdle = false; // Reset toggle on new match
   gameState.roundCounter = 1;
 
   const battleScreen = document.getElementById('battle-screen');
@@ -114,6 +116,9 @@ function startRoundCountdown() {
     if (player.isFainted) {
       if (stunOverlay) stunOverlay.hidden = false;
       if (statusEl) statusEl.textContent = 'FAINTED';
+    } else if (slot === 'p2' && gameState.p2AlwaysIdle) {
+      if (stunOverlay) stunOverlay.hidden = true;
+      if (statusEl) statusEl.textContent = 'DUMMY (IDLE)';
     } else {
       if (stunOverlay) stunOverlay.hidden = true;
       if (statusEl) statusEl.textContent = 'NORMAL';
@@ -124,11 +129,9 @@ function startRoundCountdown() {
   setSideBoxesBlank(false);
   hideCenterScreen();
 
-  // Displays faint.mp4 for fainted riders during 5s countdown
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
-  // Auto-lock DO_NOTHING for fainted human P1
   if (gameState.p1 && gameState.p1.isFainted && !gameState.p1.isCPU) {
     confirmPlayerAction('DO_NOTHING');
   }
@@ -169,7 +172,7 @@ function startRoundCountdown() {
 }
 
 function getCPUMoveChoice(cpuPlayer, opponentPlayer) {
-  if (cpuPlayer.isFainted) return 'DO_NOTHING';
+  if (cpuPlayer.isFainted || gameState.p2AlwaysIdle) return 'DO_NOTHING';
   if (typeof selectCPUMove === 'function') {
     return selectCPUMove(cpuPlayer, opponentPlayer, gameState.movesData) || 'D+J';
   }
@@ -181,10 +184,26 @@ function bindKeyboardInputs() {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toUpperCase();
 
+    // TEST MODE TOGGLE: Press '0' to freeze/unfreeze P2 into constant IDLE
+    if (e.key === '0') {
+      gameState.p2AlwaysIdle = !gameState.p2AlwaysIdle;
+      const statusEl = document.getElementById('p2-status');
+      
+      if (statusEl) {
+        if (gameState.p2AlwaysIdle) {
+          statusEl.textContent = 'DUMMY (IDLE)';
+          statusEl.style.color = '#ffcc00';
+        } else {
+          statusEl.textContent = gameState.p2 && gameState.p2.isFainted ? 'FAINTED' : 'NORMAL';
+          statusEl.style.color = '#00ffcc';
+        }
+      }
+      return;
+    }
+
     const keyEl = document.getElementById(`key-${key}`);
     if (keyEl) keyEl.classList.add('active');
 
-    // Block key inputs if input phase is over, player is CPU, confirmed, or fainted
     if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
     if (['A', 'D', 'W', 'S'].includes(key)) {
@@ -414,17 +433,22 @@ async function executeTurnResolutionPhase() {
     ? getCPUMoveChoice(gameState.p1, gameState.p2)
     : (gameState.input.selectedMoveKey || 'DO_NOTHING');
 
-  let p2MoveKey = gameState.p2.isCPU 
-    ? getCPUMoveChoice(gameState.p2, gameState.p1) 
-    : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
+  // Force DO_NOTHING for P2 if Test Mode (Key 0) is active
+  let p2MoveKey = gameState.p2AlwaysIdle
+    ? 'DO_NOTHING'
+    : (gameState.p2.isCPU 
+        ? getCPUMoveChoice(gameState.p2, gameState.p1) 
+        : (gameState.p2SelectedMoveKey || 'DO_NOTHING'));
 
   if (gameState.p1.isCPU) {
     gameState.p1.activeChargePercent = p1MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
     simulateCPUButtonPress(p1MoveKey);
   }
-  if (gameState.p2.isCPU) {
+  if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
     gameState.p2.activeChargePercent = p2MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
     simulateCPUButtonPress(p2MoveKey);
+  } else if (gameState.p2AlwaysIdle) {
+    gameState.p2.activeChargePercent = 0;
   }
 
   let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
@@ -521,7 +545,6 @@ async function executeTurnResolutionPhase() {
     processRoundBuffs(gameState.p1);
     processRoundBuffs(gameState.p2);
 
-    // Clear faint status at end of round execution and reset hit counter
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
       if (player && player.isFainted) {
@@ -671,7 +694,6 @@ function handleAirborneState(player, moveKey) {
 }
 
 function updateFaintTracker(attacker, defender, hitLanded, defenderSlot) {
-  // Do not count hits or trigger faint if defender is ALREADY fainted
   if (defender.isFainted || defender.willBeFaintedNextRound) return;
 
   if (hitLanded) {
