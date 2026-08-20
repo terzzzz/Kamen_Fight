@@ -1,3 +1,7 @@
+[hidden] {
+  display: none !important;
+}
+
 /* --- GLOBAL RESETS & FONTS --- */
 * {
   box-sizing: border-box;
