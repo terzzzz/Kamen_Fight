@@ -118,7 +118,6 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // Apply scheduled faint status for current round
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
@@ -252,24 +251,25 @@ function bindKeyboardInputs() {
 }
 
 function updateChargeProgress() {
-  if (!gameState.input.heldDirection || gameState.roundPhase !== 'INPUT' || gameState.p1.isFainted) return;
+  if (!gameState.input.heldDirection || gameState.roundPhase !== 'INPUT' || (gameState.p1 && gameState.p1.isFainted)) return;
 
   let duration = CHARGE_TIMES[gameState.input.heldDirection];
   
-  if (gameState.p1.activeBuffs.some(b => b.id === 'charge_speed')) {
+  if (gameState.p1 && gameState.p1.activeBuffs && gameState.p1.activeBuffs.some(b => b.id === 'charge_speed')) {
     duration = duration * 0.75;
   }
 
   const elapsed = Date.now() - gameState.input.chargeStartTime;
   gameState.input.currentPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
 
-  const fillEl = document.getElementById('p1-charge-fill');
+  // Multi-selector to ensure bar fills regardless of element ID naming in index.html
+  const fillEl = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill') || document.querySelector('.charge-fill');
   if (fillEl) {
     fillEl.style.width = `${gameState.input.currentPercent}%`;
     fillEl.textContent = `${gameState.input.currentPercent}%`;
   }
 
-  const statusEl = document.getElementById('charge-status-display');
+  const statusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
   if (statusEl) {
     statusEl.textContent = `CHARGING [${gameState.input.heldDirection}]: ${gameState.input.currentPercent}%`;
     statusEl.style.color = gameState.input.currentPercent >= 100 ? '#00ffcc' : '#ffcc00';
@@ -281,13 +281,13 @@ function resetCharge() {
   gameState.input.heldDirection = null;
   gameState.input.currentPercent = 0;
 
-  const fillEl = document.getElementById('p1-charge-fill');
+  const fillEl = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill') || document.querySelector('.charge-fill');
   if (fillEl) {
     fillEl.style.width = '0%';
     fillEl.textContent = '0%';
   }
 
-  const statusEl = document.getElementById('charge-status-display');
+  const statusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
   if (statusEl) {
     statusEl.textContent = 'HOLD DIRECTION TO CHARGE';
     statusEl.style.color = '#00ffcc';
@@ -308,17 +308,30 @@ function confirmPlayerAction(moveKey) {
   }
 }
 
+// MULTI-TOUCH ENABLED TOUCH BUTTON BINDINGS FOR TABLETS & IPADS
 function bindCommandButtons() {
   const buttons = document.querySelectorAll('.pad-btn');
   buttons.forEach(btn => {
-    btn.onmousedown = () => {
-      const key = btn.id.replace('key-', '');
+    const key = btn.id.replace('key-', '');
+
+    const handlePressDown = (e) => {
+      e.preventDefault();
       window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
     };
-    btn.onmouseup = () => {
-      const key = btn.id.replace('key-', '');
+
+    const handlePressUp = (e) => {
+      e.preventDefault();
       window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
     };
+
+    // Mouse Controls
+    btn.onmousedown = handlePressDown;
+    btn.onmouseup = handlePressUp;
+
+    // iPad / Touch Controls (Enables simultaneous multi-touch holding and tapping)
+    btn.addEventListener('touchstart', handlePressDown, { passive: false });
+    btn.addEventListener('touchend', handlePressUp, { passive: false });
+    btn.addEventListener('touchcancel', handlePressUp, { passive: false });
   });
 }
 
