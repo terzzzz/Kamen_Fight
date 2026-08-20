@@ -307,7 +307,6 @@ function confirmPlayerAction(moveKey) {
   }
 }
 
-// MULTI-TOUCH ENABLED TOUCH BUTTON BINDINGS FOR TABLETS & IPADS
 function bindCommandButtons() {
   const buttons = document.querySelectorAll('.pad-btn');
   buttons.forEach(btn => {
@@ -407,7 +406,6 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
 
-    // Dynamic Ichigo Video Direction Logic
     const isIchigo = player.id === 'ichigo';
     const isUnmirrored = videoFile.includes('windmill_guard') || videoFile.includes('combo_kick');
     const sourceFacingLeft = isIchigo && !isUnmirrored;
@@ -618,8 +616,15 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
   const defChargeRatio = (defender.activeChargePercent || 100) / 100;
 
-  let effectiveHitChance = (atkMove.hitChance || 80) * atkChargeRatio;
-  let rolledHit = Math.random() * 100 < effectiveHitChance;
+  // Defender is IDLE / DO_NOTHING -> 100% Guaranteed Hit
+  let rolledHit = false;
+  if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
+    rolledHit = true;
+  } else {
+    let effectiveHitChance = (atkMove.hitChance || 80) * atkChargeRatio;
+    rolledHit = Math.random() * 100 < effectiveHitChance;
+  }
+
   if (!rolledHit) return false;
 
   let damageRatio = 1.0;
@@ -681,7 +686,6 @@ function updateCharacterMedia(playerKey, stateType) {
     fileName += '.mp4';
   }
 
-  // Dynamic Ichigo Video Direction Logic for Side HUD Boxes
   const isIchigo = player.id === 'ichigo';
   const isUnmirrored = fileName.includes('windmill_guard') || fileName.includes('combo_kick');
   const sourceFacingLeft = isIchigo && !isUnmirrored;
