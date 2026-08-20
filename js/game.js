@@ -323,7 +323,6 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
     centerVid.muted = true;
     centerVid.playsInline = true;
 
-    // Apply Palette Swap & Flip if Player 2 is performing
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
     centerVid.style.transform = playerKey === 'p2' ? 'scaleX(-1)' : 'scaleX(1)';
 
@@ -338,32 +337,32 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
       centerVid.removeEventListener('ended', cleanUpAndResolve);
       centerVid.removeEventListener('error', cleanUpAndResolve);
       centerVid.removeEventListener('timeupdate', checkNearEnd);
+
+      // Hide center screen immediately so the last frame doesn't stay frozen
+      centerBox.hidden = true; 
       resolve();
     };
 
     const checkNearEnd = () => {
-      // Direct timestamp check: resolve as soon as video hits the last frame (within 0.1 seconds)
+      // Force resolve if playback reaches within 0.1s of the end
       if (centerVid.duration > 0 && centerVid.currentTime >= centerVid.duration - 0.1) {
         cleanUpAndResolve();
       }
     };
 
-    // 1. Attach listeners FIRST
+    // Attach listeners before setting source
     centerVid.addEventListener('ended', cleanUpAndResolve);
     centerVid.addEventListener('error', cleanUpAndResolve);
     centerVid.addEventListener('timeupdate', checkNearEnd);
 
-    // 2. Set source and load file
     const videoUrl = `assets/videos/${player.id}/${videoFile}`;
     centerVid.src = videoUrl;
     centerVid.load();
 
-    // 3. Play action
     centerVid.play().catch(() => cleanUpAndResolve());
 
-    // 4. Fallback timeout safety
-    const timeoutDuration = maxDurationMs || 5000;
-    fallbackTimer = setTimeout(cleanUpAndResolve, timeoutDuration);
+    // Strict 3.5 second fallback so execution never halts indefinitely
+    fallbackTimer = setTimeout(cleanUpAndResolve, maxDurationMs || 3500);
   });
 }
 
