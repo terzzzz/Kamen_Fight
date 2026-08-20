@@ -67,7 +67,8 @@ function createPlayerState(riderConfig, isCPU) {
     lp: riderConfig.maxLp || 1050,
     chi: 10,
     maxChi: 16,
-    consecutiveHitsLanded: 0,
+    faintMeter: 0,               // 100 Point Faint Meter
+    tookCleanHitThisRound: false, // Tracks if a clean hit was suffered this round
     isFainted: false,
     willBeFaintedNextRound: false,
     airborneTicks: 0,
@@ -125,6 +126,7 @@ function startRoundCountdown() {
     if (player.willBeFaintedNextRound) {
       player.isFainted = true;
       player.willBeFaintedNextRound = false;
+      player.faintMeter = 0; // Reset counter to 0 upon entering faint state
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -543,7 +545,6 @@ async function executeTurnResolutionPhase() {
   let isGlancing1 = attack1Result.isGlancing;
 
   if (hit1Landed && key1.startsWith('D')) attacker1.chi = Math.min(16, attacker1.chi + 3);
-  updateFaintTracker(attacker1, defender1, hit1Landed && !isGlancing1, defKey1);
   updateHUD();
 
   // STEP 2 EXECUTION (Counter-punch allowed if P1 missed OR only landed a Glancing Scratch)
@@ -561,7 +562,6 @@ async function executeTurnResolutionPhase() {
       let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
       if (attack2Result.hitLanded && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
-      updateFaintTracker(attacker2, defender2, attack2Result.hitLanded && !attack2Result.isGlancing, defKey2);
       updateHUD();
     }
   }
@@ -578,11 +578,21 @@ async function executeTurnResolutionPhase() {
 
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
-      if (player && player.isFainted) {
-        player.isFainted = false;
-        player.consecutiveHitsLanded = 0;
+      if (player) {
+        // Reset faint state after a fainted round ends
+        if (player.isFainted) {
+          player.isFainted = false;
+          player.faintMeter = 0;
+        } else if (!player.tookCleanHitThisRound) {
+          // Reduce 20 points if no clean hit taken this round
+          player.faintMeter = Math.max(0, player.faintMeter - 20);
+        }
+
+        player.tookCleanHitThisRound = false; // Reset round flag
       }
     });
+
+    updateHUD();
 
     if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
       gameState.roundCounter++;
@@ -659,6 +669,16 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (finalDmg > 0) {
     defender.lp = Math.max(0, defender.lp - finalDmg);
     triggerFloatingNumber(defenderKey, finalDmg, false);
+
+    // CLEAN HIT: +25 Points to Faint Meter | SCRATCH: +0 Points
+    if (!isGlancing && !defender.isFainted && !defender.willBeFaintedNextRound) {
+      defender.tookCleanHitThisRound = true;
+      defender.faintMeter = Math.min(100, defender.faintMeter + 25);
+      
+      if (defender.faintMeter >= 100) {
+        defender.willBeFaintedNextRound = true;
+      }
+    }
   }
 
   return { hitLanded: finalDmg > 0, isGlancing: isGlancing };
@@ -751,20 +771,6 @@ function handleAirborneState(player, moveKey) {
   }
 }
 
-function updateFaintTracker(attacker, defender, hitLanded, defenderSlot) {
-  if (defender.isFainted || defender.willBeFaintedNextRound) return;
-
-  if (hitLanded) {
-    attacker.consecutiveHitsLanded++;
-    if (attacker.consecutiveHitsLanded >= 4) {
-      defender.willBeFaintedNextRound = true;
-      attacker.consecutiveHitsLanded = 0;
-    }
-  } else {
-    attacker.consecutiveHitsLanded = 0;
-  }
-}
-
 function updateHUD() {
   if (gameState.p1) {
     const p1Name = document.getElementById('p1-name');
@@ -783,6 +789,15 @@ function updateHUD() {
     if (p2Lp) p2Lp.textContent = gameState.p2.lp;
     if (p2Chi) p2Chi.textContent = gameState.p2.chi;
   }
+
+  // Render vertical faint meter fill height (0% to 100%)
+  ['p1', 'p2'].forEach(slot => {
+    const player = gameState[slot];
+    const fillEl = document.getElementById(`${slot}-faint-fill`);
+    if (fillEl && player) {
+      fillEl.style.height = `${player.faintMeter}%`;
+    }
+  });
 
   const turnDisp = document.getElementById('turn-display');
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
