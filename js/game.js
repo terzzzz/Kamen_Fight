@@ -308,14 +308,21 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
+function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = null) {
   return new Promise((resolve) => {
     const centerBox = document.getElementById('center-box');
     const centerVid = document.getElementById('center-video');
+    const actionLabel = document.getElementById('center-action-label');
     if (!centerBox || !centerVid) return resolve();
 
     const player = gameState[playerKey];
     if (!player) return resolve();
+
+    // Display Rider Name and Action Label
+    if (actionLabel) {
+      actionLabel.textContent = actionName ? `${player.name} : ${actionName}!` : '';
+      actionLabel.hidden = !actionName;
+    }
 
     const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
 
@@ -338,19 +345,17 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
       centerVid.removeEventListener('error', cleanUpAndResolve);
       centerVid.removeEventListener('timeupdate', checkNearEnd);
 
-      // Hide center screen immediately so the last frame doesn't stay frozen
-      centerBox.hidden = true; 
+      centerBox.hidden = true;
+      if (actionLabel) actionLabel.hidden = true;
       resolve();
     };
 
     const checkNearEnd = () => {
-      // Force resolve if playback reaches within 0.1s of the end
       if (centerVid.duration > 0 && centerVid.currentTime >= centerVid.duration - 0.1) {
         cleanUpAndResolve();
       }
     };
 
-    // Attach listeners before setting source
     centerVid.addEventListener('ended', cleanUpAndResolve);
     centerVid.addEventListener('error', cleanUpAndResolve);
     centerVid.addEventListener('timeupdate', checkNearEnd);
@@ -361,7 +366,6 @@ function playCenterVideo(playerKey, videoFile, maxDurationMs = null) {
 
     centerVid.play().catch(() => cleanUpAndResolve());
 
-    // Strict 3.5 second fallback so execution never halts indefinitely
     fallbackTimer = setTimeout(cleanUpAndResolve, maxDurationMs || 3500);
   });
 }
@@ -442,18 +446,16 @@ async function executeTurnResolutionPhase() {
   let atkKey2 = p1GoesFirst ? 'p2' : 'p1';
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
-  // --- STEP 1: FIRST PLAYER EXECUTION ---
-  // FIX 2: Safe Chi deduction with zero fallback
+ // --- STEP 1: FIRST PLAYER EXECUTION ---
   attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
   updateHUD();
 
   let hit1Landed = false;
 
-  // A-Tree vs W-Tree: 1 second guard preview
   if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF')) {
-    await playCenterVideo(atkKey1, move1.video || 'guard.mp4', 1000);
+    await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000);
   } else {
-    await playCenterVideo(atkKey1, move1.video || 'idle.mp4');
+    await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name);
     hit1Landed = resolveAttack(attacker1, defender1, move1, key1, move2, defKey1);
   }
 
@@ -463,18 +465,17 @@ async function executeTurnResolutionPhase() {
 
   // --- STEP 2: SECOND PLAYER EXECUTION ---
   if (defender2.lp > 0) {
-    // CANCEL RULE: If hit by attack, Player 2 action canceled (No CHI deducted)
     if (hit1Landed && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
       const hitVid = key1.startsWith('D') ? 'hit_physical.mp4' : 'hit.mp4';
-      await playCenterVideo(defKey1, hitVid);
+      await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
     } else {
       if (move2.type === 'DEFENSE' && (move1.type === 'IDLE' || move1.type === 'BUFF')) {
-        await playCenterVideo(atkKey2, move2.video || 'guard.mp4', 1000);
+        await playCenterVideo(atkKey2, move2.video || 'guard.mp4', move2.name, 1000);
       } else {
         attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
         updateHUD();
 
-        await playCenterVideo(atkKey2, move2.video || 'idle.mp4');
+        await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
         let hit2Landed = resolveAttack(attacker2, defender2, move2, key2, move1, defKey2);
 
         if (hit2Landed && key2.startsWith('D')) attacker2.chi = Math.min(16, attacker2.chi + 3);
