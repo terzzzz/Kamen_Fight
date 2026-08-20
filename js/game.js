@@ -262,7 +262,6 @@ function updateChargeProgress() {
   const elapsed = Date.now() - gameState.input.chargeStartTime;
   gameState.input.currentPercent = Math.min(100, Math.floor((elapsed / duration) * 100));
 
-  // Multi-selector to ensure bar fills regardless of element ID naming in index.html
   const fillEl = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill') || document.querySelector('.charge-fill');
   if (fillEl) {
     fillEl.style.width = `${gameState.input.currentPercent}%`;
@@ -324,11 +323,9 @@ function bindCommandButtons() {
       window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
     };
 
-    // Mouse Controls
     btn.onmousedown = handlePressDown;
     btn.onmouseup = handlePressUp;
 
-    // iPad / Touch Controls (Enables simultaneous multi-touch holding and tapping)
     btn.addEventListener('touchstart', handlePressDown, { passive: false });
     btn.addEventListener('touchend', handlePressUp, { passive: false });
     btn.addEventListener('touchcancel', handlePressUp, { passive: false });
@@ -408,7 +405,6 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.muted = true;
     centerVid.playsInline = true;
 
-    // Palette swap for P2 mirror match
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
 
     // Dynamic Ichigo Video Direction Logic
@@ -416,7 +412,6 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const isUnmirrored = videoFile.includes('windmill_guard') || videoFile.includes('combo_kick');
     const sourceFacingLeft = isIchigo && !isUnmirrored;
 
-    // P1 flips source-left videos to face right; P2 flips source-right videos to face left
     const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
     centerVid.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
 
@@ -659,29 +654,12 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 }
 
 function updateCharacterMedia(playerKey, stateType) {
-  // Dynamic Ichigo Video Direction Logic for Side HUD Boxes
-  const isIchigo = player.id === 'ichigo';
-  const isUnmirrored = fileName.includes('windmill_guard') || fileName.includes('combo_kick');
-  const sourceFacingLeft = isIchigo && !isUnmirrored;
-
-  const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
-  videoEl.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
-  
   const player = gameState[playerKey];
   if (!player) return;
 
   const videoEl = document.getElementById(`${playerKey}-video`);
   const spriteEl = document.getElementById(`${playerKey}-sprite`);
   if (!videoEl) return;
-
-  const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
-
-  videoEl.muted = true;
-  videoEl.playsInline = true;
-
-  if (playerKey === 'p2') {
-    videoEl.classList.toggle('p2-mirror-palette', isMirrorMatch);
-  }
 
   let fileName = stateType;
 
@@ -701,6 +679,23 @@ function updateCharacterMedia(playerKey, stateType) {
 
   if (!fileName.endsWith('.mp4') && !fileName.endsWith('.webm')) {
     fileName += '.mp4';
+  }
+
+  // Dynamic Ichigo Video Direction Logic for Side HUD Boxes
+  const isIchigo = player.id === 'ichigo';
+  const isUnmirrored = fileName.includes('windmill_guard') || fileName.includes('combo_kick');
+  const sourceFacingLeft = isIchigo && !isUnmirrored;
+
+  const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
+  videoEl.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
+
+  const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
+
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+
+  if (playerKey === 'p2') {
+    videoEl.classList.toggle('p2-mirror-palette', isMirrorMatch);
   }
 
   const isLoopingState = ['idle.mp4', 'mid-air.mp4', 'faint.mp4'].includes(fileName);
