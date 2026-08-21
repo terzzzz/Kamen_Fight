@@ -261,19 +261,15 @@ function updateHUD() {
     
     if (p1Name) p1Name.textContent = `[P1] ${gameState.p1.name}`;
     if (p1Lp) {
-      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p1.lp}</span> / ${gameState.p1.maxLp}`;
+      p1Lp.textContent = `${gameState.p1.lp} / ${gameState.p1.maxLp}`;
     }
     if (p1Chi) {
       const maxChi = gameState.p1.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (gameState.p1.chi / maxChi) * 100));
       p1Chi.innerHTML = `
-        <div class="chi-container">
-          <span class="stat-label">CHI:</span>
-          <span class="stat-value-large">${gameState.p1.chi}</span>
-          <span class="chi-max-label">/ ${maxChi}</span>
-          <div class="chi-bar-track">
-            <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
-          </div>
+        <span class="stat-value-large">${gameState.p1.chi}</span>
+        <div class="chi-bar-track">
+          <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
     }
   }
@@ -285,19 +281,15 @@ function updateHUD() {
     
     if (p2Name) p2Name.textContent = `[P2] ${gameState.p2.name}`;
     if (p2Lp) {
-      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p2.lp}</span> / ${gameState.p2.maxLp}`;
+      p2Lp.textContent = `${gameState.p2.lp} / ${gameState.p2.maxLp}`;
     }
     if (p2Chi) {
       const maxChi = gameState.p2.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (gameState.p2.chi / maxChi) * 100));
       p2Chi.innerHTML = `
-        <div class="chi-container">
-          <span class="stat-label">CHI:</span>
-          <span class="stat-value-large">${gameState.p2.chi}</span>
-          <span class="chi-max-label">/ ${maxChi}</span>
-          <div class="chi-bar-track">
-            <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
-          </div>
+        <span class="stat-value-large">${gameState.p2.chi}</span>
+        <div class="chi-bar-track">
+          <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
     }
   }
