@@ -38,20 +38,32 @@ function stopBattleBGM() {
   }
 }
 
-// Roster Configuration (Locked exclusively to Ichigo)
-const AVAILABLE_RIDERS = [
+// Dynamic Roster Storage
+let AVAILABLE_RIDERS = [
   { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 }
 ];
 
 let vsSelectionState = {
   step: 1, // 1: Select P1, 2: Select P2, 3: Ready
-  p1Index: 0, // Kamen Rider Ichigo
+  p1Index: 0,
   p1IsCPU: false,
-  p2Index: 0, // Kamen Rider Ichigo
+  p2Index: 0,
   p2IsCPU: true
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch('data/riders.json');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        AVAILABLE_RIDERS = data;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not load riders.json, using default roster.");
+  }
+
   updateSelectionUI();
 
   // Autoplay Unlock Listener
@@ -90,10 +102,6 @@ function handleConfirmStep() {
   if (vsSelectionState.step === 1) {
     vsSelectionState.step = 2;
   } else if (vsSelectionState.step === 2) {
-    if (!vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU) {
-      if (errorBanner) errorBanner.hidden = false;
-      return;
-    }
     vsSelectionState.step = 3;
   }
   updateSelectionUI();
@@ -110,12 +118,19 @@ function handleBackStep() {
 }
 
 function updateSelectionUI() {
-  const p1 = AVAILABLE_RIDERS[vsSelectionState.p1Index];
-  const p2 = AVAILABLE_RIDERS[vsSelectionState.p2Index];
+  if (!AVAILABLE_RIDERS || AVAILABLE_RIDERS.length === 0) return;
 
-  document.getElementById('p1-img').src = p1.icon;
-  document.getElementById('p1-name-display').textContent = p1.name;
-  document.getElementById('p1-type-display').textContent = vsSelectionState.p1IsCPU ? 'CPU' : 'HUMAN';
+  const p1 = AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0];
+  const p2 = AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0];
+
+  const p1ImgEl = document.getElementById('p1-img');
+  if (p1ImgEl) p1ImgEl.src = p1.icon;
+  
+  const p1NameEl = document.getElementById('p1-name-display');
+  if (p1NameEl) p1NameEl.textContent = p1.name;
+
+  const p1TypeEl = document.getElementById('p1-type-display');
+  if (p1TypeEl) p1TypeEl.textContent = vsSelectionState.p1IsCPU ? 'CPU' : 'HUMAN';
 
   const p2ImgEl = document.getElementById('p2-img');
   if (p2ImgEl) {
@@ -124,8 +139,11 @@ function updateSelectionUI() {
     p2ImgEl.classList.toggle('p2-mirror-palette', p1.id === p2.id);
   }
 
-  document.getElementById('p2-name-display').textContent = p2.name;
-  document.getElementById('p2-type-display').textContent = vsSelectionState.p2IsCPU ? 'CPU' : 'HUMAN';
+  const p2NameEl = document.getElementById('p2-name-display');
+  if (p2NameEl) p2NameEl.textContent = p2.name;
+
+  const p2TypeEl = document.getElementById('p2-type-display');
+  if (p2TypeEl) p2TypeEl.textContent = vsSelectionState.p2IsCPU ? 'CPU' : 'HUMAN';
 
   const p1Card = document.getElementById('p1-card');
   const p2Card = document.getElementById('p2-card');
@@ -138,52 +156,76 @@ function updateSelectionUI() {
   const p1RightBtn = document.getElementById('p1-right-btn');
   const p2LeftBtn = document.getElementById('p2-left-btn');
   const p2RightBtn = document.getElementById('p2-right-btn');
+  
+  const p1TypeLeft = document.getElementById('p1-type-left');
+  const p1TypeRight = document.getElementById('p1-type-right');
   const p2TypeLeft = document.getElementById('p2-type-left');
   const p2TypeRight = document.getElementById('p2-type-right');
 
-  // Cycle buttons disabled at all times since only 1 rider is available
-  if (p1LeftBtn) p1LeftBtn.disabled = true;
-  if (p1RightBtn) p1RightBtn.disabled = true;
-  if (p2LeftBtn) p2LeftBtn.disabled = true;
-  if (p2RightBtn) p2RightBtn.disabled = true;
+  const multiRider = AVAILABLE_RIDERS.length > 1;
 
   if (vsSelectionState.step === 1) {
-    headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
-    p1Card.className = 'rider-card active-slot';
-    p2Card.className = 'rider-card locked-slot';
+    if (headerText) headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
+    if (p1Card) p1Card.className = 'rider-card active-slot';
+    if (p2Card) p2Card.className = 'rider-card locked-slot';
 
+    if (p1LeftBtn) p1LeftBtn.disabled = !multiRider;
+    if (p1RightBtn) p1RightBtn.disabled = !multiRider;
+    if (p1TypeLeft) p1TypeLeft.disabled = false;
+    if (p1TypeRight) p1TypeRight.disabled = false;
+
+    if (p2LeftBtn) p2LeftBtn.disabled = true;
+    if (p2RightBtn) p2RightBtn.disabled = true;
     if (p2TypeLeft) p2TypeLeft.disabled = true;
     if (p2TypeRight) p2TypeRight.disabled = true;
 
-    confirmBtn.hidden = false;
-    confirmBtn.textContent = 'CONFIRM P1';
-    startBtn.hidden = true;
-    backBtn.disabled = true;
+    if (confirmBtn) {
+      confirmBtn.hidden = false;
+      confirmBtn.textContent = 'CONFIRM P1';
+    }
+    if (startBtn) startBtn.hidden = true;
+    if (backBtn) backBtn.disabled = true;
 
   } else if (vsSelectionState.step === 2) {
-    headerText.textContent = 'STEP 2: CONFIRM PLAYER 2 RIDER';
-    p1Card.className = 'rider-card locked-slot';
-    p2Card.className = 'rider-card active-slot';
+    if (headerText) headerText.textContent = 'STEP 2: CONFIRM PLAYER 2 RIDER';
+    if (p1Card) p1Card.className = 'rider-card locked-slot';
+    if (p2Card) p2Card.className = 'rider-card active-slot';
 
+    if (p1LeftBtn) p1LeftBtn.disabled = true;
+    if (p1RightBtn) p1RightBtn.disabled = true;
+    if (p1TypeLeft) p1TypeLeft.disabled = true;
+    if (p1TypeRight) p1TypeRight.disabled = true;
+
+    if (p2LeftBtn) p2LeftBtn.disabled = !multiRider;
+    if (p2RightBtn) p2RightBtn.disabled = !multiRider;
     if (p2TypeLeft) p2TypeLeft.disabled = false;
     if (p2TypeRight) p2TypeRight.disabled = false;
 
-    confirmBtn.hidden = false;
-    confirmBtn.textContent = 'CONFIRM P2';
-    startBtn.hidden = true;
-    backBtn.disabled = false;
+    if (confirmBtn) {
+      confirmBtn.hidden = false;
+      confirmBtn.textContent = 'CONFIRM P2';
+    }
+    if (startBtn) startBtn.hidden = true;
+    if (backBtn) backBtn.disabled = false;
 
   } else if (vsSelectionState.step === 3) {
-    headerText.textContent = 'READY FOR BATTLE!';
-    p1Card.className = 'rider-card active-slot';
-    p2Card.className = 'rider-card active-slot';
+    if (headerText) headerText.textContent = 'READY FOR BATTLE!';
+    if (p1Card) p1Card.className = 'rider-card active-slot';
+    if (p2Card) p2Card.className = 'rider-card active-slot';
 
+    if (p1LeftBtn) p1LeftBtn.disabled = true;
+    if (p1RightBtn) p1RightBtn.disabled = true;
+    if (p1TypeLeft) p1TypeLeft.disabled = true;
+    if (p1TypeRight) p1TypeRight.disabled = true;
+
+    if (p2LeftBtn) p2LeftBtn.disabled = true;
+    if (p2RightBtn) p2RightBtn.disabled = true;
     if (p2TypeLeft) p2TypeLeft.disabled = true;
     if (p2TypeRight) p2TypeRight.disabled = true;
 
-    confirmBtn.hidden = true;
-    startBtn.hidden = false;
-    backBtn.disabled = false;
+    if (confirmBtn) confirmBtn.hidden = true;
+    if (startBtn) startBtn.hidden = false;
+    if (backBtn) backBtn.disabled = false;
   }
 }
 
@@ -191,12 +233,13 @@ function validateAndStartMatch() {
   stopSelectionBGM();
   playBattleBGM();
 
-  document.getElementById('vs-select-screen').hidden = true;
+  const selectScreen = document.getElementById('vs-select-screen');
+  if (selectScreen) selectScreen.hidden = true;
 
   const matchConfig = {
-    p1Rider: AVAILABLE_RIDERS[vsSelectionState.p1Index],
+    p1Rider: AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0],
     p1IsCPU: vsSelectionState.p1IsCPU,
-    p2Rider: AVAILABLE_RIDERS[vsSelectionState.p2Index],
+    p2Rider: AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0],
     p2IsCPU: vsSelectionState.p2IsCPU
   };
 
