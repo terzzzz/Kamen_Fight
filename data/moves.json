@@ -11,21 +11,21 @@
       "grantsAirborne": 2,
       "description": "Grants Airborne status for 2 turns; shifts idle animation to mid-air.mp4"
     },
-    "W+J": {
-      "name": "Typhoon Charge",
-      "type": "UTILITY",
-      "chiCost": 3,
-      "baseDamage": 0,
-      "hitChance": 100,
-      "video": "charge_up.mp4",
-      "buff": {
-        "id": "typhoon",
-        "label": "D&S ATK +25%",
-        "type": "attack",
-        "duration": 3
-      },
-      "description": "+30% Charge Speed for 3 turns"
-    },
+ "W+J": {
+  "name": "Typhoon Charge",
+  "type": "UTILITY",
+  "chiCost": 3,
+  "baseDamage": 0,
+  "hitChance": 100,
+  "video": "charge_up.mp4",
+  "buff": {
+    "id": "charge_speed",
+    "label": "CHARGE SPEED +25%",
+    "type": "speed",
+    "duration": 3
+  },
+  "description": "+25% Charge Speed for 3 turns (reduces charge duration to 75%)"
+}
     "W+K": {
       "name": "Typhoon Focus",
       "type": "UTILITY",
