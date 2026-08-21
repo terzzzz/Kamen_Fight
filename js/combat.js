@@ -514,13 +514,20 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
   const defChargeRatio = Math.max(0.5, (defender.activeChargePercent || 100) / 100);
 
-  let jumpEvasionBonus = defender.airborneTicks > 0 ? 20 : 0;
+  // --- 1. DYNAMIC HIT & EVASION CALCULATION ---
+  let baseHitChance = atkMove.hitChance || 80;
+
+  // Attacker Hit Bonus (Nigo's Airborne Jump grants +15% HIT)
+  let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
+
+  // Defender Evasion Bonus (Ichigo's Airborne Jump grants +20% EVS)
+  let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
 
   let rolledHit = false;
   if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
     rolledHit = true;
   } else {
-    let effectiveHitChance = Math.max(10, ((atkMove.hitChance || 80) * atkChargeRatio) - jumpEvasionBonus);
+    let effectiveHitChance = Math.max(10, ((baseHitChance + attackerHitBonus) * atkChargeRatio) - defenderEvasionBonus);
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
@@ -531,6 +538,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   let isGlancing = Math.random() * 100 < 15; 
 
+  // --- 2. DEFENSE & GUARD RATIOS ---
   let damageRatio = 1.0;
   if (defMove.type === 'DEFENSE') {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
@@ -548,13 +556,30 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
+  // Defender Mitigation Buffs (Nigo Red Shutter: +15% DEF)
+  if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
+    damageRatio *= 0.85; 
+  }
+
+  // --- 3. DYNAMIC ATTACK MULTIPLIERS ---
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
-  let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon')) ? 1.25 : 1.0;
-  let sSkillMultiplier = (atkMoveKey.startsWith('S') && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
+  let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon' || b.id === 'typhoon_speed')) ? 1.25 : 1.0;
+
+  // Rider-Specific Focus Buffs
+  let focusMultiplier = 1.0;
+  if (attacker.activeBuffs) {
+    if (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) {
+      focusMultiplier = 1.20; // Ichigo Typhoon Focus: +20% Special ATK
+    } else if (atkMoveKey.startsWith('D') && attacker.activeBuffs.some(b => b.id === 'power_focus')) {
+      focusMultiplier = 1.30; // Nigo Power Focus: +30% Physical ATK
+    }
+  }
+
+  // Airborne Attack Multiplier (+15% ATK)
   let jumpAtkMultiplier = attacker.airborneTicks > 0 ? 1.15 : 1.0;
   
   let baseDamage = atkMove.baseDamage || 0;
-  let calculatedDmg = baseDamage * typhoonMultiplier * sSkillMultiplier * jumpAtkMultiplier * damageRatio;
+  let calculatedDmg = baseDamage * typhoonMultiplier * focusMultiplier * jumpAtkMultiplier * damageRatio;
 
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
 
