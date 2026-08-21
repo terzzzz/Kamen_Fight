@@ -21,6 +21,24 @@ var FAINT_CONFIG = FAINT_CONFIG || {
   FAINT_THRESHOLD: 100   // Faint meter max limit
 };
 
+var FALLBACK_ICHIGO_MOVES = {
+  "W+I": { name: "Rider High Jump", type: "UTILITY", chiCost: 3, baseDamage: 0, hitChance: 100, video: "jump.mp4", grantsAirborne: 2 },
+  "W+J": { name: "Typhoon Charge", type: "UTILITY", chiCost: 3, baseDamage: 0, hitChance: 100, video: "charge_up.mp4", buff: { id: "charge_speed", label: "CHARGE SPEED +25%", type: "speed", duration: 3 } },
+  "W+K": { name: "Typhoon Focus", type: "UTILITY", chiCost: 2, baseDamage: 0, hitChance: 100, video: "charge_up.mp4", buff: { id: "focus", label: "S-ATK +20%", type: "attack", duration: 2 } },
+  "D+J": { name: "Standard Punch", type: "PHYSICAL", chiCost: 0, baseDamage: 60, hitChance: 75, video: "punch.mp4" },
+  "D+K": { name: "Standard Kick", type: "PHYSICAL", chiCost: 0, baseDamage: 70, hitChance: 78, video: "kick.mp4" },
+  "D+L": { name: "Combo Punch", type: "PHYSICAL", chiCost: 1, baseDamage: 120, hitChance: 72, video: "combo_punch.mp4" },
+  "D+I": { name: "Combo Kick", type: "PHYSICAL", chiCost: 1, baseDamage: 110, hitChance: 75, video: "combo_kick.mp4", unmirrored: true },
+  "S+J": { name: "Rider Power Chop", type: "SPECIAL", chiCost: 3, baseDamage: 200, hitChance: 70, video: "power_chop.mp4" },
+  "S+K": { name: "Rider Head Crusher", type: "SPECIAL", chiCost: 4, baseDamage: 240, hitChance: 65, video: "head_crusher.mp4" },
+  "S+L": { name: "Rider Kick", type: "SPECIAL", chiCost: 6, baseDamage: 430, hitChance: 60, video: "rider_kick.mp4" },
+  "S+I": { name: "Kirimomi Kick", type: "SPECIAL", chiCost: 10, baseDamage: 550, hitChance: 66, video: "kirimomi_kick.mp4" },
+  "A+I": { name: "Windmill Guard", type: "DEFENSE", chiCost: 3, baseDamage: 0, hitChance: 100, video: "windmill_guard.mp4", unmirrored: true },
+  "A+J": { name: "High Guard", type: "DEFENSE", chiCost: 0, baseDamage: 0, hitChance: 100, video: "guard.mp4" },
+  "A+K": { name: "Mid Guard", type: "DEFENSE", chiCost: 0, baseDamage: 0, hitChance: 100, video: "guard.mp4" },
+  "A+L": { name: "Side Guard", type: "DEFENSE", chiCost: 0, baseDamage: 0, hitChance: 100, video: "guard.mp4" }
+};
+
 let gameState = {
   roundCounter: 1,
   roundPhase: 'IDLE',
@@ -28,10 +46,10 @@ let gameState = {
   timerInterval: null,
   p1Moves: {},
   p2Moves: {},
-  videoCache: {}, // Memory cache for preloaded MP4 blobs
+  videoCache: {},
   p1: null,
   p2: null,
-  p2AlwaysIdle: false, // Dummy Mode Toggle (Key '0')
+  p2AlwaysIdle: false,
   canContinueFromGameOver: false,
   p2SelectedMoveKey: null,
   p2LockInTime: 0,
@@ -60,14 +78,17 @@ async function startBattle(config) {
 
   try {
     const response = await fetch('data/moves.json');
-    const fullRoster = await response.json();
-    
-    gameState.p1Moves = fullRoster[p1RiderId] || fullRoster['ichigo'] || {};
-    gameState.p2Moves = fullRoster[p2RiderId] || fullRoster['ichigo'] || {};
+    if (response.ok) {
+      const fullRoster = await response.json();
+      gameState.p1Moves = fullRoster[p1RiderId] || fullRoster['ichigo'] || FALLBACK_ICHIGO_MOVES;
+      gameState.p2Moves = fullRoster[p2RiderId] || fullRoster['ichigo'] || FALLBACK_ICHIGO_MOVES;
+    } else {
+      throw new Error("HTTP error loading moves.json");
+    }
   } catch (err) {
-    console.warn("Could not load moves.json, using fallback data.");
-    gameState.p1Moves = {};
-    gameState.p2Moves = {};
+    console.warn("Could not load moves.json, using fallback roster.");
+    gameState.p1Moves = FALLBACK_ICHIGO_MOVES;
+    gameState.p2Moves = FALLBACK_ICHIGO_MOVES;
   }
 
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
@@ -187,8 +208,23 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Check if resolution can trigger immediately (e.g. CPU vs CPU or Human locked)
-  checkBothPlayersLocked();
+  // Schedule CPU decision locks during the 5-second countdown
+  ['p1', 'p2'].forEach(slot => {
+    const player = gameState[slot];
+    if (player && player.isCPU && !player.isFainted) {
+      if (slot === 'p2' && gameState.p2AlwaysIdle) return;
+
+      const thinkTime = Math.floor(Math.random() * 1200 + 1000);
+      setTimeout(() => {
+        if (gameState.roundPhase !== 'INPUT') return;
+        const oppSlot = slot === 'p1' ? 'p2' : 'p1';
+        const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
+        player.activeChargePercent = Math.floor(Math.random() * 26 + 75);
+        confirmPlayerAction(moveKey, slot);
+        simulateCPUButtonPress(moveKey);
+      }, thinkTime);
+    }
+  });
 
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
@@ -199,29 +235,40 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      if (!gameState.input.isConfirmed && !gameState.p1.isCPU) {
-        confirmPlayerAction('DO_NOTHING', 'p1');
+      if (!gameState.input.isConfirmed) {
+        if (gameState.p1.isCPU) {
+          const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
+          confirmPlayerAction(mk, 'p1');
+        } else {
+          confirmPlayerAction('DO_NOTHING', 'p1');
+        }
       }
-      if (!gameState.p2IsConfirmed && !gameState.p2.isCPU) {
-        confirmPlayerAction('DO_NOTHING', 'p2');
+
+      if (!gameState.p2IsConfirmed) {
+        if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
+          const mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
+          confirmPlayerAction(mk, 'p2');
+        } else {
+          confirmPlayerAction('DO_NOTHING', 'p2');
+        }
       }
+
       executeTurnResolutionPhase();
     }
   }, 1000);
 }
 
 function checkBothPlayersLocked() {
-  const p1Ready = gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted;
-  const p2Ready = gameState.p2.isCPU || gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
+  const p1Ready = gameState.input.isConfirmed || gameState.p1.isFainted;
+  const p2Ready = gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
 
   if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
     clearInterval(gameState.timerInterval);
-    const delay = (gameState.p1.isCPU && gameState.p2.isCPU) ? 1200 : 300;
     setTimeout(() => {
       if (gameState.roundPhase === 'INPUT') {
         executeTurnResolutionPhase();
       }
-    }, delay);
+    }, 400);
   }
 }
 
