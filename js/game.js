@@ -238,6 +238,7 @@ function startRoundCountdown() {
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
+          gameState.p1.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p1');
         } else {
           confirmPlayerAction('DO_NOTHING', 'p1');
@@ -247,6 +248,7 @@ function startRoundCountdown() {
       if (!gameState.p2IsConfirmed) {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
           const mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
+          gameState.p2.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p2');
         } else {
           confirmPlayerAction('DO_NOTHING', 'p2');
