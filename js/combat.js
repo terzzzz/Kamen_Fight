@@ -1,23 +1,51 @@
-// BATTLE INITIALIZATION WITH LP MODIFIERS
-// BATTLE INITIALIZATION WITH LP MODIFIERS
-function startBattle(matchConfig) {
-  gameState.matchConfig = matchConfig;
+// FAINT SYSTEM FALLBACK CONFIG
+const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
+  FAINT_THRESHOLD: 100,
+  HIT_BUILDUP: 25,
+  ROUND_RECOVERY: 15
+};
 
-  // Calculate Max LP with Hard Mode (+30%) checks
-  let p1MaxLp = matchConfig.p1Rider.maxLp || 1050;
+// BATTLE INITIALIZATION WITH HARD MODE LP BOOSTS & MOVE LOADING
+async function startBattle(matchConfig) {
+  if (!window.gameState) window.gameState = {};
+  gameState.matchConfig = matchConfig;
+  if (!gameState.videoCache) gameState.videoCache = {};
+
+  // 1. Fetch Move Sets for Selected Riders
+  try {
+    const res = await fetch('data/moves.json');
+    if (res.ok) {
+      const allMoves = await res.json();
+      gameState.p1Moves = allMoves[matchConfig.p1Rider.id] || allMoves['ichigo'] || {};
+      gameState.p2Moves = allMoves[matchConfig.p2Rider.id] || allMoves['ichigo'] || {};
+    }
+  } catch (e) {
+    console.warn("Could not load moves.json in startBattle, using fallback dictionary.");
+    gameState.p1Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+    gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+  }
+
+  // 2. Preload Rider Videos
+  if (typeof preloadRiderVideos === 'function') {
+    preloadRiderVideos(matchConfig.p1Rider.id, gameState.p1Moves);
+    preloadRiderVideos(matchConfig.p2Rider.id, gameState.p2Moves);
+  }
+
+  // 3. Calculate LP with Hard Mode (+30%) Boosts
+  let p1MaxLp = (matchConfig.p1Rider && matchConfig.p1Rider.maxLp) ? matchConfig.p1Rider.maxLp : 1050;
   if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') {
     p1MaxLp = Math.floor(p1MaxLp * 1.30);
   }
 
-  let p2MaxLp = matchConfig.p2Rider.maxLp || 1050;
+  let p2MaxLp = (matchConfig.p2Rider && matchConfig.p2Rider.maxLp) ? matchConfig.p2Rider.maxLp : 1050;
   if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') {
     p2MaxLp = Math.floor(p2MaxLp * 1.30);
   }
 
-  // Initialize P1 Object Structure
+  // 4. Instantiate P1 & P2 Objects Safely
   gameState.p1 = {
-    id: matchConfig.p1Rider.id,
-    name: matchConfig.p1Rider.name,
+    id: matchConfig.p1Rider ? matchConfig.p1Rider.id : 'ichigo',
+    name: matchConfig.p1Rider ? matchConfig.p1Rider.name : 'Kamen Rider Ichigo',
     isCPU: matchConfig.p1IsCPU,
     maxLp: p1MaxLp,
     lp: p1MaxLp,
@@ -26,13 +54,14 @@ function startBattle(matchConfig) {
     faintMeter: 0,
     activeBuffs: [],
     airborneTicks: 0,
-    activeChargePercent: 100
+    activeChargePercent: 100,
+    isFainted: false,
+    tookCleanHitThisRound: false
   };
 
-  // Initialize P2 Object Structure
   gameState.p2 = {
-    id: matchConfig.p2Rider.id,
-    name: matchConfig.p2Rider.name,
+    id: matchConfig.p2Rider ? matchConfig.p2Rider.id : 'nigo',
+    name: matchConfig.p2Rider ? matchConfig.p2Rider.name : 'Kamen Rider Nigo',
     isCPU: matchConfig.p2IsCPU,
     maxLp: p2MaxLp,
     lp: p2MaxLp,
@@ -41,20 +70,23 @@ function startBattle(matchConfig) {
     faintMeter: 0,
     activeBuffs: [],
     airborneTicks: 0,
-    activeChargePercent: 100
+    activeChargePercent: 100,
+    isFainted: false,
+    tookCleanHitThisRound: false
   };
 
   gameState.p1Rider = matchConfig.p1Rider;
   gameState.p2Rider = matchConfig.p2Rider;
+  gameState.p1IsCPU = matchConfig.p1IsCPU;
+  gameState.p2IsCPU = matchConfig.p2IsCPU;
   gameState.roundCounter = 1;
 
-  // Unhide battle screen
+  // 5. Unhide Battle UI & Trigger Idle Media
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
   updateHUD();
 
-  // Initialize idle sprites/media for both players
   if (typeof updateCharacterMedia === 'function') {
     updateCharacterMedia('p1', 'IDLE');
     updateCharacterMedia('p2', 'IDLE');
@@ -65,7 +97,7 @@ function startBattle(matchConfig) {
   }
 }
 
-// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & PLAYER MOVESET
+// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & DIFFICULTY
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
@@ -102,6 +134,17 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   return 'D+J';
 }
 
+function getMoveForPlayer(playerKey, moveKey) {
+  if (!moveKey || moveKey === 'DO_NOTHING') {
+    return { name: 'Do Nothing', type: 'IDLE', chiCost: 0, baseDamage: 0, hitChance: 100, video: 'idle.mp4' };
+  }
+  const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
+  if (moves && moves[moveKey]) {
+    return moves[moveKey];
+  }
+  return { name: 'Standard Punch', type: 'PHYSICAL', chiCost: 0, baseDamage: 60, hitChance: 75, video: 'punch.mp4' };
+}
+
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const hudEl = document.querySelector(`.${slotKey}-hud`);
   if (!hudEl) return;
@@ -136,6 +179,7 @@ function triggerFloatingText(slotKey, text, customClass = '') {
 }
 
 function applyBuff(player, buffId, label, buffType, durationRounds) {
+  if (!player.activeBuffs) player.activeBuffs = [];
   player.activeBuffs = player.activeBuffs.filter(b => b.id !== buffId);
   player.activeBuffs.push({
     id: buffId,
@@ -147,6 +191,7 @@ function applyBuff(player, buffId, label, buffType, durationRounds) {
 }
 
 function processRoundBuffs(player) {
+  if (!player.activeBuffs) return;
   player.activeBuffs.forEach(b => b.roundsLeft--);
   player.activeBuffs = player.activeBuffs.filter(b => b.roundsLeft > 0);
   renderBuffTrays();
@@ -167,12 +212,14 @@ function renderBuffTrays() {
       tray.appendChild(airTag);
     }
 
-    player.activeBuffs.forEach(b => {
-      const tag = document.createElement('div');
-      tag.className = `buff-tag ${b.type}`;
-      tag.textContent = `${b.label} (${b.roundsLeft}R)`;
-      tray.appendChild(tag);
-    });
+    if (player.activeBuffs) {
+      player.activeBuffs.forEach(b => {
+        const tag = document.createElement('div');
+        tag.className = `buff-tag ${b.type}`;
+        tag.textContent = `${b.label} (${b.roundsLeft}R)`;
+        tray.appendChild(tag);
+      });
+    }
   });
 }
 
@@ -204,7 +251,7 @@ function updateHUD() {
     
     if (p1Name) p1Name.textContent = `[P1] ${gameState.p1.name}`;
     if (p1Lp) {
-      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p1.lp}</span>`;
+      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p1.lp}</span> / ${gameState.p1.maxLp}`;
     }
     if (p1Chi) {
       const maxChi = gameState.p1.maxChi || 16;
@@ -228,7 +275,7 @@ function updateHUD() {
     
     if (p2Name) p2Name.textContent = `[P2] ${gameState.p2.name}`;
     if (p2Lp) {
-      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p2.lp}</span>`;
+      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p2.lp}</span> / ${gameState.p2.maxLp}`;
     }
     if (p2Chi) {
       const maxChi = gameState.p2.maxChi || 16;
@@ -261,7 +308,7 @@ function updateHUD() {
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
-  let p1MoveKey = gameState.input.selectedMoveKey;
+  let p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
   if (!p1MoveKey && gameState.p1.isCPU) {
     p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
   }
@@ -273,13 +320,13 @@ async function executeTurnResolutionPhase() {
   }
   if (!p2MoveKey) p2MoveKey = 'DO_NOTHING';
 
-  let p1Time = gameState.input.lockInTime || 1;
+  let p1Time = (gameState.input && gameState.input.lockInTime) ? gameState.input.lockInTime : 1;
   let p2Time = gameState.p2LockInTime || 1;
 
-  if (gameState.p1.isCPU && p1MoveKey !== 'DO_NOTHING') {
+  if (gameState.p1.isCPU && p1MoveKey !== 'DO_NOTHING' && typeof simulateCPUButtonPress === 'function') {
     simulateCPUButtonPress(p1MoveKey);
   }
-  if (gameState.p2.isCPU && !gameState.p2AlwaysIdle && p2MoveKey !== 'DO_NOTHING') {
+  if (gameState.p2.isCPU && !gameState.p2AlwaysIdle && p2MoveKey !== 'DO_NOTHING' && typeof simulateCPUButtonPress === 'function') {
     simulateCPUButtonPress(p2MoveKey);
   }
 
@@ -299,7 +346,9 @@ async function executeTurnResolutionPhase() {
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
-    battleMsg.innerHTML = `P1: ${p1Move.name} (${gameState.p1.activeChargePercent}%) VS P2: ${p2Move.name} (${gameState.p2.activeChargePercent}%)`;
+    const p1Charge = gameState.p1.activeChargePercent || 100;
+    const p2Charge = gameState.p2.activeChargePercent || 100;
+    battleMsg.innerHTML = `P1: ${p1Move.name} (${p1Charge}%) VS P2: ${p2Move.name} (${p2Charge}%)`;
   }
 
   setSideBoxesBlank(true);
@@ -418,7 +467,7 @@ async function executeTurnResolutionPhase() {
           player.isFainted = false;
           player.faintMeter = 0;
         } else if (!player.tookCleanHitThisRound) {
-          player.faintMeter = Math.max(0, player.faintMeter - FAINT_CONFIG.ROUND_RECOVERY);
+          player.faintMeter = Math.max(0, player.faintMeter - FAINT_CFG.ROUND_RECOVERY);
         }
         player.tookCleanHitThisRound = false;
       }
@@ -428,7 +477,9 @@ async function executeTurnResolutionPhase() {
 
     if (gameState.p1.lp > 0 && gameState.p2.lp > 0) {
       gameState.roundCounter++;
-      startRoundCountdown();
+      if (typeof startRoundCountdown === 'function') {
+        startRoundCountdown();
+      }
     } else {
       gameState.roundPhase = 'GAME_OVER';
       if (battleMsg) battleMsg.hidden = false;
@@ -504,8 +555,8 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
-  let typhoonMultiplier = (isDOrS && attacker.activeBuffs.some(b => b.id === 'typhoon')) ? 1.25 : 1.0;
-  let sSkillMultiplier = (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
+  let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon')) ? 1.25 : 1.0;
+  let sSkillMultiplier = (atkMoveKey.startsWith('S') && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'focus')) ? 1.20 : 1.0;
   let jumpAtkMultiplier = attacker.airborneTicks > 0 ? 1.15 : 1.0;
   
   let baseDamage = atkMove.baseDamage || 0;
@@ -528,9 +579,9 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
     if (!isGlancing && !defender.isFainted && !defender.willBeFaintedNextRound) {
       defender.tookCleanHitThisRound = true;
-      defender.faintMeter = Math.min(FAINT_CONFIG.FAINT_THRESHOLD, defender.faintMeter + FAINT_CONFIG.HIT_BUILDUP);
+      defender.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, defender.faintMeter + FAINT_CFG.HIT_BUILDUP);
       
-      if (defender.faintMeter >= FAINT_CONFIG.FAINT_THRESHOLD) {
+      if (defender.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
         defender.willBeFaintedNextRound = true;
       }
     }
