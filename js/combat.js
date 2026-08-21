@@ -205,13 +205,7 @@ function renderBuffTrays() {
 
     tray.innerHTML = '';
 
-    if (player.airborneTicks > 0) {
-      const airTag = document.createElement('div');
-      airTag.className = 'buff-tag airborne';
-      airTag.textContent = `AIR (+15% ATK / +20% EVS) (${player.airborneTicks}R)`;
-      tray.appendChild(airTag);
-    }
-
+    // Render active buff badges dynamically from moves.json
     if (player.activeBuffs) {
       player.activeBuffs.forEach(b => {
         const tag = document.createElement('div');
