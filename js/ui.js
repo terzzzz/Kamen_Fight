@@ -48,7 +48,7 @@ let vsSelectionState = {
   p1Index: 0,
   p1IsCPU: false,
   p2Index: 0,
-  p2IsCPU: true
+  p2IsCPU: true // Permanently locked to CPU
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -83,10 +83,17 @@ function cycleRider(playerKey, direction) {
 }
 
 function toggleControlType(playerKey) {
+  const errorBanner = document.getElementById('vs-error-banner');
+
   if (playerKey === 'p1' && vsSelectionState.step === 1) {
     vsSelectionState.p1IsCPU = !vsSelectionState.p1IsCPU;
-  } else if (playerKey === 'p2' && vsSelectionState.step === 2) {
-    vsSelectionState.p2IsCPU = !vsSelectionState.p2IsCPU;
+    if (errorBanner) errorBanner.hidden = true;
+  } else if (playerKey === 'p2') {
+    if (errorBanner) {
+      errorBanner.textContent = 'PLAYER 2 IS LOCKED TO CPU CONTROL ONLY!';
+      errorBanner.hidden = false;
+    }
+    return;
   }
   updateSelectionUI();
 }
@@ -94,15 +101,6 @@ function toggleControlType(playerKey) {
 function handleConfirmStep() {
   const errorBanner = document.getElementById('vs-error-banner');
   if (errorBanner) errorBanner.hidden = true;
-
-  // Block progression if both players are set to HUMAN
-  if (!vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU) {
-    if (errorBanner) {
-      errorBanner.textContent = '2-PLAYER HUMAN VS HUMAN IS DISABLED. AT LEAST ONE PLAYER MUST BE CPU!';
-      errorBanner.hidden = false;
-    }
-    return;
-  }
 
   if (vsSelectionState.step === 1) {
     vsSelectionState.step = 2;
@@ -125,9 +123,10 @@ function handleBackStep() {
 function updateSelectionUI() {
   if (!AVAILABLE_RIDERS || AVAILABLE_RIDERS.length === 0) return;
 
-  // Always lock selections to index 0 (Ichigo)
+  // Always lock selections to index 0 (Ichigo) and P2 to CPU
   vsSelectionState.p1Index = 0;
   vsSelectionState.p2Index = 0;
+  vsSelectionState.p2IsCPU = true;
 
   const p1 = AVAILABLE_RIDERS[0];
   const p2 = AVAILABLE_RIDERS[0];
@@ -151,7 +150,7 @@ function updateSelectionUI() {
   if (p2NameEl) p2NameEl.textContent = p2.name;
 
   const p2TypeEl = document.getElementById('p2-type-display');
-  if (p2TypeEl) p2TypeEl.textContent = vsSelectionState.p2IsCPU ? 'CPU' : 'HUMAN';
+  if (p2TypeEl) p2TypeEl.textContent = 'CPU'; // Hardcoded display
 
   const p1Card = document.getElementById('p1-card');
   const p2Card = document.getElementById('p2-card');
@@ -159,7 +158,6 @@ function updateSelectionUI() {
   const confirmBtn = document.getElementById('confirm-btn');
   const startBtn = document.getElementById('start-game-btn');
   const backBtn = document.getElementById('back-btn');
-  const errorBanner = document.getElementById('vs-error-banner');
 
   const p1LeftBtn = document.getElementById('p1-left-btn');
   const p1RightBtn = document.getElementById('p1-right-btn');
@@ -171,23 +169,14 @@ function updateSelectionUI() {
   const p2TypeLeft = document.getElementById('p2-type-left');
   const p2TypeRight = document.getElementById('p2-type-right');
 
-  // PERMANENTLY DISABLE ALL RIDER ARROW BUTTONS
+  // PERMANENTLY DISABLE ALL RIDER ARROW BUTTONS & P2 TYPE TOGGLES
   if (p1LeftBtn) p1LeftBtn.disabled = true;
   if (p1RightBtn) p1RightBtn.disabled = true;
   if (p2LeftBtn) p2LeftBtn.disabled = true;
   if (p2RightBtn) p2RightBtn.disabled = true;
 
-  // Validate Human vs Human restriction
-  const bothAreHuman = !vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU;
-
-  if (bothAreHuman) {
-    if (errorBanner) {
-      errorBanner.textContent = '2-PLAYER HUMAN VS HUMAN IS DISABLED. AT LEAST ONE PLAYER MUST BE CPU!';
-      errorBanner.hidden = false;
-    }
-  } else {
-    if (errorBanner) errorBanner.hidden = true;
-  }
+  if (p2TypeLeft) p2TypeLeft.disabled = true;
+  if (p2TypeRight) p2TypeRight.disabled = true;
 
   if (vsSelectionState.step === 1) {
     if (headerText) headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
@@ -196,8 +185,6 @@ function updateSelectionUI() {
 
     if (p1TypeLeft) p1TypeLeft.disabled = false;
     if (p1TypeRight) p1TypeRight.disabled = false;
-    if (p2TypeLeft) p2TypeLeft.disabled = true;
-    if (p2TypeRight) p2TypeRight.disabled = true;
 
     if (confirmBtn) {
       confirmBtn.hidden = false;
@@ -208,19 +195,17 @@ function updateSelectionUI() {
     if (backBtn) backBtn.disabled = true;
 
   } else if (vsSelectionState.step === 2) {
-    if (headerText) headerText.textContent = 'STEP 2: CONFIRM PLAYER 2 RIDER';
+    if (headerText) headerText.textContent = 'STEP 2: CONFIRM PLAYER 2 RIDER (CPU)';
     if (p1Card) p1Card.className = 'rider-card locked-slot';
     if (p2Card) p2Card.className = 'rider-card active-slot';
 
     if (p1TypeLeft) p1TypeLeft.disabled = true;
     if (p1TypeRight) p1TypeRight.disabled = true;
-    if (p2TypeLeft) p2TypeLeft.disabled = false;
-    if (p2TypeRight) p2TypeRight.disabled = false;
 
     if (confirmBtn) {
       confirmBtn.hidden = false;
       confirmBtn.textContent = 'CONFIRM P2';
-      confirmBtn.disabled = bothAreHuman;
+      confirmBtn.disabled = false;
     }
     if (startBtn) startBtn.hidden = true;
     if (backBtn) backBtn.disabled = false;
@@ -232,28 +217,17 @@ function updateSelectionUI() {
 
     if (p1TypeLeft) p1TypeLeft.disabled = true;
     if (p1TypeRight) p1TypeRight.disabled = true;
-    if (p2TypeLeft) p2TypeLeft.disabled = true;
-    if (p2TypeRight) p2TypeRight.disabled = true;
 
     if (confirmBtn) confirmBtn.hidden = true;
     if (startBtn) {
       startBtn.hidden = false;
-      startBtn.disabled = bothAreHuman;
+      startBtn.disabled = false;
     }
     if (backBtn) backBtn.disabled = false;
   }
 }
 
 function validateAndStartMatch() {
-  if (!vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU) {
-    const errorBanner = document.getElementById('vs-error-banner');
-    if (errorBanner) {
-      errorBanner.textContent = '2-PLAYER HUMAN VS HUMAN IS DISABLED. AT LEAST ONE PLAYER MUST BE CPU!';
-      errorBanner.hidden = false;
-    }
-    return;
-  }
-
   stopSelectionBGM();
   playBattleBGM();
 
@@ -264,7 +238,7 @@ function validateAndStartMatch() {
     p1Rider: AVAILABLE_RIDERS[0],
     p1IsCPU: vsSelectionState.p1IsCPU,
     p2Rider: AVAILABLE_RIDERS[0],
-    p2IsCPU: vsSelectionState.p2IsCPU
+    p2IsCPU: true // Guaranteed CPU
   };
 
   if (typeof startBattle === 'function') {
