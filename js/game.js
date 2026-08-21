@@ -187,6 +187,24 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
+  // Schedule automated CPU actions with realistic thinking delay (0.8s - 1.5s)
+  ['p1', 'p2'].forEach(slot => {
+    const player = gameState[slot];
+    if (player && player.isCPU && !player.isFainted) {
+      if (slot === 'p2' && gameState.p2AlwaysIdle) return;
+
+      const thinkDelay = Math.floor(Math.random() * 700 + 800);
+      setTimeout(() => {
+        if (gameState.roundPhase !== 'INPUT') return;
+        const oppSlot = slot === 'p1' ? 'p2' : 'p1';
+        const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
+        player.activeChargePercent = moveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+        confirmPlayerAction(moveKey, slot);
+        simulateCPUButtonPress(moveKey);
+      }, thinkDelay);
+    }
+  });
+
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
 
@@ -369,7 +387,7 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.input.isConfirmed = true;
     gameState.input.selectedMoveKey = moveKey;
     gameState.input.lockInTime = gameState.turnTimerSeconds;
-    gameState.p1.activeChargePercent = Math.max(10, gameState.input.currentPercent);
+    gameState.p1.activeChargePercent = Math.max(10, gameState.p1.activeChargePercent || gameState.input.currentPercent || 100);
     clearInterval(gameState.input.chargeInterval);
 
     const flagEl = document.getElementById('p1-action-flag');
@@ -381,13 +399,30 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.p2IsConfirmed = true;
     gameState.p2SelectedMoveKey = moveKey;
     gameState.p2LockInTime = gameState.turnTimerSeconds;
-    gameState.p2.activeChargePercent = Math.max(10, gameState.p2ActiveChargePercent || 100);
+    gameState.p2.activeChargePercent = Math.max(10, gameState.p2.activeChargePercent || 100);
 
     const flagEl = document.getElementById('p2-action-flag');
     if (flagEl) {
       flagEl.hidden = false;
       flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p2.activeChargePercent}%!`;
     }
+  }
+
+  // Trigger turn resolution immediately when both inputs are locked
+  checkBothPlayersLocked();
+}
+
+function checkBothPlayersLocked() {
+  const p1Ready = gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted;
+  const p2Ready = gameState.p2.isCPU || gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
+
+  if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
+    clearInterval(gameState.timerInterval);
+    setTimeout(() => {
+      if (gameState.roundPhase === 'INPUT') {
+        executeTurnResolutionPhase();
+      }
+    }, 400);
   }
 }
 
