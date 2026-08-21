@@ -17,23 +17,18 @@ async function startBattle(matchConfig) {
   const battleScreen = document.getElementById('battle-screen');
 
   try {
-    // 1. Fetch Move Sets for Selected Riders
     try {
       const res = await fetch('data/moves.json');
       if (res.ok) {
         const allMoves = await res.json();
         gameState.p1Moves = (matchConfig.p1Rider && allMoves[matchConfig.p1Rider.id]) || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
         gameState.p2Moves = (matchConfig.p2Rider && allMoves[matchConfig.p2Rider.id]) || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
-      } else {
-        throw new Error("moves.json fetch failed");
       }
     } catch (e) {
-      console.warn("Could not load moves.json, using fallbacks.");
       gameState.p1Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
       gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
     }
 
-    // 2. Instantiate Player Objects
     const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
     const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
 
@@ -77,12 +72,11 @@ async function startBattle(matchConfig) {
 
     gameState.roundCounter = 1;
 
-    // 3. STAGE A: PRELOADING SPLASH
+    // 1. SHOW TRANSITION SPLASH SCREEN
     if (splashNames) splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
     if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
-    if (transitionScreen) transitionScreen.hidden = false;
+    if (transitionScreen) transitionScreen.style.display = 'flex';
 
-    // Non-blocking asset preload with 1.2s strict timeout
     if (typeof preloadRiderVideos === 'function') {
       try {
         const preloadTask = Promise.all([
@@ -91,21 +85,18 @@ async function startBattle(matchConfig) {
         ]);
         const timeoutTask = new Promise(resolve => setTimeout(resolve, 1200));
         await Promise.race([preloadTask, timeoutTask]);
-      } catch (err) {
-        console.warn("Preload timeout or bypass triggered:", err);
-      }
+      } catch (err) {}
     }
 
-    // 4. STAGE B: MATCHUP DISPLAY SPLASH
     if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
     await new Promise(resolve => setTimeout(resolve, 1500));
 
   } catch (err) {
-    console.error("Match initialization error:", err);
+    console.error("Match error:", err);
   } finally {
-    // 5. STAGE C: GUARANTEED MATCH LAUNCH
-    if (transitionScreen) transitionScreen.hidden = true;
-    if (battleScreen) battleScreen.hidden = false;
+    // 2. HIDE SPLASH SCREEN & UNHIDE BATTLE SCREEN
+    if (transitionScreen) transitionScreen.style.display = 'none';
+    if (battleScreen) battleScreen.style.display = 'flex';
 
     updateHUD();
 
