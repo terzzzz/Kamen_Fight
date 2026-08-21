@@ -1,3 +1,8 @@
+/* FORCE HTML HIDDEN ATTRIBUTES TO BE RESPECTED */
+[hidden] {
+  display: none !important;
+}
+
 /* GLOBAL CORE STYLES & RETRO ARCADE THEME */
 :root {
   --bg-color: #08090d;
@@ -259,7 +264,7 @@ body {
 /* FLOATING POPUPS DIRECTLY OVER CHARACTER BOXES */
 .damage-popup {
   position: absolute;
-  top: 35%; /* Centered over character video box */
+  top: 35%;
   left: 50%;
   transform: translate(-50%, 0);
   font-size: 2.2rem;
@@ -292,7 +297,6 @@ body {
   text-shadow: 0 0 10px rgba(255, 204, 0, 0.8), 2px 2px 0px #000;
 }
 
-/* SMOOTH SLOW 2.5s FLOAT ANIMATION */
 @keyframes floatPopup {
   0% {
     opacity: 0;
