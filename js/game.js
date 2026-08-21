@@ -15,6 +15,12 @@ var DO_NOTHING_MOVE = DO_NOTHING_MOVE || {
   video: "idle.mp4"
 };
 
+var FAINT_CONFIG = FAINT_CONFIG || {
+  HIT_BUILDUP: 25,       // Faint meter added per clean hit
+  ROUND_RECOVERY: 13,    // Points recovered per round if NOT hurt (changed from 20)
+  FAINT_THRESHOLD: 100   // Faint meter max limit
+};
+
 let gameState = {
   roundCounter: 1,
   roundPhase: 'IDLE',
@@ -783,14 +789,15 @@ async function executeTurnResolutionPhase() {
     processRoundBuffs(gameState.p1);
     processRoundBuffs(gameState.p2);
 
-    ['p1', 'p2'].forEach(slot => {
+['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
       if (player) {
         if (player.isFainted) {
           player.isFainted = false;
           player.faintMeter = 0;
         } else if (!player.tookCleanHitThisRound) {
-          player.faintMeter = Math.max(0, player.faintMeter - 20);
+          // Uses central constant (e.g. 10 instead of 20)
+          player.faintMeter = Math.max(0, player.faintMeter - FAINT_CONFIG.ROUND_RECOVERY);
         }
         player.tookCleanHitThisRound = false;
       }
