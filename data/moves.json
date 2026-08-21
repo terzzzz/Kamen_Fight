@@ -1,5 +1,6 @@
 {
   "ichigo": {
+    "defaultFacing": "left",
     "W+I": {
       "name": "Rider High Jump",
       "type": "UTILITY",
@@ -7,6 +8,7 @@
       "baseDamage": 0,
       "hitChance": 100,
       "video": "jump.mp4",
+      "grantsAirborne": 2,
       "description": "Grants Airborne status for 2 turns; shifts idle animation to mid-air.mp4"
     },
     "W+J": {
@@ -16,6 +18,12 @@
       "baseDamage": 0,
       "hitChance": 100,
       "video": "charge_up.mp4",
+      "buff": {
+        "id": "typhoon",
+        "label": "D&S ATK +25%",
+        "type": "attack",
+        "duration": 3
+      },
       "description": "+30% Charge Speed for 3 turns"
     },
     "W+K": {
@@ -25,6 +33,12 @@
       "baseDamage": 0,
       "hitChance": 100,
       "video": "charge_up.mp4",
+      "buff": {
+        "id": "focus",
+        "label": "S-ATK +20%",
+        "type": "attack",
+        "duration": 2
+      },
       "description": "+20% Special Attack Damage for 2 turns"
     },
 
@@ -62,6 +76,7 @@
       "baseDamage": 110,
       "hitChance": 75,
       "video": "combo_kick.mp4",
+      "unmirrored": true,
       "description": "Heavy double-leg kick; restores +3 CHI on hit"
     },
 
@@ -109,6 +124,7 @@
       "baseDamage": 0,
       "hitChance": 100,
       "video": "windmill_guard.mp4",
+      "unmirrored": true,
       "description": "Full counter guard; block attacks of all types"
     },
     "A+J": {
