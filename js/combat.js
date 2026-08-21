@@ -2,116 +2,8 @@
 const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
   FAINT_THRESHOLD: 100,
   HIT_BUILDUP: 25,
-  ROUND_RECOVERY: 15
+  ROUND_RECOVERY: 13
 };
-
-// BATTLE INITIALIZATION WITH MATCH TRANSITION SCREEN & HARD MODE LP BOOSTS
-async function startBattle(matchConfig) {
-  if (!window.gameState) window.gameState = {};
-  gameState.matchConfig = matchConfig;
-  if (!gameState.videoCache) gameState.videoCache = {};
-
-  // 1. Fetch Move Sets for Selected Riders
-  try {
-    const res = await fetch('data/moves.json');
-    if (res.ok) {
-      const allMoves = await res.json();
-      gameState.p1Moves = allMoves[matchConfig.p1Rider.id] || allMoves['ichigo'] || {};
-      gameState.p2Moves = allMoves[matchConfig.p2Rider.id] || allMoves['ichigo'] || {};
-    }
-  } catch (e) {
-    console.warn("Could not load moves.json in startBattle, using fallback dictionary.");
-    gameState.p1Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
-    gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
-  }
-
-  // 2. Preload Rider Videos (Awaited so preloading completes before battle screen opens)
-  if (typeof preloadRiderVideos === 'function') {
-    await Promise.all([
-      preloadRiderVideos(matchConfig.p1Rider.id, gameState.p1Moves),
-      preloadRiderVideos(matchConfig.p2Rider.id, gameState.p2Moves)
-    ]);
-  }
-
-  // 3. Calculate LP with Hard Mode (+30%) Boosts
-  let p1MaxLp = (matchConfig.p1Rider && matchConfig.p1Rider.maxLp) ? matchConfig.p1Rider.maxLp : 1050;
-  if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') {
-    p1MaxLp = Math.floor(p1MaxLp * 1.30);
-  }
-
-  let p2MaxLp = (matchConfig.p2Rider && matchConfig.p2Rider.maxLp) ? matchConfig.p2Rider.maxLp : 1050;
-  if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') {
-    p2MaxLp = Math.floor(p2MaxLp * 1.30);
-  }
-
-  // 4. Instantiate P1 & P2 Objects Safely
-  gameState.p1 = {
-    id: matchConfig.p1Rider ? matchConfig.p1Rider.id : 'ichigo',
-    name: matchConfig.p1Rider ? matchConfig.p1Rider.name : 'Kamen Rider Ichigo',
-    isCPU: matchConfig.p1IsCPU,
-    maxLp: p1MaxLp,
-    lp: p1MaxLp,
-    chi: 10,
-    maxChi: 16,
-    faintMeter: 0,
-    activeBuffs: [],
-    airborneTicks: 0,
-    activeChargePercent: 100,
-    isFainted: false,
-    tookCleanHitThisRound: false
-  };
-
-  gameState.p2 = {
-    id: matchConfig.p2Rider ? matchConfig.p2Rider.id : 'nigo',
-    name: matchConfig.p2Rider ? matchConfig.p2Rider.name : 'Kamen Rider Nigo',
-    isCPU: matchConfig.p2IsCPU,
-    maxLp: p2MaxLp,
-    lp: p2MaxLp,
-    chi: 10,
-    maxChi: 16,
-    faintMeter: 0,
-    activeBuffs: [],
-    airborneTicks: 0,
-    activeChargePercent: 100,
-    isFainted: false,
-    tookCleanHitThisRound: false
-  };
-
-  gameState.p1Rider = matchConfig.p1Rider;
-  gameState.p2Rider = matchConfig.p2Rider;
-  gameState.p1IsCPU = matchConfig.p1IsCPU;
-  gameState.p2IsCPU = matchConfig.p2IsCPU;
-  gameState.roundCounter = 1;
-
-  // 5. Trigger Transition Splash Screen
-  const transitionScreen = document.getElementById('match-transition-screen');
-  const splashNames = document.getElementById('splash-names-text');
-  
-  if (splashNames) {
-    splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
-  }
-
-  if (transitionScreen) {
-    transitionScreen.hidden = false;
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    transitionScreen.hidden = true;
-  }
-
-  // 6. Unhide Battle UI & Trigger Idle Media
-  const battleScreen = document.getElementById('battle-screen');
-  if (battleScreen) battleScreen.hidden = false;
-
-  updateHUD();
-
-  if (typeof updateCharacterMedia === 'function') {
-    updateCharacterMedia('p1', 'IDLE');
-    updateCharacterMedia('p2', 'IDLE');
-  }
-
-  if (typeof startRoundCountdown === 'function') {
-    startRoundCountdown();
-  }
-}
 
 // GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & DIFFICULTY
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
@@ -150,20 +42,10 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   return 'D+J';
 }
 
-function getMoveForPlayer(playerKey, moveKey) {
-  if (!moveKey || moveKey === 'DO_NOTHING') {
-    return { name: 'Do Nothing', type: 'IDLE', chiCost: 0, baseDamage: 0, hitChance: 100, video: 'idle.mp4' };
-  }
-  const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
-  if (moves && moves[moveKey]) {
-    return moves[moveKey];
-  }
-  return { name: 'Standard Punch', type: 'PHYSICAL', chiCost: 0, baseDamage: 60, hitChance: 75, video: 'punch.mp4' };
-}
-
+// FLOATING POPUP GENERATORS ATTACHED DIRECTLY TO VIEWPORT CHARACTER BOXES
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
-  const hudEl = document.querySelector(`.${slotKey}-hud`);
-  if (!hudEl) return;
+  const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
+  if (!container) return;
 
   const roundedAmount = Math.round(amount);
   if (roundedAmount <= 0) return;
@@ -172,28 +54,29 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   popup.className = `damage-popup ${isHeal ? 'heal' : 'damage'}`;
   popup.textContent = isHeal ? `+${roundedAmount}` : `-${roundedAmount}`;
 
-  hudEl.appendChild(popup);
+  container.appendChild(popup);
 
   setTimeout(() => {
     popup.remove();
-  }, 2000);
+  }, 2500);
 }
 
 function triggerFloatingText(slotKey, text, customClass = '') {
-  const hudEl = document.querySelector(`.${slotKey}-hud`);
-  if (!hudEl) return;
+  const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
+  if (!container) return;
 
   const popup = document.createElement('div');
   popup.className = `damage-popup ${customClass}`;
   popup.textContent = text;
 
-  hudEl.appendChild(popup);
+  container.appendChild(popup);
 
   setTimeout(() => {
     popup.remove();
-  }, 2000);
+  }, 2500);
 }
 
+// BUFF & AIRBORNE STATE MANAGEMENT
 function applyBuff(player, buffId, label, buffType, durationRounds) {
   if (!player.activeBuffs) player.activeBuffs = [];
   player.activeBuffs = player.activeBuffs.filter(b => b.id !== buffId);
@@ -253,6 +136,7 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
+// HUD DISPLAY UPDATER (PREVENTS DUPLICATED LP/CHI LABELS)
 function updateHUD() {
   if (gameState.p1) {
     const p1Name = document.getElementById('p1-name');
@@ -261,19 +145,15 @@ function updateHUD() {
     
     if (p1Name) p1Name.textContent = `[P1] ${gameState.p1.name}`;
     if (p1Lp) {
-      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p1.lp}</span> / ${gameState.p1.maxLp}`;
+      p1Lp.textContent = `${gameState.p1.lp} / ${gameState.p1.maxLp}`;
     }
     if (p1Chi) {
       const maxChi = gameState.p1.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (gameState.p1.chi / maxChi) * 100));
       p1Chi.innerHTML = `
-        <div class="chi-container">
-          <span class="stat-label">CHI:</span>
-          <span class="stat-value-large">${gameState.p1.chi}</span>
-          <span class="chi-max-label">/ ${maxChi}</span>
-          <div class="chi-bar-track">
-            <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
-          </div>
+        <span class="stat-value-large">${gameState.p1.chi}</span>
+        <div class="chi-bar-track">
+          <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
     }
   }
@@ -285,19 +165,15 @@ function updateHUD() {
     
     if (p2Name) p2Name.textContent = `[P2] ${gameState.p2.name}`;
     if (p2Lp) {
-      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p2.lp}</span> / ${gameState.p2.maxLp}`;
+      p2Lp.textContent = `${gameState.p2.lp} / ${gameState.p2.maxLp}`;
     }
     if (p2Chi) {
       const maxChi = gameState.p2.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (gameState.p2.chi / maxChi) * 100));
       p2Chi.innerHTML = `
-        <div class="chi-container">
-          <span class="stat-label">CHI:</span>
-          <span class="stat-value-large">${gameState.p2.chi}</span>
-          <span class="chi-max-label">/ ${maxChi}</span>
-          <div class="chi-bar-track">
-            <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
-          </div>
+        <span class="stat-value-large">${gameState.p2.chi}</span>
+        <div class="chi-bar-track">
+          <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
     }
   }
@@ -314,7 +190,7 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
-// MAIN SEQUENTIAL RESOLUTION PHASE
+// MAIN SEQUENTIAL RESOLUTION PHASE WITH COUNTER-ATTACK INTERRUPTION
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -343,7 +219,7 @@ async function executeTurnResolutionPhase() {
   let p1Move = getMoveForPlayer('p1', p1MoveKey);
   let p2Move = getMoveForPlayer('p2', p2MoveKey);
 
-  // Process Instant Utility Effects (Faint Recovery)
+  // Instant Utility Effects (Faint Recovery)
   if (p1Move && p1Move.faintRecovery) {
     gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
     triggerFloatingText('p1', `FAINT -${p1Move.faintRecovery}`, 'heal');
@@ -412,7 +288,6 @@ async function executeTurnResolutionPhase() {
   let attack1Result = { hitLanded: false, isGlancing: false };
 
   if (move1.type !== 'IDLE' && key1 !== 'DO_NOTHING') {
-    // Apply attacker 1's buff & airborne status during their turn execution
     if (move1.buff) applyBuff(attacker1, move1.buff.id, move1.buff.label, move1.buff.type, move1.buff.duration);
     handleAirborneState(attacker1, key1, move1);
 
@@ -438,9 +313,8 @@ async function executeTurnResolutionPhase() {
     }
   }
 
-  // STEP 2 EXECUTION (Cancelled if defender2 is fainted or KO'd)
+  // STEP 2 EXECUTION (Cancelled immediately if defender2 was KO'd or Stunned in Step 1)
   if (defender2.lp > 0 && !defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
-    // Apply attacker 2's buff & airborne status during their turn execution
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
 
@@ -461,11 +335,10 @@ async function executeTurnResolutionPhase() {
       await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
     }
   } else if (defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
-    // Interruption feedback when counter-attack is cancelled by stun
-    triggerFloatingText(defKey1, 'INTERRUPTED!', 'miss');
+    triggerFloatingText(defKey1, 'INTERRUPTED!', 'scratch');
   }
 
-  // --- ROUND CONCLUSION ---
+  // ROUND CONCLUSION
   setTimeout(() => {
     hideCenterScreen();
     setSideBoxesBlank(false);
@@ -529,19 +402,20 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
+// ATTACK RESOLUTION ENGINE WITH INSTANT FAINT/STUN INTERRUPTIONS
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return { hitLanded: false, isGlancing: false };
 
   const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
   const defChargeRatio = Math.max(0.5, (defender.activeChargePercent || 100) / 100);
 
-  // --- 1. DYNAMIC HIT & EVASION CALCULATION ---
+  // 1. HIT & EVASION CALCULATION
   let baseHitChance = atkMove.hitChance || 80;
 
-  // Attacker Hit Bonus (Nigo's Airborne Jump grants +15% HIT)
+  // Attacker Hit Bonus (Nigo Airborne Jump: +15% HIT)
   let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
 
-  // Defender Evasion Bonus (Ichigo's Airborne Jump grants +20% EVS)
+  // Defender Evasion Bonus (Ichigo Airborne Jump: +20% EVS)
   let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
 
   let rolledHit = false;
@@ -559,7 +433,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   let isGlancing = Math.random() * 100 < 15; 
 
-  // --- 2. DEFENSE & GUARD RATIOS ---
+  // 2. DEFENSE & GUARD RATIOS
   let damageRatio = 1.0;
   if (defMove.type === 'DEFENSE') {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
@@ -577,22 +451,22 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
-  // Defender Mitigation Buffs (Nigo Red Shutter: +15% DEF)
+  // Mitigation Buffs (Nigo Red Shutter: +15% DEF)
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
     damageRatio *= 0.85; 
   }
 
-  // --- 3. DYNAMIC ATTACK MULTIPLIERS ---
+  // 3. ATTACK MULTIPLIERS
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
   let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon' || b.id === 'typhoon_speed')) ? 1.25 : 1.0;
 
-  // Rider-Specific Focus Buffs
+  // Rider Focus Buffs
   let focusMultiplier = 1.0;
   if (attacker.activeBuffs) {
     if (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) {
-      focusMultiplier = 1.20; // Ichigo Typhoon Focus: +20% Special ATK
+      focusMultiplier = 1.20; // Ichigo Typhoon Focus
     } else if (atkMoveKey.startsWith('D') && attacker.activeBuffs.some(b => b.id === 'power_focus')) {
-      focusMultiplier = 1.30; // Nigo Power Focus: +30% Physical ATK
+      focusMultiplier = 1.30; // Nigo Power Focus
     }
   }
 
@@ -621,11 +495,10 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
       defender.tookCleanHitThisRound = true;
       defender.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, defender.faintMeter + FAINT_CFG.HIT_BUILDUP);
       
-      // IMMEDIATE FAINT INTERRUPTION
+      // INSTANT FAINT & STUN INTERRUPT
       if (defender.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
         defender.isFainted = true;
         
-        // Show STUNNED overlay on defender box immediately
         const stunOverlay = document.getElementById(`${defenderKey}-stun-overlay`);
         if (stunOverlay) stunOverlay.hidden = false;
 
