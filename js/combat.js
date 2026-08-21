@@ -2,7 +2,10 @@
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
-  const movesData = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
+  let movesData = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
+  if (!movesData || Object.keys(movesData).length === 0) {
+    movesData = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+  }
 
   let chosenKey = null;
   if (typeof selectCPUMove === 'function') {
@@ -27,7 +30,7 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     return affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
   }
 
-  return 'DO_NOTHING';
+  return 'D+J';
 }
 
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
@@ -159,29 +162,26 @@ function updateHUD() {
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
-  let p1Time = gameState.p1.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.input.lockInTime || 0);
-  let p2Time = gameState.p2.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.p2LockInTime || 0);
+  let p1MoveKey = gameState.input.selectedMoveKey;
+  if (!p1MoveKey && gameState.p1.isCPU) {
+    p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
+  }
+  if (!p1MoveKey) p1MoveKey = 'DO_NOTHING';
 
-  // Generate CPU choices dynamically at resolution time
-  let p1MoveKey = gameState.p1.isCPU
-    ? getCPUMoveChoice(gameState.p1, gameState.p2, 'p1')
-    : (gameState.input.selectedMoveKey || 'DO_NOTHING');
+  let p2MoveKey = gameState.p2AlwaysIdle ? 'DO_NOTHING' : gameState.p2SelectedMoveKey;
+  if (!p2MoveKey && gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
+    p2MoveKey = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
+  }
+  if (!p2MoveKey) p2MoveKey = 'DO_NOTHING';
 
-  let p2MoveKey = gameState.p2AlwaysIdle
-    ? 'DO_NOTHING'
-    : (gameState.p2.isCPU 
-        ? getCPUMoveChoice(gameState.p2, gameState.p1, 'p2') 
-        : (gameState.p2SelectedMoveKey || 'DO_NOTHING'));
+  let p1Time = gameState.input.lockInTime || 1;
+  let p2Time = gameState.p2LockInTime || 1;
 
-  if (gameState.p1.isCPU) {
-    gameState.p1.activeChargePercent = p1MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+  if (gameState.p1.isCPU && p1MoveKey !== 'DO_NOTHING') {
     simulateCPUButtonPress(p1MoveKey);
   }
-  if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
-    gameState.p2.activeChargePercent = p2MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+  if (gameState.p2.isCPU && !gameState.p2AlwaysIdle && p2MoveKey !== 'DO_NOTHING') {
     simulateCPUButtonPress(p2MoveKey);
-  } else if (gameState.p2AlwaysIdle) {
-    gameState.p2.activeChargePercent = 0;
   }
 
   let p1Move = getMoveForPlayer('p1', p1MoveKey);
