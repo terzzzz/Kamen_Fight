@@ -45,22 +45,24 @@ async function preloadRiderVideos(riderId) {
     'kirimomi_kick.mp4', 'windmill_guard.mp4', 'guard.mp4', 'jump.mp4', 'charge_up.mp4'
   ];
 
-  const promises = videoFiles.map(async (file) => {
-    const rawUrl = `assets/videos/${riderId}/${file}`;
-    if (gameState.videoCache[rawUrl]) return;
+  const BATCH_SIZE = 4; // Fetch 4 videos concurrently
+  for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
+    const batch = videoFiles.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(async (file) => {
+      const rawUrl = `assets/videos/${riderId}/${file}`;
+      if (gameState.videoCache[rawUrl]) return;
 
-    try {
-      const res = await fetch(rawUrl);
-      if (res.ok) {
-        const blob = await res.blob();
-        gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+      try {
+        const res = await fetch(rawUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+        }
+      } catch (e) {
+        gameState.videoCache[rawUrl] = rawUrl;
       }
-    } catch (e) {
-      gameState.videoCache[rawUrl] = rawUrl;
-    }
-  });
-
-  await Promise.all(promises);
+    }));
+  }
 }
 
 async function startBattle(config) {
