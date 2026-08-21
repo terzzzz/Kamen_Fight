@@ -38,7 +38,7 @@ function stopBattleBGM() {
   }
 }
 
-// Dynamic Roster Storage
+// Roster Storage (Locked to Ichigo)
 let AVAILABLE_RIDERS = [
   { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 }
 ];
@@ -78,12 +78,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function cycleRider(playerKey, direction) {
-  if (playerKey === 'p1' && vsSelectionState.step === 1) {
-    vsSelectionState.p1Index = (vsSelectionState.p1Index + direction + AVAILABLE_RIDERS.length) % AVAILABLE_RIDERS.length;
-  } else if (playerKey === 'p2' && vsSelectionState.step === 2) {
-    vsSelectionState.p2Index = (vsSelectionState.p2Index + direction + AVAILABLE_RIDERS.length) % AVAILABLE_RIDERS.length;
-  }
-  updateSelectionUI();
+  // Permanently disabled: prevents previewing or selecting other riders
+  return;
 }
 
 function toggleControlType(playerKey) {
@@ -120,8 +116,12 @@ function handleBackStep() {
 function updateSelectionUI() {
   if (!AVAILABLE_RIDERS || AVAILABLE_RIDERS.length === 0) return;
 
-  const p1 = AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0];
-  const p2 = AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0];
+  // Always lock selections to index 0 (Ichigo)
+  vsSelectionState.p1Index = 0;
+  vsSelectionState.p2Index = 0;
+
+  const p1 = AVAILABLE_RIDERS[0];
+  const p2 = AVAILABLE_RIDERS[0];
 
   const p1ImgEl = document.getElementById('p1-img');
   if (p1ImgEl) p1ImgEl.src = p1.icon;
@@ -135,7 +135,6 @@ function updateSelectionUI() {
   const p2ImgEl = document.getElementById('p2-img');
   if (p2ImgEl) {
     p2ImgEl.src = p2.icon;
-    // Palette Swap P2 Portrait for Mirror Match
     p2ImgEl.classList.toggle('p2-mirror-palette', p1.id === p2.id);
   }
 
@@ -162,20 +161,19 @@ function updateSelectionUI() {
   const p2TypeLeft = document.getElementById('p2-type-left');
   const p2TypeRight = document.getElementById('p2-type-right');
 
-  const multiRider = AVAILABLE_RIDERS.length > 1;
+  // PERMANENTLY DISABLE ALL RIDER ARROW BUTTONS
+  if (p1LeftBtn) p1LeftBtn.disabled = true;
+  if (p1RightBtn) p1RightBtn.disabled = true;
+  if (p2LeftBtn) p2LeftBtn.disabled = true;
+  if (p2RightBtn) p2RightBtn.disabled = true;
 
   if (vsSelectionState.step === 1) {
     if (headerText) headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
     if (p1Card) p1Card.className = 'rider-card active-slot';
     if (p2Card) p2Card.className = 'rider-card locked-slot';
 
-    if (p1LeftBtn) p1LeftBtn.disabled = !multiRider;
-    if (p1RightBtn) p1RightBtn.disabled = !multiRider;
     if (p1TypeLeft) p1TypeLeft.disabled = false;
     if (p1TypeRight) p1TypeRight.disabled = false;
-
-    if (p2LeftBtn) p2LeftBtn.disabled = true;
-    if (p2RightBtn) p2RightBtn.disabled = true;
     if (p2TypeLeft) p2TypeLeft.disabled = true;
     if (p2TypeRight) p2TypeRight.disabled = true;
 
@@ -191,13 +189,8 @@ function updateSelectionUI() {
     if (p1Card) p1Card.className = 'rider-card locked-slot';
     if (p2Card) p2Card.className = 'rider-card active-slot';
 
-    if (p1LeftBtn) p1LeftBtn.disabled = true;
-    if (p1RightBtn) p1RightBtn.disabled = true;
     if (p1TypeLeft) p1TypeLeft.disabled = true;
     if (p1TypeRight) p1TypeRight.disabled = true;
-
-    if (p2LeftBtn) p2LeftBtn.disabled = !multiRider;
-    if (p2RightBtn) p2RightBtn.disabled = !multiRider;
     if (p2TypeLeft) p2TypeLeft.disabled = false;
     if (p2TypeRight) p2TypeRight.disabled = false;
 
@@ -213,13 +206,8 @@ function updateSelectionUI() {
     if (p1Card) p1Card.className = 'rider-card active-slot';
     if (p2Card) p2Card.className = 'rider-card active-slot';
 
-    if (p1LeftBtn) p1LeftBtn.disabled = true;
-    if (p1RightBtn) p1RightBtn.disabled = true;
     if (p1TypeLeft) p1TypeLeft.disabled = true;
     if (p1TypeRight) p1TypeRight.disabled = true;
-
-    if (p2LeftBtn) p2LeftBtn.disabled = true;
-    if (p2RightBtn) p2RightBtn.disabled = true;
     if (p2TypeLeft) p2TypeLeft.disabled = true;
     if (p2TypeRight) p2TypeRight.disabled = true;
 
@@ -237,9 +225,9 @@ function validateAndStartMatch() {
   if (selectScreen) selectScreen.hidden = true;
 
   const matchConfig = {
-    p1Rider: AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0],
+    p1Rider: AVAILABLE_RIDERS[0],
     p1IsCPU: vsSelectionState.p1IsCPU,
-    p2Rider: AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0],
+    p2Rider: AVAILABLE_RIDERS[0],
     p2IsCPU: vsSelectionState.p2IsCPU
   };
 
