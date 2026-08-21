@@ -29,7 +29,7 @@
     },
 
     "D+J": {
-      "name": "Rider Punch",
+      "name": "Standard Punch",
       "type": "PHYSICAL",
       "chiCost": 0,
       "baseDamage": 60,
@@ -38,7 +38,7 @@
       "description": "Fast high-accuracy jab; restores +2 CHI on hit"
     },
     "D+K": {
-      "name": "Rider Kick",
+      "name": "Standard Kick",
       "type": "PHYSICAL",
       "chiCost": 0,
       "baseDamage": 70,
