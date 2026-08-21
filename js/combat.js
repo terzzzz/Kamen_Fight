@@ -25,10 +25,12 @@ async function startBattle(matchConfig) {
     gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
-  // 2. Preload Rider Videos
+  // 2. Preload Rider Videos (Awaited so preloading completes before battle screen opens)
   if (typeof preloadRiderVideos === 'function') {
-    preloadRiderVideos(matchConfig.p1Rider.id, gameState.p1Moves);
-    preloadRiderVideos(matchConfig.p2Rider.id, gameState.p2Moves);
+    await Promise.all([
+      preloadRiderVideos(matchConfig.p1Rider.id, gameState.p1Moves),
+      preloadRiderVideos(matchConfig.p2Rider.id, gameState.p2Moves)
+    ]);
   }
 
   // 3. Calculate LP with Hard Mode (+30%) Boosts
@@ -205,7 +207,7 @@ function renderBuffTrays() {
 
     tray.innerHTML = '';
 
-    // Render active buff badges dynamically from moves.json
+    // Render active buff badges dynamically from moves.json (no duplicate hardcoded air tags)
     if (player.activeBuffs) {
       player.activeBuffs.forEach(b => {
         const tag = document.createElement('div');
@@ -347,12 +349,6 @@ async function executeTurnResolutionPhase() {
 
   setSideBoxesBlank(true);
 
-  if (p1Move && p1Move.buff) applyBuff(gameState.p1, p1Move.buff.id, p1Move.buff.label, p1Move.buff.type, p1Move.buff.duration);
-  if (p2Move && p2Move.buff) applyBuff(gameState.p2, p2Move.buff.id, p2Move.buff.label, p2Move.buff.type, p2Move.buff.duration);
-
-  handleAirborneState(gameState.p1, p1MoveKey, p1Move);
-  handleAirborneState(gameState.p2, p2MoveKey, p2Move);
-
   let p1IsIdle = p1MoveKey === 'DO_NOTHING';
   let p2IsIdle = p2MoveKey === 'DO_NOTHING';
   let p1GoesFirst = false;
@@ -402,6 +398,10 @@ async function executeTurnResolutionPhase() {
   let attack1Result = { hitLanded: false, isGlancing: false };
 
   if (move1.type !== 'IDLE' && key1 !== 'DO_NOTHING') {
+    // Apply attacker 1's buff & airborne status during their turn execution
+    if (move1.buff) applyBuff(attacker1, move1.buff.id, move1.buff.label, move1.buff.type, move1.buff.duration);
+    handleAirborneState(attacker1, key1, move1);
+
     attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
     updateHUD();
 
@@ -424,8 +424,12 @@ async function executeTurnResolutionPhase() {
     }
   }
 
-  // STEP 2 EXECUTION
-  if (defender2.lp > 0 && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
+  // STEP 2 EXECUTION (Only if defender2 survives and is not fainted)
+  if (defender2.lp > 0 && !defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
+    // Apply attacker 2's buff & airborne status during their turn execution
+    if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
+    handleAirborneState(attacker2, key2, move2);
+
     attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
     updateHUD();
 
