@@ -95,6 +95,15 @@ function handleConfirmStep() {
   const errorBanner = document.getElementById('vs-error-banner');
   if (errorBanner) errorBanner.hidden = true;
 
+  // Block progression if both players are set to HUMAN
+  if (!vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU) {
+    if (errorBanner) {
+      errorBanner.textContent = '2-PLAYER HUMAN VS HUMAN IS DISABLED. AT LEAST ONE PLAYER MUST BE CPU!';
+      errorBanner.hidden = false;
+    }
+    return;
+  }
+
   if (vsSelectionState.step === 1) {
     vsSelectionState.step = 2;
   } else if (vsSelectionState.step === 2) {
@@ -150,6 +159,7 @@ function updateSelectionUI() {
   const confirmBtn = document.getElementById('confirm-btn');
   const startBtn = document.getElementById('start-game-btn');
   const backBtn = document.getElementById('back-btn');
+  const errorBanner = document.getElementById('vs-error-banner');
 
   const p1LeftBtn = document.getElementById('p1-left-btn');
   const p1RightBtn = document.getElementById('p1-right-btn');
@@ -167,6 +177,18 @@ function updateSelectionUI() {
   if (p2LeftBtn) p2LeftBtn.disabled = true;
   if (p2RightBtn) p2RightBtn.disabled = true;
 
+  // Validate Human vs Human restriction
+  const bothAreHuman = !vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU;
+
+  if (bothAreHuman) {
+    if (errorBanner) {
+      errorBanner.textContent = '2-PLAYER HUMAN VS HUMAN IS DISABLED. AT LEAST ONE PLAYER MUST BE CPU!';
+      errorBanner.hidden = false;
+    }
+  } else {
+    if (errorBanner) errorBanner.hidden = true;
+  }
+
   if (vsSelectionState.step === 1) {
     if (headerText) headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
     if (p1Card) p1Card.className = 'rider-card active-slot';
@@ -180,6 +202,7 @@ function updateSelectionUI() {
     if (confirmBtn) {
       confirmBtn.hidden = false;
       confirmBtn.textContent = 'CONFIRM P1';
+      confirmBtn.disabled = false;
     }
     if (startBtn) startBtn.hidden = true;
     if (backBtn) backBtn.disabled = true;
@@ -197,6 +220,7 @@ function updateSelectionUI() {
     if (confirmBtn) {
       confirmBtn.hidden = false;
       confirmBtn.textContent = 'CONFIRM P2';
+      confirmBtn.disabled = bothAreHuman;
     }
     if (startBtn) startBtn.hidden = true;
     if (backBtn) backBtn.disabled = false;
@@ -212,12 +236,24 @@ function updateSelectionUI() {
     if (p2TypeRight) p2TypeRight.disabled = true;
 
     if (confirmBtn) confirmBtn.hidden = true;
-    if (startBtn) startBtn.hidden = false;
+    if (startBtn) {
+      startBtn.hidden = false;
+      startBtn.disabled = bothAreHuman;
+    }
     if (backBtn) backBtn.disabled = false;
   }
 }
 
 function validateAndStartMatch() {
+  if (!vsSelectionState.p1IsCPU && !vsSelectionState.p2IsCPU) {
+    const errorBanner = document.getElementById('vs-error-banner');
+    if (errorBanner) {
+      errorBanner.textContent = '2-PLAYER HUMAN VS HUMAN IS DISABLED. AT LEAST ONE PLAYER MUST BE CPU!';
+      errorBanner.hidden = false;
+    }
+    return;
+  }
+
   stopSelectionBGM();
   playBattleBGM();
 
