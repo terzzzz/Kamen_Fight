@@ -1,41 +1,65 @@
 // BATTLE INITIALIZATION WITH LP MODIFIERS
+// BATTLE INITIALIZATION WITH LP MODIFIERS
 function startBattle(matchConfig) {
   gameState.matchConfig = matchConfig;
 
-  // Setup P1
-  gameState.p1.name = matchConfig.p1Rider.name;
-  gameState.p1.isCPU = matchConfig.p1IsCPU;
+  // Calculate Max LP with Hard Mode (+30%) checks
   let p1MaxLp = matchConfig.p1Rider.maxLp || 1050;
   if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') {
     p1MaxLp = Math.floor(p1MaxLp * 1.30);
   }
-  gameState.p1.maxLp = p1MaxLp;
-  gameState.p1.lp = p1MaxLp;
-  gameState.p1.chi = 10;
-  gameState.p1.faintMeter = 0;
-  gameState.p1.activeBuffs = [];
-  gameState.p1.airborneTicks = 0;
 
-  // Setup P2
-  gameState.p2.name = matchConfig.p2Rider.name;
-  gameState.p2.isCPU = matchConfig.p2IsCPU;
   let p2MaxLp = matchConfig.p2Rider.maxLp || 1050;
   if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') {
     p2MaxLp = Math.floor(p2MaxLp * 1.30);
   }
-  gameState.p2.maxLp = p2MaxLp;
-  gameState.p2.lp = p2MaxLp;
-  gameState.p2.chi = 10;
-  gameState.p2.faintMeter = 0;
-  gameState.p2.activeBuffs = [];
-  gameState.p2.airborneTicks = 0;
 
+  // Initialize P1 Object Structure
+  gameState.p1 = {
+    id: matchConfig.p1Rider.id,
+    name: matchConfig.p1Rider.name,
+    isCPU: matchConfig.p1IsCPU,
+    maxLp: p1MaxLp,
+    lp: p1MaxLp,
+    chi: 10,
+    maxChi: 16,
+    faintMeter: 0,
+    activeBuffs: [],
+    airborneTicks: 0,
+    activeChargePercent: 100
+  };
+
+  // Initialize P2 Object Structure
+  gameState.p2 = {
+    id: matchConfig.p2Rider.id,
+    name: matchConfig.p2Rider.name,
+    isCPU: matchConfig.p2IsCPU,
+    maxLp: p2MaxLp,
+    lp: p2MaxLp,
+    chi: 10,
+    maxChi: 16,
+    faintMeter: 0,
+    activeBuffs: [],
+    airborneTicks: 0,
+    activeChargePercent: 100
+  };
+
+  gameState.p1Rider = matchConfig.p1Rider;
+  gameState.p2Rider = matchConfig.p2Rider;
   gameState.roundCounter = 1;
-  
+
+  // Unhide battle screen
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
   updateHUD();
+
+  // Initialize idle sprites/media for both players
+  if (typeof updateCharacterMedia === 'function') {
+    updateCharacterMedia('p1', 'IDLE');
+    updateCharacterMedia('p2', 'IDLE');
+  }
+
   if (typeof startRoundCountdown === 'function') {
     startRoundCountdown();
   }
