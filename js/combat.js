@@ -162,8 +162,27 @@ async function executeTurnResolutionPhase() {
   let p1Time = gameState.p1.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.input.lockInTime || 0);
   let p2Time = gameState.p2.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.p2LockInTime || 0);
 
-  let p1MoveKey = gameState.input.selectedMoveKey || 'DO_NOTHING';
-  let p2MoveKey = gameState.p2AlwaysIdle ? 'DO_NOTHING' : (gameState.p2SelectedMoveKey || 'DO_NOTHING');
+  // Generate CPU choices dynamically at resolution time
+  let p1MoveKey = gameState.p1.isCPU
+    ? getCPUMoveChoice(gameState.p1, gameState.p2, 'p1')
+    : (gameState.input.selectedMoveKey || 'DO_NOTHING');
+
+  let p2MoveKey = gameState.p2AlwaysIdle
+    ? 'DO_NOTHING'
+    : (gameState.p2.isCPU 
+        ? getCPUMoveChoice(gameState.p2, gameState.p1, 'p2') 
+        : (gameState.p2SelectedMoveKey || 'DO_NOTHING'));
+
+  if (gameState.p1.isCPU) {
+    gameState.p1.activeChargePercent = p1MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+    simulateCPUButtonPress(p1MoveKey);
+  }
+  if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
+    gameState.p2.activeChargePercent = p2MoveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
+    simulateCPUButtonPress(p2MoveKey);
+  } else if (gameState.p2AlwaysIdle) {
+    gameState.p2.activeChargePercent = 0;
+  }
 
   let p1Move = getMoveForPlayer('p1', p1MoveKey);
   let p2Move = getMoveForPlayer('p2', p2MoveKey);
