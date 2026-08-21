@@ -5,7 +5,6 @@ const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
   ROUND_RECOVERY: 15
 };
 
-// BATTLE INITIALIZATION WITH HARD MODE LP BOOSTS & MOVE LOADING
 // BATTLE INITIALIZATION WITH MATCH TRANSITION SCREEN & HARD MODE LP BOOSTS
 async function startBattle(matchConfig) {
   if (!window.gameState) window.gameState = {};
@@ -26,7 +25,7 @@ async function startBattle(matchConfig) {
     gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
-  // 2. Preload Rider Videos
+  // 2. Preload Rider Videos (Awaited so preloading completes before battle screen opens)
   if (typeof preloadRiderVideos === 'function') {
     await Promise.all([
       preloadRiderVideos(matchConfig.p1Rider.id, gameState.p1Moves),
@@ -94,7 +93,6 @@ async function startBattle(matchConfig) {
 
   if (transitionScreen) {
     transitionScreen.hidden = false;
-    // Hold transition screen for 2 seconds
     await new Promise(resolve => setTimeout(resolve, 2000));
     transitionScreen.hidden = true;
   }
@@ -223,7 +221,7 @@ function renderBuffTrays() {
 
     tray.innerHTML = '';
 
-    // Render active buff badges dynamically from moves.json (no duplicate hardcoded air tags)
+    // Render active buff badges dynamically from moves.json
     if (player.activeBuffs) {
       player.activeBuffs.forEach(b => {
         const tag = document.createElement('div');
@@ -440,7 +438,7 @@ async function executeTurnResolutionPhase() {
     }
   }
 
-  // STEP 2 EXECUTION (Only if defender2 survives and is not fainted)
+  // STEP 2 EXECUTION (Cancelled if defender2 is fainted or KO'd)
   if (defender2.lp > 0 && !defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
     // Apply attacker 2's buff & airborne status during their turn execution
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
@@ -462,6 +460,9 @@ async function executeTurnResolutionPhase() {
       const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
       await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
     }
+  } else if (defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
+    // Interruption feedback when counter-attack is cancelled by stun
+    triggerFloatingText(defKey1, 'INTERRUPTED!', 'miss');
   }
 
   // --- ROUND CONCLUSION ---
@@ -616,12 +617,19 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
       triggerFloatingNumber(defenderKey, finalDmg, false);
     }
 
-    if (!isGlancing && !defender.isFainted && !defender.willBeFaintedNextRound) {
+    if (!isGlancing && !defender.isFainted) {
       defender.tookCleanHitThisRound = true;
       defender.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, defender.faintMeter + FAINT_CFG.HIT_BUILDUP);
       
+      // IMMEDIATE FAINT INTERRUPTION
       if (defender.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
-        defender.willBeFaintedNextRound = true;
+        defender.isFainted = true;
+        
+        // Show STUNNED overlay on defender box immediately
+        const stunOverlay = document.getElementById(`${defenderKey}-stun-overlay`);
+        if (stunOverlay) stunOverlay.hidden = false;
+
+        triggerFloatingText(defenderKey, 'STUNNED!!', 'scratch');
       }
     }
   }
