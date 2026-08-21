@@ -249,47 +249,46 @@ async function executeTurnResolutionPhase() {
   // STEP 1 EXECUTION
   let attack1Result = { hitLanded: false, isGlancing: false };
 
-  attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
-  updateHUD();
+  if (move1.type !== 'IDLE' && key1 !== 'DO_NOTHING') {
+    attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
+    updateHUD();
 
-  if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF' || move2.type === 'UTILITY')) {
-    await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000, move1);
-  } else {
-    await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
-    attack1Result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
-  }
+    if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF' || move2.type === 'UTILITY')) {
+      await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000, move1);
+    } else {
+      await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
+      attack1Result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
+    }
 
-  let hit1Landed = attack1Result.hitLanded;
-  let isGlancing1 = attack1Result.isGlancing;
+    if (attack1Result.hitLanded && key1.startsWith('D')) {
+      const chiGain = (key1 === 'D+J' || key1 === 'D+K') ? 2 : 3;
+      attacker1.chi = Math.min(16, attacker1.chi + chiGain);
+    }
+    updateHUD();
 
-  if (hit1Landed && key1.startsWith('D')) {
-    const chiGain = (key1 === 'D+J' || key1 === 'D+K') ? 2 : 3;
-    attacker1.chi = Math.min(16, attacker1.chi + chiGain);
-  }
-  updateHUD();
-
-  // STEP 2 EXECUTION
-  if (defender2.lp > 0) {
-    if (hit1Landed && !isGlancing1 && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
+    if (attack1Result.hitLanded && !attack1Result.isGlancing && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
       const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
       await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
-    } else {
-      attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
-      updateHUD();
+    }
+  }
 
-      await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
-      let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
+  // STEP 2 EXECUTION (Unnested: Attacker 2 executes move if alive)
+  if (defender2.lp > 0 && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
+    attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
+    updateHUD();
 
-      if (attack2Result.hitLanded && key2.startsWith('D')) {
-        const chiGain = (key2 === 'D+J' || key2 === 'D+K') ? 2 : 3;
-        attacker2.chi = Math.min(16, attacker2.chi + chiGain);
-      }
-      updateHUD();
+    await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
+    let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
-      if (attack2Result.hitLanded && !attack2Result.isGlancing && (move2.type === 'MELEE' || move2.type === 'PROJECTILE' || move2.type === 'SPECIAL' || move2.type === 'PHYSICAL')) {
-        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
-      }
+    if (attack2Result.hitLanded && key2.startsWith('D')) {
+      const chiGain = (key2 === 'D+J' || key2 === 'D+K') ? 2 : 3;
+      attacker2.chi = Math.min(16, attacker2.chi + chiGain);
+    }
+    updateHUD();
+
+    if (attack2Result.hitLanded && !attack2Result.isGlancing && (move2.type === 'MELEE' || move2.type === 'PROJECTILE' || move2.type === 'SPECIAL' || move2.type === 'PHYSICAL')) {
+      const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+      await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
     }
   }
 
@@ -358,8 +357,8 @@ async function executeTurnResolutionPhase() {
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return { hitLanded: false, isGlancing: false };
 
-  const atkChargeRatio = (attacker.activeChargePercent || 100) / 100;
-  const defChargeRatio = (defender.activeChargePercent || 100) / 100;
+  const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
+  const defChargeRatio = Math.max(0.5, (defender.activeChargePercent || 100) / 100);
 
   let jumpEvasionBonus = defender.airborneTicks > 0 ? 20 : 0;
 
@@ -367,7 +366,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
     rolledHit = true;
   } else {
-    let effectiveHitChance = Math.max(0, ((atkMove.hitChance || 80) * atkChargeRatio) - jumpEvasionBonus);
+    let effectiveHitChance = Math.max(10, ((atkMove.hitChance || 80) * atkChargeRatio) - jumpEvasionBonus);
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
