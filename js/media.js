@@ -1,3 +1,26 @@
+// ORIENTATION RESOLVER BASED ON NATIVE SOURCE FACING & UNMIRRORED EXCEPTIONS
+function getTransformFlip(player, playerKey, moveObj = null) {
+  if (!player) return 'scaleX(1)';
+
+  // Determine native video orientation (Default: 'left', Nigo: 'right')
+  const nativeFacing = player.sourceFacing || (player.id === 'nigo' ? 'right' : 'left');
+
+  // P1 needs to face RIGHT, P2 needs to face LEFT
+  let shouldFlip = false;
+  if (nativeFacing === 'left') {
+    shouldFlip = (playerKey === 'p1');
+  } else {
+    shouldFlip = (playerKey === 'p2');
+  }
+
+  // Invert flip if the move is explicitly marked unmirrored
+  if (moveObj && moveObj.unmirrored) {
+    shouldFlip = !shouldFlip;
+  }
+
+  return shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
+}
+
 // DYNAMIC BATCH PRELOAD OF MP4 CLIPS FROM RIDER MOVESET
 async function preloadRiderVideos(riderId, riderMoves = {}) {
   const baseVideoFiles = [
@@ -11,7 +34,7 @@ async function preloadRiderVideos(riderId, riderMoves = {}) {
 
   const videoFiles = Array.from(new Set([...baseVideoFiles, ...moveVideos]));
 
-  const BATCH_SIZE = 4; // Fetch 4 videos concurrently for optimal speed
+  const BATCH_SIZE = 4; // Concurrent video fetches
   for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
     const batch = videoFiles.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (file) => {
@@ -55,11 +78,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
 
-    const isUnmirrored = moveObj && moveObj.unmirrored;
-    const sourceFacingLeft = !isUnmirrored;
-
-    const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
-    centerVid.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
+    // Dynamic Orientation
+    centerVid.style.transform = getTransformFlip(player, playerKey, moveObj);
 
     let resolved = false;
     let fallbackTimer = null;
@@ -125,13 +145,10 @@ function updateCharacterMedia(playerKey, stateType) {
   }
 
   const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
-  const currentMove = Object.values(moves).find(m => m && m.video === fileName);
+  const currentMove = moves ? Object.values(moves).find(m => m && m.video === fileName) : null;
 
-  const isUnmirrored = currentMove && currentMove.unmirrored;
-  const sourceFacingLeft = !isUnmirrored;
-
-  const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
-  videoEl.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
+  // Dynamic Orientation
+  videoEl.style.transform = getTransformFlip(player, playerKey, currentMove);
 
   const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
 
