@@ -1,11 +1,9 @@
-// ORIENTATION RESOLVER BASED ON NATIVE SOURCE FACING & UNMIRRORED EXCEPTIONS
+// ORIENTATION RESOLVER
 function getTransformFlip(player, playerKey, moveObj = null) {
   if (!player) return 'scaleX(1)';
 
-  // Determine native video orientation (Default: 'left', Nigo: 'right')
   const nativeFacing = player.sourceFacing || (player.id === 'nigo' ? 'right' : 'left');
 
-  // P1 needs to face RIGHT, P2 needs to face LEFT
   let shouldFlip = false;
   if (nativeFacing === 'left') {
     shouldFlip = (playerKey === 'p1');
@@ -13,7 +11,6 @@ function getTransformFlip(player, playerKey, moveObj = null) {
     shouldFlip = (playerKey === 'p2');
   }
 
-  // Invert flip if the move is explicitly marked unmirrored
   if (moveObj && moveObj.unmirrored) {
     shouldFlip = !shouldFlip;
   }
@@ -21,34 +18,42 @@ function getTransformFlip(player, playerKey, moveObj = null) {
   return shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
 }
 
-// DYNAMIC BATCH PRELOAD OF MP4 CLIPS FROM RIDER MOVESET
+// SAFE NON-BLOCKING PRELOADER WITH INDIVIDUAL FETCH TIMEOUTS
 async function preloadRiderVideos(riderId, riderMoves = {}) {
+  if (!riderId) return;
+
   const baseVideoFiles = [
     'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
     'hit.mp4', 'hit_physical.mp4', 'guard.mp4'
   ];
 
-  const moveVideos = Object.values(riderMoves)
+  const moveVideos = Object.values(riderMoves || {})
     .filter(m => m && typeof m === 'object' && m.video)
     .map(m => m.video);
 
   const videoFiles = Array.from(new Set([...baseVideoFiles, ...moveVideos]));
 
-  const BATCH_SIZE = 4; // Concurrent video fetches
+  const BATCH_SIZE = 4;
   for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
     const batch = videoFiles.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (file) => {
       const rawUrl = `assets/videos/${riderId}/${file}`;
-      if (gameState.videoCache[rawUrl]) return;
+      if (gameState.videoCache && gameState.videoCache[rawUrl]) return;
 
       try {
-        const res = await fetch(rawUrl);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch(rawUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (res.ok) {
           const blob = await res.blob();
-          gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+          if (gameState.videoCache) gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+        } else {
+          if (gameState.videoCache) gameState.videoCache[rawUrl] = rawUrl;
         }
       } catch (e) {
-        gameState.videoCache[rawUrl] = rawUrl;
+        if (gameState.videoCache) gameState.videoCache[rawUrl] = rawUrl;
       }
     }));
   }
@@ -77,8 +82,6 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.playsInline = true;
 
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
-
-    // Dynamic Orientation
     centerVid.style.transform = getTransformFlip(player, playerKey, moveObj);
 
     let resolved = false;
@@ -101,7 +104,7 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.addEventListener('error', cleanUpAndResolve);
 
     const rawUrl = `assets/videos/${player.id}/${videoFile}`;
-    const videoUrl = gameState.videoCache[rawUrl] || rawUrl;
+    const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
     centerVid.src = videoUrl;
     centerVid.load();
 
@@ -147,7 +150,6 @@ function updateCharacterMedia(playerKey, stateType) {
   const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
   const currentMove = moves ? Object.values(moves).find(m => m && m.video === fileName) : null;
 
-  // Dynamic Orientation
   videoEl.style.transform = getTransformFlip(player, playerKey, currentMove);
 
   const isMirrorMatch = gameState.p1 && gameState.p2 && (gameState.p1.id === gameState.p2.id);
@@ -164,7 +166,7 @@ function updateCharacterMedia(playerKey, stateType) {
 
   const riderId = player.id || 'ichigo';
   const rawUrl = `assets/videos/${riderId}/${fileName}`;
-  const videoUrl = gameState.videoCache[rawUrl] || rawUrl;
+  const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
 
   if (videoEl.dataset.currentFile !== videoUrl || videoEl.paused || videoEl.readyState === 0) {
     videoEl.dataset.currentFile = videoUrl;
