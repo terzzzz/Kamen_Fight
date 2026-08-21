@@ -5,6 +5,108 @@ const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
   ROUND_RECOVERY: 13
 };
 
+// BATTLE INITIALIZATION WITH THREE-STAGE LOADING LIFECYCLE
+async function startBattle(matchConfig) {
+  if (!window.gameState) window.gameState = {};
+  gameState.matchConfig = matchConfig;
+  if (!gameState.videoCache) gameState.videoCache = {};
+
+  const transitionScreen = document.getElementById('match-transition-screen');
+  const splashNames = document.getElementById('splash-names-text');
+  const splashRound = document.getElementById('splash-round-text');
+
+  // 1. Fetch Move Sets for Selected Riders
+  try {
+    const res = await fetch('data/moves.json');
+    if (res.ok) {
+      const allMoves = await res.json();
+      gameState.p1Moves = allMoves[matchConfig.p1Rider.id] || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
+      gameState.p2Moves = allMoves[matchConfig.p2Rider.id] || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
+    }
+  } catch (e) {
+    console.warn("Could not load moves.json, using fallbacks.");
+    gameState.p1Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+    gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+  }
+
+  // 2. Instantiate Player Objects
+  const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
+  const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
+
+  let p1MaxLp = p1Rider.maxLp || 1050;
+  if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') p1MaxLp = Math.floor(p1MaxLp * 1.30);
+
+  let p2MaxLp = p2Rider.maxLp || 1200;
+  if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') p2MaxLp = Math.floor(p2MaxLp * 1.30);
+
+  gameState.p1 = {
+    id: p1Rider.id,
+    name: p1Rider.name,
+    isCPU: matchConfig.p1IsCPU,
+    maxLp: p1MaxLp,
+    lp: p1MaxLp,
+    chi: 10,
+    maxChi: 16,
+    faintMeter: 0,
+    activeBuffs: [],
+    airborneTicks: 0,
+    activeChargePercent: 100,
+    isFainted: false,
+    tookCleanHitThisRound: false
+  };
+
+  gameState.p2 = {
+    id: p2Rider.id,
+    name: p2Rider.name,
+    isCPU: matchConfig.p2IsCPU,
+    maxLp: p2MaxLp,
+    lp: p2MaxLp,
+    chi: 10,
+    maxChi: 16,
+    faintMeter: 0,
+    activeBuffs: [],
+    airborneTicks: 0,
+    activeChargePercent: 100,
+    isFainted: false,
+    tookCleanHitThisRound: false
+  };
+
+  gameState.roundCounter = 1;
+
+  // 3. STAGE A: PRELOADING SCREEN
+  if (splashNames) splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
+  if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
+  if (transitionScreen) transitionScreen.hidden = false;
+
+  if (typeof preloadRiderVideos === 'function') {
+    await Promise.all([
+      preloadRiderVideos(p1Rider.id, gameState.p1Moves),
+      preloadRiderVideos(p2Rider.id, gameState.p2Moves)
+    ]);
+  }
+
+  // 4. STAGE B: "GET READY FOR THE FIGHT!" MATCHUP SPLASH
+  if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
+  await new Promise(resolve => setTimeout(resolve, 1800));
+
+  // 5. STAGE C: LAUNCH BATTLE SCREEN
+  if (transitionScreen) transitionScreen.hidden = true;
+
+  const battleScreen = document.getElementById('battle-screen');
+  if (battleScreen) battleScreen.hidden = false;
+
+  updateHUD();
+
+  if (typeof updateCharacterMedia === 'function') {
+    updateCharacterMedia('p1', 'IDLE');
+    updateCharacterMedia('p2', 'IDLE');
+  }
+
+  if (typeof startRoundCountdown === 'function') {
+    startRoundCountdown();
+  }
+}
+
 // GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & DIFFICULTY
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
@@ -42,7 +144,7 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   return 'D+J';
 }
 
-// FLOATING POPUP GENERATORS ATTACHED DIRECTLY TO VIEWPORT CHARACTER BOXES
+// FLOATING POPUP GENERATORS
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
   if (!container) return;
@@ -104,7 +206,6 @@ function renderBuffTrays() {
 
     tray.innerHTML = '';
 
-    // Render active buff badges dynamically from moves.json
     if (player.activeBuffs) {
       player.activeBuffs.forEach(b => {
         const tag = document.createElement('div');
@@ -136,7 +237,7 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-// HUD DISPLAY UPDATER (PREVENTS DUPLICATED LP/CHI LABELS)
+// HUD DISPLAY UPDATER
 function updateHUD() {
   if (gameState.p1) {
     const p1Name = document.getElementById('p1-name');
@@ -190,7 +291,7 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
-// MAIN SEQUENTIAL RESOLUTION PHASE WITH COUNTER-ATTACK INTERRUPTION
+// MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -219,7 +320,7 @@ async function executeTurnResolutionPhase() {
   let p1Move = getMoveForPlayer('p1', p1MoveKey);
   let p2Move = getMoveForPlayer('p2', p2MoveKey);
 
-  // Instant Utility Effects (Faint Recovery)
+  // Process Instant Utility Effects
   if (p1Move && p1Move.faintRecovery) {
     gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
     triggerFloatingText('p1', `FAINT -${p1Move.faintRecovery}`, 'heal');
@@ -402,7 +503,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH INSTANT FAINT/STUN INTERRUPTIONS
+// ATTACK RESOLUTION ENGINE
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return { hitLanded: false, isGlancing: false };
 
@@ -411,11 +512,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   // 1. HIT & EVASION CALCULATION
   let baseHitChance = atkMove.hitChance || 80;
-
-  // Attacker Hit Bonus (Nigo Airborne Jump: +15% HIT)
   let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
-
-  // Defender Evasion Bonus (Ichigo Airborne Jump: +20% EVS)
   let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
 
   let rolledHit = false;
@@ -451,7 +548,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
-  // Mitigation Buffs (Nigo Red Shutter: +15% DEF)
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
     damageRatio *= 0.85; 
   }
@@ -460,17 +556,15 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
   let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon' || b.id === 'typhoon_speed')) ? 1.25 : 1.0;
 
-  // Rider Focus Buffs
   let focusMultiplier = 1.0;
   if (attacker.activeBuffs) {
     if (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) {
-      focusMultiplier = 1.20; // Ichigo Typhoon Focus
+      focusMultiplier = 1.20;
     } else if (atkMoveKey.startsWith('D') && attacker.activeBuffs.some(b => b.id === 'power_focus')) {
-      focusMultiplier = 1.30; // Nigo Power Focus
+      focusMultiplier = 1.30;
     }
   }
 
-  // Airborne Attack Multiplier (+15% ATK)
   let jumpAtkMultiplier = attacker.airborneTicks > 0 ? 1.15 : 1.0;
   
   let baseDamage = atkMove.baseDamage || 0;
