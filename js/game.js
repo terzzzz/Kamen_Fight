@@ -1,4 +1,4 @@
-// SAFE GLOBAL DECLARATIONS
+// SAFE GLOBAL DECLARATIONS (Prevents ES6 redeclaration SyntaxError)
 var CHARGE_TIMES = CHARGE_TIMES || {
   'A': 800,   // Defense
   'D': 1300,  // Offense
@@ -21,10 +21,10 @@ let gameState = {
   turnTimerSeconds: 5,
   timerInterval: null,
   movesData: {},
-  videoCache: {}, 
+  videoCache: {}, // Memory cache for preloaded MP4 blobs
   p1: null,
   p2: null,
-  p2AlwaysIdle: false,
+  p2AlwaysIdle: false, // Dummy Mode Toggle (Key '0')
   canContinueFromGameOver: false,
   input: {
     heldDirection: null,
@@ -37,7 +37,7 @@ let gameState = {
   }
 };
 
-// PRELOAD MP4 CLIPS INTO MEMORY BLOBS
+// FAST BATCH PRELOAD OF MP4 CLIPS INTO MEMORY BLOBS
 async function preloadRiderVideos(riderId) {
   const videoFiles = [
     'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
@@ -46,22 +46,24 @@ async function preloadRiderVideos(riderId) {
     'kirimomi_kick.mp4', 'windmill_guard.mp4', 'guard.mp4', 'jump.mp4', 'charge_up.mp4'
   ];
 
-  const promises = videoFiles.map(async (file) => {
-    const rawUrl = `assets/videos/${riderId}/${file}`;
-    if (gameState.videoCache[rawUrl]) return;
+  const BATCH_SIZE = 4; // Fetch 4 videos concurrently for optimal speed
+  for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
+    const batch = videoFiles.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(async (file) => {
+      const rawUrl = `assets/videos/${riderId}/${file}`;
+      if (gameState.videoCache[rawUrl]) return;
 
-    try {
-      const res = await fetch(rawUrl);
-      if (res.ok) {
-        const blob = await res.blob();
-        gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+      try {
+        const res = await fetch(rawUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
+        }
+      } catch (e) {
+        gameState.videoCache[rawUrl] = rawUrl;
       }
-    } catch (e) {
-      gameState.videoCache[rawUrl] = rawUrl;
-    }
-  });
-
-  await Promise.all(promises);
+    }));
+  }
 }
 
 async function startBattle(config) {
@@ -84,6 +86,7 @@ async function startBattle(config) {
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
+  // Show transition screen during preload
   const splashScreen = document.getElementById('match-transition-screen');
   const splashRound = document.getElementById('splash-round-text');
   const splashNames = document.getElementById('splash-names-text');
@@ -98,6 +101,7 @@ async function startBattle(config) {
   bindCommandButtons();
   updateHUD();
 
+  // Preload video assets into blob memory before match starts
   const p1RiderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
   const p2RiderId = (config.p2Rider && config.p2Rider.id) || 'ichigo';
   await preloadRiderVideos(p1RiderId);
@@ -121,8 +125,8 @@ function createPlayerState(riderConfig, isCPU) {
     lp: riderConfig.maxLp || 1050,
     chi: 10,
     maxChi: 16,
-    faintMeter: 0,
-    tookCleanHitThisRound: false,
+    faintMeter: 0,               // 100-Point Faint Meter
+    tookCleanHitThisRound: false, // Round damage tracker
     isFainted: false,
     willBeFaintedNextRound: false,
     airborneTicks: 0,
@@ -144,6 +148,7 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
 
   hudEl.appendChild(popup);
 
+  // Extended duration to 2.0s for better visibility
   setTimeout(() => {
     popup.remove();
   }, 2000);
@@ -159,6 +164,7 @@ function triggerFloatingText(slotKey, text, customClass = '') {
 
   hudEl.appendChild(popup);
 
+  // Extended duration to 2.0s for better visibility
   setTimeout(() => {
     popup.remove();
   }, 2000);
@@ -486,8 +492,9 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const player = gameState[playerKey];
     if (!player) return resolve();
 
+    // Display [P1] or [P2] prefix on action labels
     if (actionLabel) {
-      const slotPrefix = playerKey.toUpperCase();
+      const slotPrefix = playerKey.toUpperCase(); // 'P1' or 'P2'
       actionLabel.textContent = actionName ? `[${slotPrefix}] ${player.name} : ${actionName}!` : '';
       actionLabel.hidden = !actionName;
     }
@@ -731,7 +738,7 @@ async function executeTurnResolutionPhase() {
 
       battleMsg.innerHTML = `${resultText}<br><span class="continue-prompt">PRESS ANY KEY TO CONTINUE</span>`;
 
-      // 1s Delay before inputs allow continuing to prevent accidental skips
+      // 1s Input cooldown to prevent accidental rapid skips
       gameState.canContinueFromGameOver = false;
       setTimeout(() => {
         gameState.canContinueFromGameOver = true;
@@ -797,6 +804,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (finalDmg > 0) {
     defender.lp = Math.max(0, defender.lp - finalDmg);
 
+    // Stagger damage number by 250ms when glancing hit triggers to prevent visual stacking
     if (isGlancing) {
       setTimeout(() => triggerFloatingNumber(defenderKey, finalDmg, false), 250);
     } else {
