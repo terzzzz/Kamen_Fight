@@ -12,7 +12,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, movesData);
   }
 
-  // Validate if chosen move is affordable
   if (chosenKey && movesData[chosenKey] && typeof movesData[chosenKey] === 'object') {
     const moveCost = movesData[chosenKey].chiCost || 0;
     if (moveCost <= cpuPlayer.chi) {
@@ -20,7 +19,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     }
   }
 
-  // Fallback: Pick a random move the CPU can afford
   const affordableKeys = Object.keys(movesData).filter(key => {
     const move = movesData[key];
     return move && typeof move === 'object' && (move.chiCost || 0) <= cpuPlayer.chi;
@@ -132,18 +130,48 @@ function updateHUD() {
     const p1Name = document.getElementById('p1-name');
     const p1Lp = document.getElementById('p1-lp');
     const p1Chi = document.getElementById('p1-chi');
-    if (p1Name) p1Name.textContent = gameState.p1.name;
-    if (p1Lp) p1Lp.textContent = gameState.p1.lp;
-    if (p1Chi) p1Chi.textContent = gameState.p1.chi;
+    
+    if (p1Name) p1Name.textContent = `[P1] ${gameState.p1.name}`;
+    if (p1Lp) {
+      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p1.lp}</span>`;
+    }
+    if (p1Chi) {
+      const maxChi = gameState.p1.maxChi || 16;
+      const chiPct = Math.min(100, Math.max(0, (gameState.p1.chi / maxChi) * 100));
+      p1Chi.innerHTML = `
+        <div class="chi-container">
+          <span class="stat-label">CHI:</span>
+          <span class="stat-value-large">${gameState.p1.chi}</span>
+          <span class="chi-max-label">/ ${maxChi}</span>
+          <div class="chi-bar-track">
+            <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
+          </div>
+        </div>`;
+    }
   }
 
   if (gameState.p2) {
     const p2Name = document.getElementById('p2-name');
     const p2Lp = document.getElementById('p2-lp');
     const p2Chi = document.getElementById('p2-chi');
-    if (p2Name) p2Name.textContent = gameState.p2.name;
-    if (p2Lp) p2Lp.textContent = gameState.p2.lp;
-    if (p2Chi) p2Chi.textContent = gameState.p2.chi;
+    
+    if (p2Name) p2Name.textContent = `[P2] ${gameState.p2.name}`;
+    if (p2Lp) {
+      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-large">${gameState.p2.lp}</span>`;
+    }
+    if (p2Chi) {
+      const maxChi = gameState.p2.maxChi || 16;
+      const chiPct = Math.min(100, Math.max(0, (gameState.p2.chi / maxChi) * 100));
+      p2Chi.innerHTML = `
+        <div class="chi-container">
+          <span class="stat-label">CHI:</span>
+          <span class="stat-value-large">${gameState.p2.chi}</span>
+          <span class="chi-max-label">/ ${maxChi}</span>
+          <div class="chi-bar-track">
+            <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
+          </div>
+        </div>`;
+    }
   }
 
   ['p1', 'p2'].forEach(slot => {
@@ -272,7 +300,7 @@ async function executeTurnResolutionPhase() {
     }
   }
 
-  // STEP 2 EXECUTION (Unnested: Attacker 2 executes move if alive)
+  // STEP 2 EXECUTION
   if (defender2.lp > 0 && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
     attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
     updateHUD();
