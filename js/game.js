@@ -187,23 +187,8 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Schedule automated CPU actions with realistic thinking delay (0.8s - 1.5s)
-  ['p1', 'p2'].forEach(slot => {
-    const player = gameState[slot];
-    if (player && player.isCPU && !player.isFainted) {
-      if (slot === 'p2' && gameState.p2AlwaysIdle) return;
-
-      const thinkDelay = Math.floor(Math.random() * 700 + 800);
-      setTimeout(() => {
-        if (gameState.roundPhase !== 'INPUT') return;
-        const oppSlot = slot === 'p1' ? 'p2' : 'p1';
-        const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
-        player.activeChargePercent = moveKey === 'DO_NOTHING' ? 0 : Math.floor(Math.random() * 26 + 75);
-        confirmPlayerAction(moveKey, slot);
-        simulateCPUButtonPress(moveKey);
-      }, thinkDelay);
-    }
-  });
+  // Check if resolution can trigger immediately (e.g. CPU vs CPU or Human locked)
+  checkBothPlayersLocked();
 
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
@@ -223,6 +208,21 @@ function startRoundCountdown() {
       executeTurnResolutionPhase();
     }
   }, 1000);
+}
+
+function checkBothPlayersLocked() {
+  const p1Ready = gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted;
+  const p2Ready = gameState.p2.isCPU || gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
+
+  if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
+    clearInterval(gameState.timerInterval);
+    const delay = (gameState.p1.isCPU && gameState.p2.isCPU) ? 1200 : 300;
+    setTimeout(() => {
+      if (gameState.roundPhase === 'INPUT') {
+        executeTurnResolutionPhase();
+      }
+    }, delay);
+  }
 }
 
 function returnToCharSelect() {
@@ -408,22 +408,7 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     }
   }
 
-  // Trigger turn resolution immediately when both inputs are locked
   checkBothPlayersLocked();
-}
-
-function checkBothPlayersLocked() {
-  const p1Ready = gameState.input.isConfirmed || gameState.p1.isFainted;
-  const p2Ready = gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
-
-  if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
-    clearInterval(gameState.timerInterval);
-    setTimeout(() => {
-      if (gameState.roundPhase === 'INPUT') {
-        executeTurnResolutionPhase();
-      }
-    }, 300);
-  }
 }
 
 function bindCommandButtons() {
