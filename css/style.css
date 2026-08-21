@@ -38,7 +38,7 @@ body {
 #vs-select-screen h1 {
   color: #66fcf1;
   margin-bottom: 20px;
-  font-size: 22px;
+  font-size: 24px;
   text-shadow: 0 0 8px #66fcf1;
   text-align: center;
 }
@@ -102,6 +102,7 @@ body {
   color: #fff;
   padding: 8px 16px;
   font-weight: bold;
+  font-size: 15px;
   cursor: pointer;
 }
 
@@ -113,14 +114,15 @@ body {
 .type-badge {
   background: #66fcf1;
   color: #0b0c10;
-  padding: 6px 12px;
+  padding: 6px 14px;
   font-weight: bold;
+  font-size: 15px;
   border-radius: 4px;
   cursor: pointer;
 }
 
 .vs-divider {
-  font-size: 36px;
+  font-size: 40px;
   font-weight: bold;
   color: #c5c6c7;
   text-shadow: 0 0 10px #ffffff;
@@ -133,7 +135,7 @@ body {
   padding: 8px;
   margin-bottom: 15px;
   font-weight: bold;
-  font-size: 13px;
+  font-size: 15px;
   text-align: center;
 }
 
@@ -147,7 +149,7 @@ body {
   border: none;
   color: #fff;
   padding: 12px 24px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
   cursor: pointer;
 }
@@ -166,7 +168,7 @@ body {
   width: 100%;
   background: #0b0c10;
   border: 2px solid #45a29e;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 10px;
 }
 
@@ -179,44 +181,53 @@ body {
 .p2-hud { text-align: right; }
 
 .player-hud h2 {
-  font-size: 16px;
+  font-size: 18px;
   color: #66fcf1;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
 }
 
 .stat-line {
-  font-size: 14px;
+  font-size: 16px;
   color: #c5c6c7;
+  font-weight: bold;
+  margin-bottom: 2px;
 }
 
 .status-tag {
-  font-size: 11px;
+  font-size: 14px;
   color: #00ffcc;
-  margin-top: 2px;
+  font-weight: bold;
+  margin-top: 4px;
 }
 
+/* --- BUFF & STATUS TRAY --- */
 .buff-tray {
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 6px;
   flex-wrap: wrap;
 }
 
 .buff-tag {
-  font-size: 10px;
-  padding: 2px 4px;
-  border-radius: 2px;
-  background: #333;
+  font-size: 13px;
+  font-weight: bold;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: #2a2a2a;
+  border: 1px solid #555;
+  letter-spacing: 0.5px;
 }
 
-.buff-tag.speed { background: #0099ff; color: #fff; }
-.buff-tag.attack { background: #ff3300; color: #fff; }
+.buff-tag.speed { background: #0077cc; color: #fff; border-color: #00aaff; }
+.buff-tag.attack { background: #cc2200; color: #fff; border-color: #ff4422; }
 
 .buff-tag.airborne {
   background: #ffcc00;
   color: #0b0c10;
   font-weight: bold;
-  box-shadow: 0 0 6px rgba(255, 204, 0, 0.8);
+  border-color: #ffee66;
+  box-shadow: 0 0 8px rgba(255, 204, 0, 0.8);
 }
 
 .center-hud {
@@ -225,13 +236,14 @@ body {
 
 .round-title {
   color: #ffcc00;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
+  letter-spacing: 1px;
 }
 
 .timer-display {
   color: #ff0055;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: bold;
   margin-top: 4px;
 }
@@ -242,10 +254,11 @@ body {
   border: 1px solid #ffcc00;
   color: #ffcc00;
   text-align: center;
-  padding: 8px;
+  padding: 10px;
   margin-bottom: 10px;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 16px;
+  letter-spacing: 0.5px;
 }
 
 /* --- VERTICAL FAINT METER BAR --- */
@@ -261,7 +274,7 @@ body {
 }
 
 .faint-label {
-  font-size: 10px;
+  font-size: 12px;
   color: #ffcc00;
   font-weight: bold;
   letter-spacing: 1px;
@@ -269,7 +282,7 @@ body {
 }
 
 .faint-track {
-  width: 14px;
+  width: 16px;
   height: 60px;
   background: #0b0c10;
   border: 1px solid #ffcc00;
@@ -281,7 +294,7 @@ body {
 
 .faint-fill {
   width: 100%;
-  height: 0%; /* Animate height from 0% to 100% via game.js */
+  height: 0%;
   position: absolute;
   bottom: 0;
   left: 0;
@@ -355,11 +368,12 @@ body {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(255, 0, 85, 0.8);
+  background: rgba(255, 0, 85, 0.85);
   color: #fff;
-  padding: 4px 8px;
+  padding: 6px 10px;
   font-weight: bold;
-  font-size: 12px;
+  font-size: 14px;
+  letter-spacing: 1px;
 }
 
 /* --- CONTROLS & CHARGE BAR --- */
@@ -377,14 +391,16 @@ body {
 }
 
 .charge-status {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: bold;
   color: #66fcf1;
   margin-bottom: 4px;
+  letter-spacing: 0.5px;
 }
 
 .charge-track {
   width: 100%;
-  height: 20px;
+  height: 22px;
   background: #222;
   border: 1px solid #45a29e;
   border-radius: 10px;
@@ -395,7 +411,7 @@ body {
   height: 100%;
   background: linear-gradient(90deg, #45a29e, #66fcf1);
   color: #000;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -406,10 +422,10 @@ body {
 .action-flag {
   position: absolute;
   right: 0;
-  top: -20px;
+  top: -22px;
   color: #00ffcc;
   font-weight: bold;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .pad-container {
@@ -431,13 +447,13 @@ body {
 }
 
 .pad-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: #1f2833;
   border: 1px solid #45a29e;
   color: #66fcf1;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -453,15 +469,15 @@ body {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(11, 12, 16, 0.85);
+  background: rgba(11, 12, 16, 0.90);
   border: 2px solid #66fcf1;
   color: #ffcc00;
-  padding: 6px 16px;
-  font-size: 14px;
+  padding: 8px 18px;
+  font-size: 17px;
   font-weight: bold;
   letter-spacing: 1px;
   text-shadow: 0 0 8px #ffcc00;
-  box-shadow: 0 0 10px rgba(102, 252, 241, 0.5);
+  box-shadow: 0 0 12px rgba(102, 252, 241, 0.6);
   z-index: 20;
   border-radius: 4px;
   white-space: nowrap;
@@ -486,14 +502,14 @@ body {
 }
 
 .splash-content h1 {
-  font-size: 32px;
+  font-size: 34px;
   color: #66fcf1;
   text-shadow: 0 0 15px #66fcf1;
   margin-bottom: 10px;
 }
 
 .splash-content h2 {
-  font-size: 24px;
+  font-size: 26px;
   color: #ffcc00;
 }
 
@@ -502,10 +518,10 @@ body {
   position: absolute;
   top: -15px;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: bold;
   pointer-events: none;
-  animation: floatUpFade 1.2s ease-out forwards;
+  animation: floatUpFade 2.0s ease-out forwards;
   z-index: 50;
 }
 
@@ -524,14 +540,16 @@ body {
 
 .damage-popup.miss {
   color: #00ccff;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   text-shadow: 0 0 6px #0055ff;
+  top: -35px;
 }
 
 .damage-popup.scratch {
   color: #ffaa00;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   text-shadow: 0 0 6px #884400;
+  top: -45px;
 }
 
 @keyframes floatUpFade {
@@ -539,12 +557,33 @@ body {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-  40% {
+  30% {
     opacity: 1;
-    transform: translateY(-22px) scale(1.35);
+    transform: translateY(-25px) scale(1.3);
   }
   100% {
     opacity: 0;
-    transform: translateY(-45px) scale(1);
+    transform: translateY(-65px) scale(1);
+  }
+}
+
+/* --- CONTINUE PROMPT DISPLAY --- */
+.battle-banner .continue-prompt {
+  display: inline-block;
+  font-size: 14px;
+  color: #66fcf1;
+  margin-top: 8px;
+  letter-spacing: 1px;
+  animation: continueGlow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes continueGlow {
+  from {
+    opacity: 0.4;
+    text-shadow: 0 0 2px #66fcf1;
+  }
+  to {
+    opacity: 1;
+    text-shadow: 0 0 10px #66fcf1;
   }
 }
