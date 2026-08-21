@@ -20,7 +20,8 @@ let gameState = {
   roundPhase: 'IDLE',
   turnTimerSeconds: 5,
   timerInterval: null,
-  movesData: {},
+  p1Moves: {},
+  p2Moves: {},
   videoCache: {}, // Memory cache for preloaded MP4 blobs
   p1: null,
   p2: null,
@@ -41,14 +42,24 @@ let gameState = {
   }
 };
 
-// FAST BATCH PRELOAD OF MP4 CLIPS INTO MEMORY BLOBS
-async function preloadRiderVideos(riderId) {
-  const videoFiles = [
+function getMoveForPlayer(playerKey, moveKey) {
+  if (moveKey === 'DO_NOTHING' || !moveKey) return DO_NOTHING_MOVE;
+  const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
+  return (moves && moves[moveKey]) || DO_NOTHING_MOVE;
+}
+
+// DYNAMIC BATCH PRELOAD OF MP4 CLIPS FROM RIDER MOVESET
+async function preloadRiderVideos(riderId, riderMoves = {}) {
+  const baseVideoFiles = [
     'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
-    'hit.mp4', 'hit_physical.mp4', 'punch.mp4', 'kick.mp4', 'combo_punch.mp4',
-    'combo_kick.mp4', 'power_chop.mp4', 'head_crusher.mp4', 'rider_kick.mp4',
-    'kirimomi_kick.mp4', 'windmill_guard.mp4', 'guard.mp4', 'jump.mp4', 'charge_up.mp4'
+    'hit.mp4', 'hit_physical.mp4', 'guard.mp4'
   ];
+
+  const moveVideos = Object.values(riderMoves)
+    .filter(m => m && typeof m === 'object' && m.video)
+    .map(m => m.video);
+
+  const videoFiles = Array.from(new Set([...baseVideoFiles, ...moveVideos]));
 
   const BATCH_SIZE = 4; // Fetch 4 videos concurrently for optimal speed
   for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
@@ -71,14 +82,19 @@ async function preloadRiderVideos(riderId) {
 }
 
 async function startBattle(config) {
+  const p1RiderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
+  const p2RiderId = (config.p2Rider && config.p2Rider.id) || 'ichigo';
+
   try {
     const response = await fetch('data/moves.json');
     const fullRoster = await response.json();
     
-    const riderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
-    gameState.movesData = fullRoster[riderId] || fullRoster['ichigo'];
+    gameState.p1Moves = fullRoster[p1RiderId] || fullRoster['ichigo'] || {};
+    gameState.p2Moves = fullRoster[p2RiderId] || fullRoster['ichigo'] || {};
   } catch (err) {
     console.warn("Could not load moves.json, using fallback data.");
+    gameState.p1Moves = {};
+    gameState.p2Moves = {};
   }
 
   gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
@@ -105,11 +121,11 @@ async function startBattle(config) {
   bindCommandButtons();
   updateHUD();
 
-  // Preload video assets into blob memory before match starts
-  const p1RiderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
-  const p2RiderId = (config.p2Rider && config.p2Rider.id) || 'ichigo';
-  await preloadRiderVideos(p1RiderId);
-  if (p1RiderId !== p2RiderId) await preloadRiderVideos(p2RiderId);
+  // Preload video assets dynamically per rider moveset
+  await preloadRiderVideos(p1RiderId, gameState.p1Moves);
+  if (p1RiderId !== p2RiderId) {
+    await preloadRiderVideos(p2RiderId, gameState.p2Moves);
+  }
 
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
@@ -152,7 +168,6 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
 
   hudEl.appendChild(popup);
 
-  // Extended duration to 2.0s for better visibility
   setTimeout(() => {
     popup.remove();
   }, 2000);
@@ -168,7 +183,6 @@ function triggerFloatingText(slotKey, text, customClass = '') {
 
   hudEl.appendChild(popup);
 
-  // Extended duration to 2.0s for better visibility
   setTimeout(() => {
     popup.remove();
   }, 2000);
@@ -255,27 +269,29 @@ function startRoundCountdown() {
   }, 1000);
 }
 
-// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI
-function getCPUMoveChoice(cpuPlayer, opponentPlayer) {
+// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & PLAYER MOVESET
+function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || gameState.p2AlwaysIdle) return 'DO_NOTHING';
+
+  const movesData = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
 
   let chosenKey = null;
   if (typeof selectCPUMove === 'function') {
-    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, gameState.movesData);
+    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, movesData);
   }
 
   // Validate if chosen move is affordable
-  if (chosenKey && gameState.movesData[chosenKey]) {
-    const moveCost = gameState.movesData[chosenKey].chiCost || 0;
+  if (chosenKey && movesData[chosenKey]) {
+    const moveCost = movesData[chosenKey].chiCost || 0;
     if (moveCost <= cpuPlayer.chi) {
       return chosenKey;
     }
   }
 
   // Fallback: Pick a random move the CPU can afford
-  const affordableKeys = Object.keys(gameState.movesData).filter(key => {
-    const move = gameState.movesData[key];
-    return (move.chiCost || 0) <= cpuPlayer.chi;
+  const affordableKeys = Object.keys(movesData).filter(key => {
+    const move = movesData[key];
+    return move && typeof move === 'object' && (move.chiCost || 0) <= cpuPlayer.chi;
   });
 
   if (affordableKeys.length > 0) {
@@ -289,7 +305,6 @@ function returnToCharSelect() {
   gameState.roundPhase = 'IDLE';
   gameState.canContinueFromGameOver = false;
 
-  // Clean up stun overlays
   ['p1', 'p2'].forEach(slot => {
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
     if (stunOverlay) stunOverlay.hidden = true;
@@ -421,13 +436,13 @@ function resetCharge() {
   }
 }
 
-// CONFIRM PLAYER ACTION WITH CHI VALIDATION (GENERIC FOR BOTH P1 & P2)
+// CONFIRM PLAYER ACTION WITH CHI VALIDATION
 function confirmPlayerAction(moveKey, playerKey = 'p1') {
   const player = gameState[playerKey];
   if (!player) return;
 
   if (moveKey !== 'DO_NOTHING') {
-    const move = gameState.movesData[moveKey] || DO_NOTHING_MOVE;
+    const move = getMoveForPlayer(playerKey, moveKey);
     const chiCost = move.chiCost || 0;
 
     // Check if player has sufficient CHI
@@ -556,7 +571,7 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = null) {
+function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = null, moveObj = null) {
   return new Promise((resolve) => {
     const centerBox = document.getElementById('center-box');
     const centerVid = document.getElementById('center-video');
@@ -566,9 +581,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const player = gameState[playerKey];
     if (!player) return resolve();
 
-    // Display [P1] or [P2] prefix on action labels
     if (actionLabel) {
-      const slotPrefix = playerKey.toUpperCase(); // 'P1' or 'P2'
+      const slotPrefix = playerKey.toUpperCase();
       actionLabel.textContent = actionName ? `[${slotPrefix}] ${player.name} : ${actionName}!` : '';
       actionLabel.hidden = !actionName;
     }
@@ -581,9 +595,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
 
-    const isIchigo = player.id === 'ichigo';
-    const isUnmirrored = videoFile.includes('windmill_guard') || videoFile.includes('combo_kick');
-    const sourceFacingLeft = isIchigo && !isUnmirrored;
+    const isUnmirrored = moveObj && moveObj.unmirrored;
+    const sourceFacingLeft = !isUnmirrored;
 
     const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
     centerVid.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
@@ -631,13 +644,13 @@ async function executeTurnResolutionPhase() {
   let p2Time = gameState.p2.isCPU ? Math.floor(Math.random() * 4 + 1) : (gameState.p2LockInTime || 0);
 
   let p1MoveKey = gameState.p1.isCPU
-    ? getCPUMoveChoice(gameState.p1, gameState.p2)
+    ? getCPUMoveChoice(gameState.p1, gameState.p2, 'p1')
     : (gameState.input.selectedMoveKey || 'DO_NOTHING');
 
   let p2MoveKey = gameState.p2AlwaysIdle
     ? 'DO_NOTHING'
     : (gameState.p2.isCPU 
-        ? getCPUMoveChoice(gameState.p2, gameState.p1) 
+        ? getCPUMoveChoice(gameState.p2, gameState.p1, 'p2') 
         : (gameState.p2SelectedMoveKey || 'DO_NOTHING'));
 
   if (gameState.p1.isCPU) {
@@ -651,8 +664,8 @@ async function executeTurnResolutionPhase() {
     gameState.p2.activeChargePercent = 0;
   }
 
-  let p1Move = p1MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p1MoveKey] || DO_NOTHING_MOVE);
-  let p2Move = p2MoveKey === 'DO_NOTHING' ? DO_NOTHING_MOVE : (gameState.movesData[p2MoveKey] || DO_NOTHING_MOVE);
+  let p1Move = getMoveForPlayer('p1', p1MoveKey);
+  let p2Move = getMoveForPlayer('p2', p2MoveKey);
 
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
@@ -662,14 +675,11 @@ async function executeTurnResolutionPhase() {
 
   setSideBoxesBlank(true);
 
-  if (p1MoveKey === 'W+J') applyBuff(gameState.p1, 'typhoon', 'D&S ATK +25%', 'attack', 3);
-  if (p2MoveKey === 'W+J') applyBuff(gameState.p2, 'typhoon', 'D&S ATK +25%', 'attack', 3);
-  
-  if (p1MoveKey === 'W+K') applyBuff(gameState.p1, 'focus', 'S-ATK +20%', 'attack', 2);
-  if (p2MoveKey === 'W+K') applyBuff(gameState.p2, 'focus', 'S-ATK +20%', 'attack', 2);
+  if (p1Move && p1Move.buff) applyBuff(gameState.p1, p1Move.buff.id, p1Move.buff.label, p1Move.buff.type, p1Move.buff.duration);
+  if (p2Move && p2Move.buff) applyBuff(gameState.p2, p2Move.buff.id, p2Move.buff.label, p2Move.buff.type, p2Move.buff.duration);
 
-  handleAirborneState(gameState.p1, p1MoveKey);
-  handleAirborneState(gameState.p2, p2MoveKey);
+  handleAirborneState(gameState.p1, p1MoveKey, p1Move);
+  handleAirborneState(gameState.p2, p2MoveKey, p2Move);
 
   let p1IsIdle = p1MoveKey === 'DO_NOTHING';
   let p2IsIdle = p2MoveKey === 'DO_NOTHING';
@@ -723,9 +733,9 @@ async function executeTurnResolutionPhase() {
   updateHUD();
 
   if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF' || move2.type === 'UTILITY')) {
-    await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000);
+    await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000, move1);
   } else {
-    await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name);
+    await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
     attack1Result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
   }
 
@@ -747,7 +757,7 @@ async function executeTurnResolutionPhase() {
       attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
       updateHUD();
 
-      await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name);
+      await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
       let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
       if (attack2Result.hitLanded && key2.startsWith('D')) {
@@ -884,7 +894,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (finalDmg > 0) {
     defender.lp = Math.max(0, defender.lp - finalDmg);
 
-    // Stagger damage number by 250ms when glancing hit triggers to prevent visual stacking
     if (isGlancing) {
       setTimeout(() => triggerFloatingNumber(defenderKey, finalDmg, false), 250);
     } else {
@@ -932,9 +941,11 @@ function updateCharacterMedia(playerKey, stateType) {
     fileName += '.mp4';
   }
 
-  const isIchigo = player.id === 'ichigo';
-  const isUnmirrored = fileName.includes('windmill_guard') || fileName.includes('combo_kick');
-  const sourceFacingLeft = isIchigo && !isUnmirrored;
+  const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
+  const currentMove = Object.values(moves).find(m => m && m.video === fileName);
+
+  const isUnmirrored = currentMove && currentMove.unmirrored;
+  const sourceFacingLeft = !isUnmirrored;
 
   const shouldFlip = playerKey === 'p1' ? sourceFacingLeft : !sourceFacingLeft;
   videoEl.style.transform = shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
@@ -986,11 +997,10 @@ function resetTurnInputState() {
   if (flag2El) flag2El.hidden = true;
 }
 
-function handleAirborneState(player, moveKey) {
-  if (moveKey === 'W+I') {
-    player.airborneTicks = 2;
+function handleAirborneState(player, moveKey, move) {
+  if (move && move.grantsAirborne) {
+    player.airborneTicks = move.grantsAirborne;
   } else if (player.airborneTicks > 0) {
-    const move = gameState.movesData[moveKey];
     if (move && move.forcesLanding) {
       player.airborneTicks = 0;
     } else {
