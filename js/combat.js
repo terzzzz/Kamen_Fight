@@ -1,109 +1,122 @@
- // FAINT SYSTEM FALLBACK CONFIG
+// FAINT SYSTEM FALLBACK CONFIG
 const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
   FAINT_THRESHOLD: 100,
   HIT_BUILDUP: 25,
   ROUND_RECOVERY: 13
 };
 
-// BATTLE INITIALIZATION WITH THREE-STAGE LOADING LIFECYCLE
+// BATTLE INITIALIZATION WITH GUARANTEED LIFECYCLE UNLOCK
 async function startBattle(matchConfig) {
   if (!window.gameState) window.gameState = {};
-  gameState.matchConfig = matchConfig;
+  gameState.matchConfig = matchConfig || {};
   if (!gameState.videoCache) gameState.videoCache = {};
 
   const transitionScreen = document.getElementById('match-transition-screen');
   const splashNames = document.getElementById('splash-names-text');
   const splashRound = document.getElementById('splash-round-text');
-
-  // 1. Fetch Move Sets for Selected Riders
-  try {
-    const res = await fetch('data/moves.json');
-    if (res.ok) {
-      const allMoves = await res.json();
-      gameState.p1Moves = allMoves[matchConfig.p1Rider.id] || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
-      gameState.p2Moves = allMoves[matchConfig.p2Rider.id] || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
-    }
-  } catch (e) {
-    console.warn("Could not load moves.json, using fallbacks.");
-    gameState.p1Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
-    gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
-  }
-
-  // 2. Instantiate Player Objects
-  const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
-  const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
-
-  let p1MaxLp = p1Rider.maxLp || 1050;
-  if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') p1MaxLp = Math.floor(p1MaxLp * 1.30);
-
-  let p2MaxLp = p2Rider.maxLp || 1200;
-  if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') p2MaxLp = Math.floor(p2MaxLp * 1.30);
-
-  gameState.p1 = {
-    id: p1Rider.id,
-    name: p1Rider.name,
-    isCPU: matchConfig.p1IsCPU,
-    maxLp: p1MaxLp,
-    lp: p1MaxLp,
-    chi: 10,
-    maxChi: 16,
-    faintMeter: 0,
-    activeBuffs: [],
-    airborneTicks: 0,
-    activeChargePercent: 100,
-    isFainted: false,
-    tookCleanHitThisRound: false
-  };
-
-  gameState.p2 = {
-    id: p2Rider.id,
-    name: p2Rider.name,
-    isCPU: matchConfig.p2IsCPU,
-    maxLp: p2MaxLp,
-    lp: p2MaxLp,
-    chi: 10,
-    maxChi: 16,
-    faintMeter: 0,
-    activeBuffs: [],
-    airborneTicks: 0,
-    activeChargePercent: 100,
-    isFainted: false,
-    tookCleanHitThisRound: false
-  };
-
-  gameState.roundCounter = 1;
-
-  // 3. STAGE A: PRELOADING SCREEN
-  if (splashNames) splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
-  if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
-  if (transitionScreen) transitionScreen.hidden = false;
-
-  if (typeof preloadRiderVideos === 'function') {
-    await Promise.all([
-      preloadRiderVideos(p1Rider.id, gameState.p1Moves),
-      preloadRiderVideos(p2Rider.id, gameState.p2Moves)
-    ]);
-  }
-
-  // 4. STAGE B: "GET READY FOR THE FIGHT!" MATCHUP SPLASH
-  if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
-  await new Promise(resolve => setTimeout(resolve, 1800));
-
-  // 5. STAGE C: LAUNCH BATTLE SCREEN
-  if (transitionScreen) transitionScreen.hidden = true;
-
   const battleScreen = document.getElementById('battle-screen');
-  if (battleScreen) battleScreen.hidden = false;
 
-  updateHUD();
+  try {
+    // 1. Fetch Move Sets for Selected Riders
+    try {
+      const res = await fetch('data/moves.json');
+      if (res.ok) {
+        const allMoves = await res.json();
+        gameState.p1Moves = (matchConfig.p1Rider && allMoves[matchConfig.p1Rider.id]) || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
+        gameState.p2Moves = (matchConfig.p2Rider && allMoves[matchConfig.p2Rider.id]) || allMoves['ichigo'] || FALLBACK_ICHIGO_MOVES;
+      } else {
+        throw new Error("moves.json fetch failed");
+      }
+    } catch (e) {
+      console.warn("Could not load moves.json, using fallbacks.");
+      gameState.p1Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+      gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
+    }
 
-  if (typeof updateCharacterMedia === 'function') {
-    updateCharacterMedia('p1', 'IDLE');
-    updateCharacterMedia('p2', 'IDLE');
-  }
+    // 2. Instantiate Player Objects
+    const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
+    const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
 
-  if (typeof startRoundCountdown === 'function') {
-    startRoundCountdown();
+    let p1MaxLp = p1Rider.maxLp || 1050;
+    if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') p1MaxLp = Math.floor(p1MaxLp * 1.30);
+
+    let p2MaxLp = p2Rider.maxLp || 1200;
+    if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') p2MaxLp = Math.floor(p2MaxLp * 1.30);
+
+    gameState.p1 = {
+      id: p1Rider.id || 'ichigo',
+      name: p1Rider.name || 'Kamen Rider Ichigo',
+      isCPU: !!matchConfig.p1IsCPU,
+      maxLp: p1MaxLp,
+      lp: p1MaxLp,
+      chi: 10,
+      maxChi: 16,
+      faintMeter: 0,
+      activeBuffs: [],
+      airborneTicks: 0,
+      activeChargePercent: 100,
+      isFainted: false,
+      tookCleanHitThisRound: false
+    };
+
+    gameState.p2 = {
+      id: p2Rider.id || 'nigo',
+      name: p2Rider.name || 'Kamen Rider Nigo',
+      isCPU: !!matchConfig.p2IsCPU,
+      maxLp: p2MaxLp,
+      lp: p2MaxLp,
+      chi: 10,
+      maxChi: 16,
+      faintMeter: 0,
+      activeBuffs: [],
+      airborneTicks: 0,
+      activeChargePercent: 100,
+      isFainted: false,
+      tookCleanHitThisRound: false
+    };
+
+    gameState.roundCounter = 1;
+
+    // 3. STAGE A: PRELOADING SPLASH
+    if (splashNames) splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
+    if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
+    if (transitionScreen) transitionScreen.hidden = false;
+
+    // Non-blocking asset preload with 1.2s strict timeout
+    if (typeof preloadRiderVideos === 'function') {
+      try {
+        const preloadTask = Promise.all([
+          preloadRiderVideos(p1Rider.id, gameState.p1Moves),
+          preloadRiderVideos(p2Rider.id, gameState.p2Moves)
+        ]);
+        const timeoutTask = new Promise(resolve => setTimeout(resolve, 1200));
+        await Promise.race([preloadTask, timeoutTask]);
+      } catch (err) {
+        console.warn("Preload timeout or bypass triggered:", err);
+      }
+    }
+
+    // 4. STAGE B: MATCHUP DISPLAY SPLASH
+    if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+  } catch (err) {
+    console.error("Match initialization error:", err);
+  } finally {
+    // 5. STAGE C: GUARANTEED MATCH LAUNCH
+    if (transitionScreen) transitionScreen.hidden = true;
+    if (battleScreen) battleScreen.hidden = false;
+
+    updateHUD();
+
+    if (typeof updateCharacterMedia === 'function') {
+      updateCharacterMedia('p1', 'IDLE');
+      updateCharacterMedia('p2', 'IDLE');
+    }
+
+    if (typeof startRoundCountdown === 'function') {
+      startRoundCountdown();
+    }
   }
 }
 
