@@ -38,30 +38,34 @@ function stopBattleBGM() {
   }
 }
 
-// Roster Storage (Locked to Ichigo)
+// Fallback Roster Storage
 let AVAILABLE_RIDERS = [
-  { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 }
+  { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 },
+  { id: 'nigo', name: 'Kamen Rider Nigo', icon: 'assets/images/icons/nigo.png', maxLp: 1200 }
 ];
 
 let vsSelectionState = {
   step: 1, // 1: Select P1, 2: Select P2, 3: Ready
   p1Index: 0,
   p1IsCPU: false,
-  p2Index: 0,
+  p2Index: 1, // Default P2 to Nigo
   p2IsCPU: true // Permanently locked to CPU
 };
 
+// Single Consolidated DOM Initialization Listener
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     const res = await fetch('data/riders.json');
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        AVAILABLE_RIDERS = data;
+      const allRiders = await res.json();
+      // Only keep active riders
+      const activeRiders = allRiders.filter(r => r.active === true);
+      if (activeRiders.length > 0) {
+        AVAILABLE_RIDERS = activeRiders;
       }
     }
   } catch (err) {
-    console.warn("Could not load riders.json, using default roster.");
+    console.warn("Could not load riders.json, defaulting to fallback roster.");
   }
 
   updateSelectionUI();
@@ -78,8 +82,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function cycleRider(playerKey, direction) {
-  // Permanently disabled: prevents previewing or selecting other riders
-  return;
+  if (!AVAILABLE_RIDERS || AVAILABLE_RIDERS.length === 0) return;
+
+  if (playerKey === 'p1' && vsSelectionState.step === 1) {
+    vsSelectionState.p1Index = (vsSelectionState.p1Index + direction + AVAILABLE_RIDERS.length) % AVAILABLE_RIDERS.length;
+  } else if (playerKey === 'p2' && vsSelectionState.step === 2) {
+    vsSelectionState.p2Index = (vsSelectionState.p2Index + direction + AVAILABLE_RIDERS.length) % AVAILABLE_RIDERS.length;
+  }
+  updateSelectionUI();
 }
 
 function toggleControlType(playerKey) {
@@ -123,13 +133,12 @@ function handleBackStep() {
 function updateSelectionUI() {
   if (!AVAILABLE_RIDERS || AVAILABLE_RIDERS.length === 0) return;
 
-  // Always lock selections to index 0 (Ichigo) and P2 to CPU
-  vsSelectionState.p1Index = 0;
-  vsSelectionState.p2Index = 0;
-  vsSelectionState.p2IsCPU = true;
+  // Boundary safety check for selection indices
+  if (vsSelectionState.p1Index >= AVAILABLE_RIDERS.length) vsSelectionState.p1Index = 0;
+  if (vsSelectionState.p2Index >= AVAILABLE_RIDERS.length) vsSelectionState.p2Index = 0;
 
-  const p1 = AVAILABLE_RIDERS[0];
-  const p2 = AVAILABLE_RIDERS[0];
+  const p1 = AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0];
+  const p2 = AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0];
 
   const p1ImgEl = document.getElementById('p1-img');
   if (p1ImgEl) p1ImgEl.src = p1.icon;
@@ -150,7 +159,7 @@ function updateSelectionUI() {
   if (p2NameEl) p2NameEl.textContent = p2.name;
 
   const p2TypeEl = document.getElementById('p2-type-display');
-  if (p2TypeEl) p2TypeEl.textContent = 'CPU'; // Hardcoded display
+  if (p2TypeEl) p2TypeEl.textContent = 'CPU';
 
   const p1Card = document.getElementById('p1-card');
   const p2Card = document.getElementById('p2-card');
@@ -169,19 +178,18 @@ function updateSelectionUI() {
   const p2TypeLeft = document.getElementById('p2-type-left');
   const p2TypeRight = document.getElementById('p2-type-right');
 
-  // PERMANENTLY DISABLE ALL RIDER ARROW BUTTONS & P2 TYPE TOGGLES
-  if (p1LeftBtn) p1LeftBtn.disabled = true;
-  if (p1RightBtn) p1RightBtn.disabled = true;
-  if (p2LeftBtn) p2LeftBtn.disabled = true;
-  if (p2RightBtn) p2RightBtn.disabled = true;
-
   if (p2TypeLeft) p2TypeLeft.disabled = true;
   if (p2TypeRight) p2TypeRight.disabled = true;
 
   if (vsSelectionState.step === 1) {
-    if (headerText) headerText.textContent = 'STEP 1: CONFIRM PLAYER 1 RIDER';
+    if (headerText) headerText.textContent = 'STEP 1: SELECT PLAYER 1 RIDER';
     if (p1Card) p1Card.className = 'rider-card active-slot';
     if (p2Card) p2Card.className = 'rider-card locked-slot';
+
+    if (p1LeftBtn) p1LeftBtn.disabled = false;
+    if (p1RightBtn) p1RightBtn.disabled = false;
+    if (p2LeftBtn) p2LeftBtn.disabled = true;
+    if (p2RightBtn) p2RightBtn.disabled = true;
 
     if (p1TypeLeft) p1TypeLeft.disabled = false;
     if (p1TypeRight) p1TypeRight.disabled = false;
@@ -195,9 +203,14 @@ function updateSelectionUI() {
     if (backBtn) backBtn.disabled = true;
 
   } else if (vsSelectionState.step === 2) {
-    if (headerText) headerText.textContent = 'STEP 2: CONFIRM PLAYER 2 RIDER (CPU)';
+    if (headerText) headerText.textContent = 'STEP 2: SELECT PLAYER 2 RIDER (CPU)';
     if (p1Card) p1Card.className = 'rider-card locked-slot';
     if (p2Card) p2Card.className = 'rider-card active-slot';
+
+    if (p1LeftBtn) p1LeftBtn.disabled = true;
+    if (p1RightBtn) p1RightBtn.disabled = true;
+    if (p2LeftBtn) p2LeftBtn.disabled = false;
+    if (p2RightBtn) p2RightBtn.disabled = false;
 
     if (p1TypeLeft) p1TypeLeft.disabled = true;
     if (p1TypeRight) p1TypeRight.disabled = true;
@@ -214,6 +227,11 @@ function updateSelectionUI() {
     if (headerText) headerText.textContent = 'READY FOR BATTLE!';
     if (p1Card) p1Card.className = 'rider-card active-slot';
     if (p2Card) p2Card.className = 'rider-card active-slot';
+
+    if (p1LeftBtn) p1LeftBtn.disabled = true;
+    if (p1RightBtn) p1RightBtn.disabled = true;
+    if (p2LeftBtn) p2LeftBtn.disabled = true;
+    if (p2RightBtn) p2RightBtn.disabled = true;
 
     if (p1TypeLeft) p1TypeLeft.disabled = true;
     if (p1TypeRight) p1TypeRight.disabled = true;
@@ -235,10 +253,10 @@ function validateAndStartMatch() {
   if (selectScreen) selectScreen.hidden = true;
 
   const matchConfig = {
-    p1Rider: AVAILABLE_RIDERS[0],
+    p1Rider: AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0],
     p1IsCPU: vsSelectionState.p1IsCPU,
-    p2Rider: AVAILABLE_RIDERS[0],
-    p2IsCPU: true // Guaranteed CPU
+    p2Rider: AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0],
+    p2IsCPU: true
   };
 
   if (typeof startBattle === 'function') {
