@@ -413,8 +413,8 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
 }
 
 function checkBothPlayersLocked() {
-  const p1Ready = gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted;
-  const p2Ready = gameState.p2.isCPU || gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
+  const p1Ready = gameState.input.isConfirmed || gameState.p1.isFainted;
+  const p2Ready = gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
 
   if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
     clearInterval(gameState.timerInterval);
@@ -422,7 +422,7 @@ function checkBothPlayersLocked() {
       if (gameState.roundPhase === 'INPUT') {
         executeTurnResolutionPhase();
       }
-    }, 400);
+    }, 300);
   }
 }
 
