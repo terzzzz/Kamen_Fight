@@ -26,6 +26,10 @@ let gameState = {
   p2: null,
   p2AlwaysIdle: false, // Dummy Mode Toggle (Key '0')
   canContinueFromGameOver: false,
+  p2SelectedMoveKey: null,
+  p2LockInTime: 0,
+  p2IsConfirmed: false,
+  p2ActiveChargePercent: 100,
   input: {
     heldDirection: null,
     chargeStartTime: 0,
@@ -207,7 +211,10 @@ function startRoundCountdown() {
   updateCharacterMedia('p2', 'IDLE');
 
   if (gameState.p1 && gameState.p1.isFainted && !gameState.p1.isCPU) {
-    confirmPlayerAction('DO_NOTHING');
+    confirmPlayerAction('DO_NOTHING', 'p1');
+  }
+  if (gameState.p2 && gameState.p2.isFainted && !gameState.p2.isCPU) {
+    confirmPlayerAction('DO_NOTHING', 'p2');
   }
 
   const battleMsg = document.getElementById('battle-message');
@@ -238,7 +245,10 @@ function startRoundCountdown() {
       clearInterval(gameState.timerInterval);
 
       if (!gameState.input.isConfirmed && !gameState.p1.isCPU) {
-        confirmPlayerAction('DO_NOTHING');
+        confirmPlayerAction('DO_NOTHING', 'p1');
+      }
+      if (!gameState.p2IsConfirmed && !gameState.p2.isCPU) {
+        confirmPlayerAction('DO_NOTHING', 'p2');
       }
       executeTurnResolutionPhase();
     }
@@ -350,7 +360,7 @@ function bindKeyboardInputs() {
 
     if (['J', 'K', 'L', 'I'].includes(key)) {
       if (!gameState.input.heldDirection) return;
-      confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
+      confirmPlayerAction(`${gameState.input.heldDirection}+${key}`, 'p1');
     }
   });
 
@@ -411,17 +421,23 @@ function resetCharge() {
   }
 }
 
-// CONFIRM PLAYER ACTION WITH CHI VALIDATION
-function confirmPlayerAction(moveKey) {
+// CONFIRM PLAYER ACTION WITH CHI VALIDATION (GENERIC FOR BOTH P1 & P2)
+function confirmPlayerAction(moveKey, playerKey = 'p1') {
+  const player = gameState[playerKey];
+  if (!player) return;
+
   if (moveKey !== 'DO_NOTHING') {
     const move = gameState.movesData[moveKey] || DO_NOTHING_MOVE;
     const chiCost = move.chiCost || 0;
 
     // Check if player has sufficient CHI
-    if (gameState.p1.chi < chiCost) {
-      triggerFloatingText('p1', 'NOT ENOUGH CHI!', 'miss');
+    if (player.chi < chiCost) {
+      triggerFloatingText(playerKey, 'NOT ENOUGH CHI!', 'miss');
 
-      const statusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
+      const statusEl = playerKey === 'p1' 
+        ? (document.getElementById('charge-status-display') || document.getElementById('charge-status'))
+        : document.getElementById('p2-charge-status-display');
+
       if (statusEl) {
         statusEl.textContent = `NOT ENOUGH CHI FOR ${move.name.toUpperCase()}! (NEEDS ${chiCost} CHI)`;
         statusEl.style.color = '#ff0055';
@@ -430,16 +446,29 @@ function confirmPlayerAction(moveKey) {
     }
   }
 
-  gameState.input.isConfirmed = true;
-  gameState.input.selectedMoveKey = moveKey;
-  gameState.input.lockInTime = gameState.turnTimerSeconds;
-  gameState.p1.activeChargePercent = Math.max(10, gameState.input.currentPercent);
-  clearInterval(gameState.input.chargeInterval);
+  if (playerKey === 'p1') {
+    gameState.input.isConfirmed = true;
+    gameState.input.selectedMoveKey = moveKey;
+    gameState.input.lockInTime = gameState.turnTimerSeconds;
+    gameState.p1.activeChargePercent = Math.max(10, gameState.input.currentPercent);
+    clearInterval(gameState.input.chargeInterval);
 
-  const flagEl = document.getElementById('p1-action-flag');
-  if (flagEl) {
-    flagEl.hidden = false;
-    flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p1.activeChargePercent}%!`;
+    const flagEl = document.getElementById('p1-action-flag');
+    if (flagEl) {
+      flagEl.hidden = false;
+      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p1.activeChargePercent}%!`;
+    }
+  } else if (playerKey === 'p2') {
+    gameState.p2IsConfirmed = true;
+    gameState.p2SelectedMoveKey = moveKey;
+    gameState.p2LockInTime = gameState.turnTimerSeconds;
+    gameState.p2.activeChargePercent = Math.max(10, gameState.p2ActiveChargePercent || 100);
+
+    const flagEl = document.getElementById('p2-action-flag');
+    if (flagEl) {
+      flagEl.hidden = false;
+      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p2.activeChargePercent}%!`;
+    }
   }
 }
 
@@ -946,8 +975,15 @@ function resetTurnInputState() {
   gameState.input.isConfirmed = false;
   gameState.input.selectedMoveKey = null;
   gameState.input.lockInTime = 0;
-  const flagEl = document.getElementById('p1-action-flag');
-  if (flagEl) flagEl.hidden = true;
+  gameState.p2IsConfirmed = false;
+  gameState.p2SelectedMoveKey = null;
+  gameState.p2LockInTime = 0;
+
+  const flag1El = document.getElementById('p1-action-flag');
+  if (flag1El) flag1El.hidden = true;
+
+  const flag2El = document.getElementById('p2-action-flag');
+  if (flag2El) flag2El.hidden = true;
 }
 
 function handleAirborneState(player, moveKey) {
