@@ -25,6 +25,10 @@
           <span id="p1-type-display" class="type-badge" onclick="toggleControlType('p1')">HUMAN</span>
           <button id="p1-right-btn" onclick="cycleRider('p1', 1)">&gt;</button>
         </div>
+        <div class="difficulty-control-group">
+          <span class="diff-label">DIFFICULTY:</span>
+          <span id="p1-diff-display" class="diff-badge" onclick="toggleDifficulty('p1')">N/A</span>
+        </div>
       </div>
 
       <div class="vs-divider">VS</div>
@@ -40,6 +44,10 @@
           <button id="p2-left-btn" onclick="cycleRider('p2', -1)" disabled>&lt;</button>
           <span id="p2-type-display" class="type-badge" onclick="toggleControlType('p2')">CPU</span>
           <button id="p2-right-btn" onclick="cycleRider('p2', 1)" disabled>&gt;</button>
+        </div>
+        <div class="difficulty-control-group">
+          <span class="diff-label">DIFFICULTY:</span>
+          <span id="p2-diff-display" class="diff-badge" onclick="toggleDifficulty('p2')">NORMAL</span>
         </div>
       </div>
     </div>
