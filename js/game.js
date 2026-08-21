@@ -245,18 +245,45 @@ function startRoundCountdown() {
   }, 1000);
 }
 
+// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI
 function getCPUMoveChoice(cpuPlayer, opponentPlayer) {
   if (cpuPlayer.isFainted || gameState.p2AlwaysIdle) return 'DO_NOTHING';
+
+  let chosenKey = null;
   if (typeof selectCPUMove === 'function') {
-    return selectCPUMove(cpuPlayer, opponentPlayer, gameState.movesData) || 'D+J';
+    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, gameState.movesData);
   }
-  const availableKeys = Object.keys(gameState.movesData);
-  return availableKeys.length > 0 ? availableKeys[Math.floor(Math.random() * availableKeys.length)] : 'D+J';
+
+  // Validate if chosen move is affordable
+  if (chosenKey && gameState.movesData[chosenKey]) {
+    const moveCost = gameState.movesData[chosenKey].chiCost || 0;
+    if (moveCost <= cpuPlayer.chi) {
+      return chosenKey;
+    }
+  }
+
+  // Fallback: Pick a random move the CPU can afford
+  const affordableKeys = Object.keys(gameState.movesData).filter(key => {
+    const move = gameState.movesData[key];
+    return (move.chiCost || 0) <= cpuPlayer.chi;
+  });
+
+  if (affordableKeys.length > 0) {
+    return affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
+  }
+
+  return 'DO_NOTHING';
 }
 
 function returnToCharSelect() {
   gameState.roundPhase = 'IDLE';
   gameState.canContinueFromGameOver = false;
+
+  // Clean up stun overlays
+  ['p1', 'p2'].forEach(slot => {
+    const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
+    if (stunOverlay) stunOverlay.hidden = true;
+  });
 
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = true;
@@ -384,7 +411,25 @@ function resetCharge() {
   }
 }
 
+// CONFIRM PLAYER ACTION WITH CHI VALIDATION
 function confirmPlayerAction(moveKey) {
+  if (moveKey !== 'DO_NOTHING') {
+    const move = gameState.movesData[moveKey] || DO_NOTHING_MOVE;
+    const chiCost = move.chiCost || 0;
+
+    // Check if player has sufficient CHI
+    if (gameState.p1.chi < chiCost) {
+      triggerFloatingText('p1', 'NOT ENOUGH CHI!', 'miss');
+
+      const statusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
+      if (statusEl) {
+        statusEl.textContent = `NOT ENOUGH CHI FOR ${move.name.toUpperCase()}! (NEEDS ${chiCost} CHI)`;
+        statusEl.style.color = '#ff0055';
+      }
+      return; // Reject input
+    }
+  }
+
   gameState.input.isConfirmed = true;
   gameState.input.selectedMoveKey = moveKey;
   gameState.input.lockInTime = gameState.turnTimerSeconds;
@@ -720,6 +765,12 @@ async function executeTurnResolutionPhase() {
     } else {
       gameState.roundPhase = 'GAME_OVER';
       if (battleMsg) battleMsg.hidden = false;
+
+      // Hide stun overlay banners on match end so KO/Victory clips render clean
+      ['p1', 'p2'].forEach(slot => {
+        const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
+        if (stunOverlay) stunOverlay.hidden = true;
+      });
 
       let resultText = "";
       if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
