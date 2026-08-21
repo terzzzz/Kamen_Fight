@@ -1,3 +1,46 @@
+// BATTLE INITIALIZATION WITH LP MODIFIERS
+function startBattle(matchConfig) {
+  gameState.matchConfig = matchConfig;
+
+  // Setup P1
+  gameState.p1.name = matchConfig.p1Rider.name;
+  gameState.p1.isCPU = matchConfig.p1IsCPU;
+  let p1MaxLp = matchConfig.p1Rider.maxLp || 1050;
+  if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') {
+    p1MaxLp = Math.floor(p1MaxLp * 1.30);
+  }
+  gameState.p1.maxLp = p1MaxLp;
+  gameState.p1.lp = p1MaxLp;
+  gameState.p1.chi = 10;
+  gameState.p1.faintMeter = 0;
+  gameState.p1.activeBuffs = [];
+  gameState.p1.airborneTicks = 0;
+
+  // Setup P2
+  gameState.p2.name = matchConfig.p2Rider.name;
+  gameState.p2.isCPU = matchConfig.p2IsCPU;
+  let p2MaxLp = matchConfig.p2Rider.maxLp || 1050;
+  if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') {
+    p2MaxLp = Math.floor(p2MaxLp * 1.30);
+  }
+  gameState.p2.maxLp = p2MaxLp;
+  gameState.p2.lp = p2MaxLp;
+  gameState.p2.chi = 10;
+  gameState.p2.faintMeter = 0;
+  gameState.p2.activeBuffs = [];
+  gameState.p2.airborneTicks = 0;
+
+  gameState.roundCounter = 1;
+  
+  const battleScreen = document.getElementById('battle-screen');
+  if (battleScreen) battleScreen.hidden = false;
+
+  updateHUD();
+  if (typeof startRoundCountdown === 'function') {
+    startRoundCountdown();
+  }
+}
+
 // GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & PLAYER MOVESET
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
@@ -7,9 +50,13 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     movesData = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
+  const difficulty = playerKey === 'p1' 
+    ? (gameState.matchConfig?.p1Difficulty || 'normal') 
+    : (gameState.matchConfig?.p2Difficulty || 'normal');
+
   let chosenKey = null;
   if (typeof selectCPUMove === 'function') {
-    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, movesData);
+    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty);
   }
 
   if (chosenKey && movesData[chosenKey] && typeof movesData[chosenKey] === 'object') {
@@ -214,6 +261,16 @@ async function executeTurnResolutionPhase() {
 
   let p1Move = getMoveForPlayer('p1', p1MoveKey);
   let p2Move = getMoveForPlayer('p2', p2MoveKey);
+
+  // Process Instant Utility Effects (Faint Recovery)
+  if (p1Move && p1Move.faintRecovery) {
+    gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
+    triggerFloatingText('p1', `FAINT -${p1Move.faintRecovery}`, 'heal');
+  }
+  if (p2Move && p2Move.faintRecovery) {
+    gameState.p2.faintMeter = Math.max(0, gameState.p2.faintMeter - p2Move.faintRecovery);
+    triggerFloatingText('p2', `FAINT -${p2Move.faintRecovery}`, 'heal');
+  }
 
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
