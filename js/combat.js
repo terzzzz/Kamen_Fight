@@ -6,6 +6,7 @@ const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
 };
 
 // BATTLE INITIALIZATION WITH HARD MODE LP BOOSTS & MOVE LOADING
+// BATTLE INITIALIZATION WITH MATCH TRANSITION SCREEN & HARD MODE LP BOOSTS
 async function startBattle(matchConfig) {
   if (!window.gameState) window.gameState = {};
   gameState.matchConfig = matchConfig;
@@ -25,7 +26,7 @@ async function startBattle(matchConfig) {
     gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
-  // 2. Preload Rider Videos (Awaited so preloading completes before battle screen opens)
+  // 2. Preload Rider Videos
   if (typeof preloadRiderVideos === 'function') {
     await Promise.all([
       preloadRiderVideos(matchConfig.p1Rider.id, gameState.p1Moves),
@@ -83,7 +84,22 @@ async function startBattle(matchConfig) {
   gameState.p2IsCPU = matchConfig.p2IsCPU;
   gameState.roundCounter = 1;
 
-  // 5. Unhide Battle UI & Trigger Idle Media
+  // 5. Trigger Transition Splash Screen
+  const transitionScreen = document.getElementById('match-transition-screen');
+  const splashNames = document.getElementById('splash-names-text');
+  
+  if (splashNames) {
+    splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
+  }
+
+  if (transitionScreen) {
+    transitionScreen.hidden = false;
+    // Hold transition screen for 2 seconds
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    transitionScreen.hidden = true;
+  }
+
+  // 6. Unhide Battle UI & Trigger Idle Media
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
