@@ -511,3 +511,54 @@ function resetTurnInputState() {
   const flag2El = document.getElementById('p2-action-flag');
   if (flag2El) flag2El.hidden = true;
 }
+
+
+// GAME OVER RESET HANDLER
+function handleGameOverContinue() {
+  if (gameState.roundPhase !== 'GAME_OVER' || !gameState.canContinueFromGameOver) return;
+
+  // Prevent multiple triggers
+  gameState.canContinueFromGameOver = false;
+  gameState.roundPhase = 'SELECTION';
+
+  // 1. Hide Battle Screen & Overlays
+  const battleScreen = document.getElementById('battle-screen');
+  if (battleScreen) battleScreen.hidden = true;
+
+  const battleMsg = document.getElementById('battle-message');
+  if (battleMsg) battleMsg.hidden = true;
+
+  ['p1', 'p2'].forEach(slot => {
+    const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
+    if (stunOverlay) stunOverlay.hidden = true;
+  });
+
+  // 2. Unhide Character Selection Screen
+  const selectScreen = document.getElementById('vs-select-screen');
+  if (selectScreen) selectScreen.hidden = false;
+
+  // 3. Audio Switch
+  if (typeof stopBattleBGM === 'function') stopBattleBGM();
+  if (typeof playSelectionBGM === 'function') playSelectionBGM();
+
+  // 4. Reset Selection State
+  if (typeof vsSelectionState !== 'undefined') {
+    vsSelectionState.step = 1;
+    if (typeof updateSelectionUI === 'function') updateSelectionUI();
+  }
+}
+
+// Global listeners for keypress and click
+window.addEventListener('keydown', () => {
+  if (gameState && gameState.roundPhase === 'GAME_OVER') {
+    handleGameOverContinue();
+  }
+});
+
+window.addEventListener('click', () => {
+  if (gameState && gameState.roundPhase === 'GAME_OVER') {
+    handleGameOverContinue();
+  }
+});
+
+
