@@ -21,10 +21,11 @@ let gameState = {
   turnTimerSeconds: 5,
   timerInterval: null,
   movesData: {},
-  videoCache: {}, // Memory cache for preloaded MP4 blobs
+  videoCache: {}, 
   p1: null,
   p2: null,
-  p2AlwaysIdle: false, // Dummy Mode Toggle (Key '0')
+  p2AlwaysIdle: false,
+  canContinueFromGameOver: false,
   input: {
     heldDirection: null,
     chargeStartTime: 0,
@@ -45,24 +46,22 @@ async function preloadRiderVideos(riderId) {
     'kirimomi_kick.mp4', 'windmill_guard.mp4', 'guard.mp4', 'jump.mp4', 'charge_up.mp4'
   ];
 
-  const BATCH_SIZE = 4; // Fetch 4 videos concurrently
-  for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
-    const batch = videoFiles.slice(i, i + BATCH_SIZE);
-    await Promise.all(batch.map(async (file) => {
-      const rawUrl = `assets/videos/${riderId}/${file}`;
-      if (gameState.videoCache[rawUrl]) return;
+  const promises = videoFiles.map(async (file) => {
+    const rawUrl = `assets/videos/${riderId}/${file}`;
+    if (gameState.videoCache[rawUrl]) return;
 
-      try {
-        const res = await fetch(rawUrl);
-        if (res.ok) {
-          const blob = await res.blob();
-          gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
-        }
-      } catch (e) {
-        gameState.videoCache[rawUrl] = rawUrl;
+    try {
+      const res = await fetch(rawUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
       }
-    }));
-  }
+    } catch (e) {
+      gameState.videoCache[rawUrl] = rawUrl;
+    }
+  });
+
+  await Promise.all(promises);
 }
 
 async function startBattle(config) {
@@ -80,11 +79,11 @@ async function startBattle(config) {
   gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
   gameState.p2AlwaysIdle = false;
   gameState.roundCounter = 1;
+  gameState.canContinueFromGameOver = false;
 
   const battleScreen = document.getElementById('battle-screen');
   if (battleScreen) battleScreen.hidden = false;
 
-  // 1. UNHIDE TRANSITION SPLASH IMMEDIATELY DURING PRELOAD
   const splashScreen = document.getElementById('match-transition-screen');
   const splashRound = document.getElementById('splash-round-text');
   const splashNames = document.getElementById('splash-names-text');
@@ -99,7 +98,6 @@ async function startBattle(config) {
   bindCommandButtons();
   updateHUD();
 
-  // 2. PRELOAD ASSETS WHILE SPLASH SCREEN IS ACTIVE
   const p1RiderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
   const p2RiderId = (config.p2Rider && config.p2Rider.id) || 'ichigo';
   await preloadRiderVideos(p1RiderId);
@@ -108,7 +106,6 @@ async function startBattle(config) {
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
-  // 3. TRANSITION TO GET READY & START ROUND
   if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
 
   setTimeout(() => {
@@ -124,8 +121,8 @@ function createPlayerState(riderConfig, isCPU) {
     lp: riderConfig.maxLp || 1050,
     chi: 10,
     maxChi: 16,
-    faintMeter: 0,               // 100-Point Faint Meter
-    tookCleanHitThisRound: false, // Round damage tracker
+    faintMeter: 0,
+    tookCleanHitThisRound: false,
     isFainted: false,
     willBeFaintedNextRound: false,
     airborneTicks: 0,
@@ -149,7 +146,7 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
 
   setTimeout(() => {
     popup.remove();
-  }, 1200);
+  }, 2000);
 }
 
 function triggerFloatingText(slotKey, text, customClass = '') {
@@ -164,7 +161,7 @@ function triggerFloatingText(slotKey, text, customClass = '') {
 
   setTimeout(() => {
     popup.remove();
-  }, 1200);
+  }, 2000);
 }
 
 function startRoundCountdown() {
@@ -251,8 +248,41 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer) {
   return availableKeys.length > 0 ? availableKeys[Math.floor(Math.random() * availableKeys.length)] : 'D+J';
 }
 
+function returnToCharSelect() {
+  gameState.roundPhase = 'IDLE';
+  gameState.canContinueFromGameOver = false;
+
+  const battleScreen = document.getElementById('battle-screen');
+  if (battleScreen) battleScreen.hidden = true;
+
+  const selectScreen = document.getElementById('vs-select-screen');
+  if (selectScreen) selectScreen.hidden = false;
+
+  const battleMsg = document.getElementById('battle-message');
+  if (battleMsg) battleMsg.hidden = true;
+
+  if (typeof stopBattleBGM === 'function') stopBattleBGM();
+  if (typeof playSelectionBGM === 'function') playSelectionBGM();
+
+  if (typeof vsSelectionState !== 'undefined') {
+    vsSelectionState.step = 1;
+    if (typeof updateSelectionUI === 'function') updateSelectionUI();
+  }
+}
+
 function bindKeyboardInputs() {
+  const handleContinue = () => {
+    if (gameState.roundPhase === 'GAME_OVER' && gameState.canContinueFromGameOver) {
+      returnToCharSelect();
+    }
+  };
+
   window.addEventListener('keydown', (e) => {
+    if (gameState.roundPhase === 'GAME_OVER') {
+      handleContinue();
+      return;
+    }
+
     const key = e.key.toUpperCase();
 
     if (e.key === '0') {
@@ -290,6 +320,8 @@ function bindKeyboardInputs() {
       confirmPlayerAction(`${gameState.input.heldDirection}+${key}`);
     }
   });
+
+  window.addEventListener('click', handleContinue);
 
   window.addEventListener('keyup', (e) => {
     const key = e.key.toUpperCase();
@@ -454,9 +486,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const player = gameState[playerKey];
     if (!player) return resolve();
 
-    // UPDATED: ADD P1/P2 PREFIX TO ACTION LABELS
     if (actionLabel) {
-      const slotPrefix = playerKey.toUpperCase(); // 'P1' or 'P2'
+      const slotPrefix = playerKey.toUpperCase();
       actionLabel.textContent = actionName ? `[${slotPrefix}] ${player.name} : ${actionName}!` : '';
       actionLabel.hidden = !actionName;
     }
@@ -680,21 +711,31 @@ async function executeTurnResolutionPhase() {
       gameState.roundCounter++;
       startRoundCountdown();
     } else {
+      gameState.roundPhase = 'GAME_OVER';
       if (battleMsg) battleMsg.hidden = false;
 
+      let resultText = "";
       if (gameState.p1.lp <= 0 && gameState.p2.lp <= 0) {
-        if (battleMsg) battleMsg.innerHTML = "DOUBLE KO!<br>DRAW MATCH!";
+        resultText = "DOUBLE KO!<br>DRAW MATCH!";
         updateCharacterMedia('p1', 'KO');
         updateCharacterMedia('p2', 'KO');
       } else if (gameState.p1.lp <= 0) {
-        if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p2.name.toUpperCase()} WINS!`;
+        resultText = `KO!<br>P2 ${gameState.p2.name.toUpperCase()} WINS!`;
         updateCharacterMedia('p1', 'KO');
         updateCharacterMedia('p2', 'VICTORY');
       } else {
-        if (battleMsg) battleMsg.innerHTML = `KO!<br>${gameState.p1.name.toUpperCase()} WINS!`;
+        resultText = `KO!<br>P1 ${gameState.p1.name.toUpperCase()} WINS!`;
         updateCharacterMedia('p1', 'VICTORY');
         updateCharacterMedia('p2', 'KO');
       }
+
+      battleMsg.innerHTML = `${resultText}<br><span class="continue-prompt">PRESS ANY KEY TO CONTINUE</span>`;
+
+      // 1s Delay before inputs allow continuing to prevent accidental skips
+      gameState.canContinueFromGameOver = false;
+      setTimeout(() => {
+        gameState.canContinueFromGameOver = true;
+      }, 1000);
     }
   }, 1000);
 }
@@ -755,7 +796,12 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   if (finalDmg > 0) {
     defender.lp = Math.max(0, defender.lp - finalDmg);
-    triggerFloatingNumber(defenderKey, finalDmg, false);
+
+    if (isGlancing) {
+      setTimeout(() => triggerFloatingNumber(defenderKey, finalDmg, false), 250);
+    } else {
+      triggerFloatingNumber(defenderKey, finalDmg, false);
+    }
 
     if (!isGlancing && !defender.isFainted && !defender.willBeFaintedNextRound) {
       defender.tookCleanHitThisRound = true;
