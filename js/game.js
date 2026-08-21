@@ -1,4 +1,4 @@
-// SAFE GLOBAL DECLARATIONS (Prevents ES6 redeclaration SyntaxError)
+// SAFE GLOBAL DECLARATIONS
 var CHARGE_TIMES = CHARGE_TIMES || {
   'A': 800,   // Defense
   'D': 1300,  // Offense
@@ -16,9 +16,9 @@ var DO_NOTHING_MOVE = DO_NOTHING_MOVE || {
 };
 
 var FAINT_CONFIG = FAINT_CONFIG || {
-  HIT_BUILDUP: 25,       // Faint meter added per clean hit
-  ROUND_RECOVERY: 13,    // Points recovered per round if NOT hurt
-  FAINT_THRESHOLD: 100   // Faint meter max limit
+  HIT_BUILDUP: 25,
+  ROUND_RECOVERY: 13,
+  FAINT_THRESHOLD: 100
 };
 
 var FALLBACK_ICHIGO_MOVES = {
@@ -70,81 +70,6 @@ function getMoveForPlayer(playerKey, moveKey) {
   if (moveKey === 'DO_NOTHING' || !moveKey) return DO_NOTHING_MOVE;
   const moves = playerKey === 'p1' ? gameState.p1Moves : gameState.p2Moves;
   return (moves && moves[moveKey]) || DO_NOTHING_MOVE;
-}
-
-async function startBattle(config) {
-  const p1RiderId = (config.p1Rider && config.p1Rider.id) || 'ichigo';
-  const p2RiderId = (config.p2Rider && config.p2Rider.id) || 'ichigo';
-
-  try {
-    const response = await fetch('data/moves.json');
-    if (response.ok) {
-      const fullRoster = await response.json();
-      gameState.p1Moves = fullRoster[p1RiderId] || fullRoster['ichigo'] || FALLBACK_ICHIGO_MOVES;
-      gameState.p2Moves = fullRoster[p2RiderId] || fullRoster['ichigo'] || FALLBACK_ICHIGO_MOVES;
-    } else {
-      throw new Error("HTTP error loading moves.json");
-    }
-  } catch (err) {
-    console.warn("Could not load moves.json, using fallback roster.");
-    gameState.p1Moves = FALLBACK_ICHIGO_MOVES;
-    gameState.p2Moves = FALLBACK_ICHIGO_MOVES;
-  }
-
-  gameState.p1 = createPlayerState(config.p1Rider, config.p1IsCPU);
-  gameState.p2 = createPlayerState(config.p2Rider, config.p2IsCPU);
-  gameState.p2AlwaysIdle = false;
-  gameState.roundCounter = 1;
-  gameState.canContinueFromGameOver = false;
-
-  const battleScreen = document.getElementById('battle-screen');
-  if (battleScreen) battleScreen.hidden = false;
-
-  const splashScreen = document.getElementById('match-transition-screen');
-  const splashRound = document.getElementById('splash-round-text');
-  const splashNames = document.getElementById('splash-names-text');
-
-  if (splashScreen) {
-    if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
-    if (splashNames) splashNames.textContent = `${gameState.p1.name} VS ${gameState.p2.name}`;
-    splashScreen.hidden = false;
-  }
-
-  bindKeyboardInputs();
-  bindCommandButtons();
-  updateHUD();
-
-  await preloadRiderVideos(p1RiderId, gameState.p1Moves);
-  if (p1RiderId !== p2RiderId) {
-    await preloadRiderVideos(p2RiderId, gameState.p2Moves);
-  }
-
-  updateCharacterMedia('p1', 'IDLE');
-  updateCharacterMedia('p2', 'IDLE');
-
-  if (splashRound) splashRound.textContent = "GET READY FOR THE FIGHT!";
-
-  setTimeout(() => {
-    if (splashScreen) splashScreen.hidden = true;
-    startRoundCountdown();
-  }, 1800);
-}
-
-function createPlayerState(riderConfig, isCPU) {
-  return {
-    ...riderConfig,
-    isCPU: isCPU,
-    lp: riderConfig.maxLp || 1050,
-    chi: 10,
-    maxChi: 16,
-    faintMeter: 0,
-    tookCleanHitThisRound: false,
-    isFainted: false,
-    willBeFaintedNextRound: false,
-    airborneTicks: 0,
-    activeChargePercent: 100,
-    activeBuffs: []
-  };
 }
 
 function startRoundCountdown() {
@@ -208,7 +133,7 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Schedule CPU decision locks during the 5-second countdown
+  // Schedule CPU decisions during countdown
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (player && player.isCPU && !player.isFainted) {
@@ -512,53 +437,10 @@ function resetTurnInputState() {
   if (flag2El) flag2El.hidden = true;
 }
 
-
-// GAME OVER RESET HANDLER
-function handleGameOverContinue() {
-  if (gameState.roundPhase !== 'GAME_OVER' || !gameState.canContinueFromGameOver) return;
-
-  // Prevent multiple triggers
-  gameState.canContinueFromGameOver = false;
-  gameState.roundPhase = 'SELECTION';
-
-  // 1. Hide Battle Screen & Overlays
-  const battleScreen = document.getElementById('battle-screen');
-  if (battleScreen) battleScreen.hidden = true;
-
-  const battleMsg = document.getElementById('battle-message');
-  if (battleMsg) battleMsg.hidden = true;
-
-  ['p1', 'p2'].forEach(slot => {
-    const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
-    if (stunOverlay) stunOverlay.hidden = true;
-  });
-
-  // 2. Unhide Character Selection Screen
-  const selectScreen = document.getElementById('vs-select-screen');
-  if (selectScreen) selectScreen.hidden = false;
-
-  // 3. Audio Switch
-  if (typeof stopBattleBGM === 'function') stopBattleBGM();
-  if (typeof playSelectionBGM === 'function') playSelectionBGM();
-
-  // 4. Reset Selection State
-  if (typeof vsSelectionState !== 'undefined') {
-    vsSelectionState.step = 1;
-    if (typeof updateSelectionUI === 'function') updateSelectionUI();
-  }
-}
-
-// Global listeners for keypress and click
-window.addEventListener('keydown', () => {
-  if (gameState && gameState.roundPhase === 'GAME_OVER') {
-    handleGameOverContinue();
+// Background Preloading on Launch
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof preloadRiderVideos === 'function') {
+    preloadRiderVideos('ichigo');
+    preloadRiderVideos('nigo');
   }
 });
-
-window.addEventListener('click', () => {
-  if (gameState && gameState.roundPhase === 'GAME_OVER') {
-    handleGameOverContinue();
-  }
-});
-
-
