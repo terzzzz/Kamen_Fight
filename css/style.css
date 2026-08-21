@@ -7,6 +7,7 @@
 :root {
   --bg-color: #08090d;
   --panel-bg: #11141e;
+  --card-bg: #161b26;
   --border-cyan: #00ffcc;
   --text-yellow: #ffcc00;
   --text-red: #ff2a5f;
@@ -40,10 +41,207 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  padding: 15px;
+  padding: 20px;
 }
 
-/* TOP HUD BAR */
+/* ==========================================================================
+   CHARACTER SELECTION SCREEN STYLES
+   ========================================================================== */
+
+#vs-select-screen h1 {
+  text-align: center;
+  color: var(--text-yellow);
+  font-size: 1.5rem;
+  margin-bottom: 15px;
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.5);
+}
+
+.selection-layout {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-grow: 1;
+  margin-bottom: 15px;
+}
+
+.rider-card {
+  width: 320px;
+  background: var(--card-bg);
+  border: 2px solid #334155;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.rider-card.active-slot {
+  border-color: var(--border-cyan);
+  box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+}
+
+.rider-card.locked-slot {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+.rider-card h2 {
+  font-size: 1.1rem;
+  color: var(--text-main);
+  margin-bottom: 10px;
+}
+
+.portrait-box {
+  width: 220px;
+  height: 220px;
+  background: #000;
+  border: 2px solid var(--border-cyan);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.portrait-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rider-card h3 {
+  font-size: 1rem;
+  color: var(--text-yellow);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.card-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.card-controls button {
+  width: 32px;
+  height: 32px;
+  background: #1a2235;
+  border: 1px solid var(--border-cyan);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.card-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #555;
+}
+
+.type-badge {
+  background: #111827;
+  border: 1px solid var(--border-cyan);
+  color: var(--border-cyan);
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  min-width: 80px;
+  text-align: center;
+}
+
+.difficulty-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.diff-label {
+  color: var(--text-main);
+}
+
+.diff-badge {
+  background: #1f293d;
+  border: 1px solid var(--text-yellow);
+  color: var(--text-yellow);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.diff-badge.hard {
+  border-color: var(--text-red);
+  color: var(--text-red);
+  background: #3b111e;
+}
+
+.vs-divider {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--text-red);
+  text-shadow: 0 0 10px rgba(255, 42, 95, 0.8);
+}
+
+.error-banner {
+  background: rgba(255, 42, 95, 0.2);
+  border: 1px solid var(--text-red);
+  color: var(--text-red);
+  padding: 8px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.selection-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.nav-btn, .action-btn {
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  background: #1a2235;
+  border: 2px solid var(--border-cyan);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  border-color: #555;
+  cursor: not-allowed;
+}
+
+.action-btn:hover {
+  background: var(--border-cyan);
+  color: #000;
+  box-shadow: 0 0 12px var(--border-cyan);
+}
+
+.start-glow {
+  border-color: var(--text-yellow);
+  color: var(--text-yellow);
+  animation: pulseYellow 1.5s infinite alternate;
+}
+
+@keyframes pulseYellow {
+  0% { box-shadow: 0 0 5px var(--text-yellow); }
+  100% { box-shadow: 0 0 20px var(--text-yellow); }
+}
+
+/* ==========================================================================
+   TOP HUD BAR & BATTLE VIEWPORT STYLES
+   ========================================================================== */
+
 .hud-bar {
   display: flex;
   justify-content: space-between;
@@ -154,7 +352,6 @@ body {
 .buff-tag.speed { border-color: var(--text-yellow); color: var(--text-yellow); }
 .buff-tag.attack { border-color: var(--text-red); color: var(--text-red); }
 
-/* CENTER HUD */
 .center-hud {
   text-align: center;
 }
@@ -172,7 +369,6 @@ body {
   margin-top: 4px;
 }
 
-/* BATTLE MESSAGES BANNER */
 .battle-banner {
   background: rgba(0, 0, 0, 0.85);
   border: 1px solid var(--text-yellow);
@@ -184,7 +380,6 @@ body {
   font-size: 0.95rem;
 }
 
-/* BATTLE VIEWPORT */
 .battle-viewport {
   display: flex;
   justify-content: space-between;
