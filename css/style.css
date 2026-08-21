@@ -248,36 +248,46 @@ body {
   font-size: 14px;
 }
 
-/* --- FAINT METER BAR --- */
+/* --- VERTICAL FAINT METER BAR --- */
 .faint-bar-wrapper {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  margin-top: 4px;
+  align-items: flex-start;
+  margin-top: 6px;
+}
+
+.p2-hud .faint-bar-wrapper {
+  align-items: flex-end;
 }
 
 .faint-label {
-  font-size: 9px;
+  font-size: 10px;
   color: #ffcc00;
   font-weight: bold;
+  letter-spacing: 1px;
   margin-bottom: 2px;
 }
 
 .faint-track {
-  width: 100px;
-  height: 10px;
-  background: #111;
+  width: 14px;
+  height: 60px;
+  background: #0b0c10;
   border: 1px solid #ffcc00;
   border-radius: 4px;
   overflow: hidden;
   position: relative;
+  box-shadow: inset 0 0 4px #000;
 }
 
 .faint-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #ffcc00, #ff0055);
-  transition: width 0.3s ease;
+  width: 100%;
+  height: 0%; /* Animate height from 0% to 100% via game.js */
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(to top, #ffcc00, #ff0055);
+  box-shadow: 0 0 6px #ffcc00;
+  transition: height 0.3s ease-in-out;
 }
 
 /* --- VIEWPORT & VIDEO CONTAINERS --- */
