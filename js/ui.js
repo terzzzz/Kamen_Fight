@@ -48,8 +48,10 @@ let vsSelectionState = {
   step: 1, // 1: Select P1, 2: Select P2, 3: Ready
   p1Index: 0,
   p1IsCPU: false,
+  p1Difficulty: 'normal',
   p2Index: 1, // Default P2 to Nigo
-  p2IsCPU: true // Permanently locked to CPU
+  p2IsCPU: true, // Permanently locked to CPU
+  p2Difficulty: 'normal'
 };
 
 // Single Consolidated DOM Initialization Listener
@@ -108,6 +110,15 @@ function toggleControlType(playerKey) {
   updateSelectionUI();
 }
 
+function toggleDifficulty(playerKey) {
+  if (playerKey === 'p1' && vsSelectionState.p1IsCPU && vsSelectionState.step === 1) {
+    vsSelectionState.p1Difficulty = vsSelectionState.p1Difficulty === 'normal' ? 'hard' : 'normal';
+  } else if (playerKey === 'p2' && vsSelectionState.step === 2) {
+    vsSelectionState.p2Difficulty = vsSelectionState.p2Difficulty === 'normal' ? 'hard' : 'normal';
+  }
+  updateSelectionUI();
+}
+
 function handleConfirmStep() {
   const errorBanner = document.getElementById('vs-error-banner');
   if (errorBanner) errorBanner.hidden = true;
@@ -149,6 +160,17 @@ function updateSelectionUI() {
   const p1TypeEl = document.getElementById('p1-type-display');
   if (p1TypeEl) p1TypeEl.textContent = vsSelectionState.p1IsCPU ? 'CPU' : 'HUMAN';
 
+  const p1DiffDisplay = document.getElementById('p1-diff-display');
+  if (p1DiffDisplay) {
+    if (!vsSelectionState.p1IsCPU) {
+      p1DiffDisplay.textContent = 'N/A';
+      p1DiffDisplay.classList.remove('hard');
+    } else {
+      p1DiffDisplay.textContent = vsSelectionState.p1Difficulty.toUpperCase() + (vsSelectionState.p1Difficulty === 'hard' ? ' (+30% LP)' : '');
+      p1DiffDisplay.classList.toggle('hard', vsSelectionState.p1Difficulty === 'hard');
+    }
+  }
+
   const p2ImgEl = document.getElementById('p2-img');
   if (p2ImgEl) {
     p2ImgEl.src = p2.icon;
@@ -161,6 +183,12 @@ function updateSelectionUI() {
   const p2TypeEl = document.getElementById('p2-type-display');
   if (p2TypeEl) p2TypeEl.textContent = 'CPU';
 
+  const p2DiffDisplay = document.getElementById('p2-diff-display');
+  if (p2DiffDisplay) {
+    p2DiffDisplay.textContent = vsSelectionState.p2Difficulty.toUpperCase() + (vsSelectionState.p2Difficulty === 'hard' ? ' (+30% LP)' : '');
+    p2DiffDisplay.classList.toggle('hard', vsSelectionState.p2Difficulty === 'hard');
+  }
+
   const p1Card = document.getElementById('p1-card');
   const p2Card = document.getElementById('p2-card');
   const headerText = document.getElementById('vs-header-text');
@@ -172,14 +200,6 @@ function updateSelectionUI() {
   const p1RightBtn = document.getElementById('p1-right-btn');
   const p2LeftBtn = document.getElementById('p2-left-btn');
   const p2RightBtn = document.getElementById('p2-right-btn');
-  
-  const p1TypeLeft = document.getElementById('p1-type-left');
-  const p1TypeRight = document.getElementById('p1-type-right');
-  const p2TypeLeft = document.getElementById('p2-type-left');
-  const p2TypeRight = document.getElementById('p2-type-right');
-
-  if (p2TypeLeft) p2TypeLeft.disabled = true;
-  if (p2TypeRight) p2TypeRight.disabled = true;
 
   if (vsSelectionState.step === 1) {
     if (headerText) headerText.textContent = 'STEP 1: SELECT PLAYER 1 RIDER';
@@ -190,9 +210,6 @@ function updateSelectionUI() {
     if (p1RightBtn) p1RightBtn.disabled = false;
     if (p2LeftBtn) p2LeftBtn.disabled = true;
     if (p2RightBtn) p2RightBtn.disabled = true;
-
-    if (p1TypeLeft) p1TypeLeft.disabled = false;
-    if (p1TypeRight) p1TypeRight.disabled = false;
 
     if (confirmBtn) {
       confirmBtn.hidden = false;
@@ -212,9 +229,6 @@ function updateSelectionUI() {
     if (p2LeftBtn) p2LeftBtn.disabled = false;
     if (p2RightBtn) p2RightBtn.disabled = false;
 
-    if (p1TypeLeft) p1TypeLeft.disabled = true;
-    if (p1TypeRight) p1TypeRight.disabled = true;
-
     if (confirmBtn) {
       confirmBtn.hidden = false;
       confirmBtn.textContent = 'CONFIRM P2';
@@ -232,9 +246,6 @@ function updateSelectionUI() {
     if (p1RightBtn) p1RightBtn.disabled = true;
     if (p2LeftBtn) p2LeftBtn.disabled = true;
     if (p2RightBtn) p2RightBtn.disabled = true;
-
-    if (p1TypeLeft) p1TypeLeft.disabled = true;
-    if (p1TypeRight) p1TypeRight.disabled = true;
 
     if (confirmBtn) confirmBtn.hidden = true;
     if (startBtn) {
@@ -255,8 +266,10 @@ function validateAndStartMatch() {
   const matchConfig = {
     p1Rider: AVAILABLE_RIDERS[vsSelectionState.p1Index] || AVAILABLE_RIDERS[0],
     p1IsCPU: vsSelectionState.p1IsCPU,
+    p1Difficulty: vsSelectionState.p1IsCPU ? vsSelectionState.p1Difficulty : 'normal',
     p2Rider: AVAILABLE_RIDERS[vsSelectionState.p2Index] || AVAILABLE_RIDERS[0],
-    p2IsCPU: true
+    p2IsCPU: true,
+    p2Difficulty: vsSelectionState.p2Difficulty
   };
 
   if (typeof startBattle === 'function') {
