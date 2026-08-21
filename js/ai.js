@@ -5,41 +5,43 @@ function selectCPUMove(cpuState, opponentState, movesData) {
 
   Object.keys(movesData).forEach(key => {
     const move = movesData[key];
-    if (!move || typeof move !== 'object' || cpuState.chi < (move.chiCost || 0)) return; // Exclude unaffordable moves
+    if (!move || typeof move !== 'object' || cpuState.chi < (move.chiCost || 0)) return;
 
-    let weight = 10; // Base neutral weight
+    let weight = 15; // Increased base weight to keep options versatile
 
-    // 1. FAINTED OPPONENT PUNISHMENT: Favor highest base damage special/finishers
+    // 1. HIGH CHI OFFENSIVE AGGRESSION: High Chi (> 6) -> Heavy preference for Special attacks
+    if (cpuState.chi >= 6 && (move.type === 'SPECIAL' || move.type === 'FINISHER')) {
+      weight += 70 + Math.floor((move.baseDamage || 0) / 10);
+    }
+
+    // 2. FAINTED OPPONENT PUNISHMENT: Maximize heavy damage specials
     if (opponentState.isFainted) {
       if (move.type === 'SPECIAL' || move.type === 'FINISHER') {
-        weight += 80 + Math.floor((move.baseDamage || 0) / 10);
+        weight += 120 + Math.floor((move.baseDamage || 0) / 10);
       } else if (move.type === 'PHYSICAL') {
-        weight += 20;
+        weight += 30;
       }
     }
-    // 2. FAINT TRAP: Opponent at 75+ faint pts -> Favor high accuracy Physical strikes
+    // 3. FAINT TRAP: Opponent at 75+ faint pts -> Favor high-accuracy physical strikes
     else if (opponentState.faintMeter >= 75) {
       if (move.type === 'PHYSICAL') weight += 60;
       if (move.grantsAirborne && cpuState.airborneTicks === 0) weight += 30;
     }
-    // 3. SELF PRESERVATION: Self at 75+ faint pts -> Jump to gain +20% evasion or Guard
+    // 4. SELF PRESERVATION: Self at 75+ faint pts -> Jump or Guard
     else if (cpuState.faintMeter >= 75) {
       if (move.grantsAirborne && cpuState.airborneTicks === 0) weight += 70;
       if (move.type === 'DEFENSE') weight += 40;
     }
-    // 4. AIR CONTROL: Grounded -> High priority to initiate Airborne Status
-    else if (cpuState.airborneTicks === 0) {
-      if (move.grantsAirborne) weight += 40;
-      if (move.type === 'PHYSICAL') weight += 20;
-    }
-    // 5. AIR EXPLOITATION: Airborne -> Leverage +15% damage multiplier
-    else if (cpuState.airborneTicks > 0) {
-      if (move.type === 'PHYSICAL' || move.type === 'SPECIAL') weight += 35;
+    // 5. AIR CONTROL & EXPLOITATION
+    else if (cpuState.airborneTicks === 0 && move.grantsAirborne) {
+      weight += 30;
+    } else if (cpuState.airborneTicks > 0 && (move.type === 'PHYSICAL' || move.type === 'SPECIAL')) {
+      weight += 45;
     }
 
-    // 6. CHI RECOVERY: Low Chi (< 4) -> Prioritize Physical strikes (+2/+3 Chi gain)
+    // 6. CHI RECOVERY: Low Chi (< 4) -> Prioritize Physical strikes
     if (cpuState.chi < 4 && move.type === 'PHYSICAL') {
-      weight += 50;
+      weight += 65;
     }
 
     candidates.push({ key, weight });
