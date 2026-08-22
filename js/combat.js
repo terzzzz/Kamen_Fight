@@ -72,10 +72,10 @@ async function startBattle(matchConfig) {
 
     gameState.roundCounter = 1;
 
-    // 1. SHOW TRANSITION SPLASH SCREEN
+    // 1. SHOW TRANSITION SPLASH SCREEN (REMOVING HIDDEN ATTRIBUTE)
     if (splashNames) splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
     if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
-    if (transitionScreen) transitionScreen.style.display = 'flex';
+    if (transitionScreen) transitionScreen.hidden = false;
 
     if (typeof preloadRiderVideos === 'function') {
       try {
@@ -94,9 +94,9 @@ async function startBattle(matchConfig) {
   } catch (err) {
     console.error("Match error:", err);
   } finally {
-    // 2. HIDE SPLASH SCREEN & UNHIDE BATTLE SCREEN
-    if (transitionScreen) transitionScreen.style.display = 'none';
-    if (battleScreen) battleScreen.style.display = 'flex';
+    // 2. HIDE SPLASH SCREEN & UNHIDE BATTLE SCREEN SAFELY
+    if (transitionScreen) transitionScreen.hidden = true;
+    if (battleScreen) battleScreen.hidden = false;
 
     updateHUD();
 
@@ -321,8 +321,9 @@ async function executeTurnResolutionPhase() {
     simulateCPUButtonPress(p2MoveKey);
   }
 
-  let p1Move = getMoveForPlayer('p1', p1MoveKey);
-  let p2Move = getMoveForPlayer('p2', p2MoveKey);
+  const defaultMove = { name: 'Do Nothing', type: 'IDLE', baseDamage: 0, chiCost: 0 };
+  let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
+  let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
   // Process Instant Utility Effects
   if (p1Move && p1Move.faintRecovery) {
@@ -440,7 +441,7 @@ async function executeTurnResolutionPhase() {
       await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
     }
   } else if (defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
-    triggerFloatingText(defKey1, 'INTERRUPTED!', 'scratch');
+    triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
   // ROUND CONCLUSION
