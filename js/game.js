@@ -77,7 +77,7 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // 1. ADD +1 CHI AT THE START OF EACH ROUND (EXCEPT ROUND 1)
+  // ADD +1 CHI AT THE START OF EACH ROUND (EXCEPT ROUND 1)
   if (gameState.roundCounter > 1) {
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
@@ -163,7 +163,7 @@ function startRoundCountdown() {
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
         player.activeChargePercent = Math.floor(Math.random() * 26 + 75);
         if (confirmPlayerAction(moveKey, slot)) {
-          simulateCPUButtonPress(moveKey);
+          simulateCPUButtonPress(moveKey, slot);
         }
       }, thinkTime);
     }
@@ -272,8 +272,10 @@ function bindKeyboardInputs() {
 
     if (gameState.roundPhase !== 'INPUT' || !gameState.input.acceptingInputs || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
-    // AUTO-CHARGING DIRECTION LOGIC
+    // AUTO-CHARGING DIRECTION LOGIC WITH REPEAT GUARD
     if (['A', 'D', 'W', 'S'].includes(key)) {
+      if (gameState.input.heldDirection === key) return;
+
       clearInterval(gameState.input.chargeInterval);
 
       ['W', 'A', 'S', 'D'].forEach(dir => {
@@ -457,16 +459,9 @@ function bindCommandButtons() {
   });
 }
 
-function simulateCPUButtonPress(moveKey) {
-  if (moveKey === 'DO_NOTHING') return;
-  const parts = moveKey.split('+');
-  parts.forEach(k => {
-    const keyEl = document.getElementById(`key-${k}`);
-    if (keyEl) {
-      keyEl.classList.add('active');
-      setTimeout(() => keyEl.classList.remove('active'), 1200);
-    }
-  });
+// DISABLED: CPU ACTIONS NEVER HIGHLIGHT THE PLAYER'S CONTROL PAD
+function simulateCPUButtonPress(moveKey, playerKey = 'p2') {
+  return;
 }
 
 function resetTurnInputState() {
