@@ -18,9 +18,12 @@ function getTransformFlip(player, playerKey, moveObj = null) {
   return shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
 }
 
-// SAFE NON-BLOCKING PRELOADER WITH INDIVIDUAL FETCH TIMEOUTS
+// SAFE NON-BLOCKING PRELOADER WITH DIRECT PATH CACHING
 async function preloadRiderVideos(riderId, riderMoves = {}) {
   if (!riderId) return;
+
+  if (!window.gameState) window.gameState = {};
+  if (!window.gameState.videoCache) window.gameState.videoCache = {};
 
   const baseVideoFiles = [
     'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
@@ -38,22 +41,17 @@ async function preloadRiderVideos(riderId, riderMoves = {}) {
     const batch = videoFiles.slice(i, i + BATCH_SIZE);
     await Promise.all(batch.map(async (file) => {
       const rawUrl = `assets/videos/${riderId}/${file}`;
-      if (gameState.videoCache && gameState.videoCache[rawUrl]) return;
+      if (gameState.videoCache[rawUrl]) return;
 
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const res = await fetch(rawUrl, { signal: controller.signal });
+        const res = await fetch(rawUrl, { method: 'HEAD', signal: controller.signal });
         clearTimeout(timeoutId);
 
-        if (res.ok) {
-          const blob = await res.blob();
-          if (gameState.videoCache) gameState.videoCache[rawUrl] = URL.createObjectURL(blob);
-        } else {
-          if (gameState.videoCache) gameState.videoCache[rawUrl] = rawUrl;
-        }
+        gameState.videoCache[rawUrl] = rawUrl;
       } catch (e) {
-        if (gameState.videoCache) gameState.videoCache[rawUrl] = rawUrl;
+        gameState.videoCache[rawUrl] = rawUrl;
       }
     }));
   }
@@ -64,10 +62,16 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const centerBox = document.getElementById('center-box');
     const centerVid = document.getElementById('center-video');
     const actionLabel = document.getElementById('center-action-label');
-    if (!centerBox || !centerVid) return resolve();
+    if (!centerBox || !centerVid) {
+      resolve();
+      return;
+    }
 
-    const player = gameState[playerKey];
-    if (!player) return resolve();
+    const player = gameState ? gameState[playerKey] : null;
+    if (!player) {
+      resolve();
+      return;
+    }
 
     if (actionLabel) {
       const slotPrefix = playerKey.toUpperCase();
@@ -80,6 +84,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerBox.hidden = false;
     centerVid.muted = true;
     centerVid.playsInline = true;
+    centerVid.setAttribute('playsinline', '');
+    centerVid.setAttribute('webkit-playsinline', '');
 
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
     centerVid.style.transform = getTransformFlip(player, playerKey, moveObj);
@@ -105,8 +111,11 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
     const rawUrl = `assets/videos/${player.id}/${videoFile}`;
     const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
-    centerVid.src = videoUrl;
-    centerVid.load();
+    
+    if (centerVid.src !== videoUrl) {
+      centerVid.src = videoUrl;
+      centerVid.load();
+    }
 
     centerVid.play().catch(() => cleanUpAndResolve());
 
@@ -120,6 +129,7 @@ function hideCenterScreen() {
 }
 
 function updateCharacterMedia(playerKey, stateType) {
+  if (!gameState) return;
   const player = gameState[playerKey];
   if (!player) return;
 
@@ -156,6 +166,8 @@ function updateCharacterMedia(playerKey, stateType) {
 
   videoEl.muted = true;
   videoEl.playsInline = true;
+  videoEl.setAttribute('playsinline', '');
+  videoEl.setAttribute('webkit-playsinline', '');
 
   if (playerKey === 'p2') {
     videoEl.classList.toggle('p2-mirror-palette', isMirrorMatch);
@@ -168,17 +180,19 @@ function updateCharacterMedia(playerKey, stateType) {
   const rawUrl = `assets/videos/${riderId}/${fileName}`;
   const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
 
-  if (videoEl.dataset.currentFile !== videoUrl || videoEl.paused || videoEl.readyState === 0) {
+  // PREVENT RESTART STUTTER: Only load and play if source changed or video unstarted
+  if (videoEl.dataset.currentFile !== videoUrl) {
     videoEl.dataset.currentFile = videoUrl;
     videoEl.src = videoUrl;
     videoEl.load();
+    const playPromise = videoEl.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {});
+    }
+  } else if (videoEl.paused && isLoopingState && !videoEl.ended) {
+    videoEl.play().catch(() => {});
   }
 
   if (spriteEl) spriteEl.hidden = true;
   videoEl.hidden = false;
-
-  const playPromise = videoEl.play();
-  if (playPromise !== undefined) {
-    playPromise.catch(() => {});
-  }
 }
