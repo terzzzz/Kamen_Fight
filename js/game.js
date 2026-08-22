@@ -133,7 +133,6 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Schedule CPU decisions during countdown
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (player && player.isCPU && !player.isFainted) {
@@ -186,16 +185,15 @@ function startRoundCountdown() {
 }
 
 function checkBothPlayersLocked() {
-  const p1Ready = gameState.input.isConfirmed || gameState.p1.isFainted;
-  const p2Ready = gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
+  // Lock-in confirmation UI updates without prematurely terminating the 5-second countdown timer
+  const flag1El = document.getElementById('p1-action-flag');
+  if (flag1El && gameState.input.isConfirmed) {
+    flag1El.hidden = false;
+  }
 
-  if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
-    clearInterval(gameState.timerInterval);
-    setTimeout(() => {
-      if (gameState.roundPhase === 'INPUT') {
-        executeTurnResolutionPhase();
-      }
-    }, 400);
+  const flag2El = document.getElementById('p2-action-flag');
+  if (flag2El && gameState.p2IsConfirmed) {
+    flag2El.hidden = false;
   }
 }
 
@@ -259,36 +257,29 @@ function bindKeyboardInputs() {
 
     if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
-    // AUTO-CHARGING DIRECTION LOGIC
     if (['A', 'D', 'W', 'S'].includes(key)) {
-      // Clear previous charge interval
       clearInterval(gameState.input.chargeInterval);
 
-      // Reset active button highlights on D-pad
       ['W', 'A', 'S', 'D'].forEach(dir => {
         const keyEl = document.getElementById(`key-${dir}`);
         if (keyEl) keyEl.classList.remove('active');
       });
 
-      // Set/restart direction and start charging from 0%
       gameState.input.heldDirection = key;
       gameState.input.chargeStartTime = Date.now();
       gameState.input.currentPercent = 0;
       gameState.input.chargeInterval = setInterval(updateChargeProgress, 30);
 
-      // Keep current direction button visually highlighted while charging
       const keyEl = document.getElementById(`key-${key}`);
       if (keyEl) keyEl.classList.add('active');
     }
 
-    // ACTION BUTTON SELECTION
     if (['J', 'K', 'L', 'I'].includes(key)) {
       if (!gameState.input.heldDirection) {
         triggerFloatingText('p1', 'TAP DIRECTION FIRST!', 'scratch');
         return;
       }
 
-      // Visual flash for action button
       const actKeyEl = document.getElementById(`key-${key}`);
       if (actKeyEl) {
         actKeyEl.classList.add('active');
@@ -445,7 +436,6 @@ function resetTurnInputState() {
   if (flag2El) flag2El.hidden = true;
 }
 
-// INITIALIZE CONTROLS & PRELOAD ASSETS ON LAUNCH
 window.addEventListener('DOMContentLoaded', () => {
   bindKeyboardInputs();
   bindCommandButtons();
