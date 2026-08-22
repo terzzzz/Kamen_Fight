@@ -1,3 +1,28 @@
+// IOS MOBILE VIDEO UNLOCKER
+let mobileVideosUnlocked = false;
+
+function unlockMobileVideos() {
+  if (mobileVideosUnlocked) return;
+
+  const vids = document.querySelectorAll('video');
+  vids.forEach(v => {
+    v.muted = true;
+    v.playsInline = true;
+    v.setAttribute('playsinline', '');
+    v.setAttribute('webkit-playsinline', '');
+    
+    // Warm up center and player video instances on direct touch
+    const p = v.play();
+    if (p !== undefined) {
+      p.then(() => {
+        v.pause();
+      }).catch(() => {});
+    }
+  });
+
+  mobileVideosUnlocked = true;
+}
+
 // ORIENTATION RESOLVER
 function getTransformFlip(player, playerKey, moveObj = null) {
   if (!player) return 'scaleX(1)';
@@ -44,6 +69,8 @@ async function preloadRiderVideos(riderId, riderMoves = {}) {
 
 function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = null, moveObj = null) {
   return new Promise((resolve) => {
+    unlockMobileVideos();
+
     const centerBox = document.getElementById('center-box');
     const centerVid = document.getElementById('center-video');
     const actionLabel = document.getElementById('center-action-label');
@@ -98,17 +125,14 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const rawUrl = `assets/videos/${riderId}/${videoFile}`;
     const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
 
-    if (centerVid.dataset.currentFile !== videoUrl) {
-      centerVid.dataset.currentFile = videoUrl;
-      centerVid.src = videoUrl;
-    } else {
-      try { centerVid.currentTime = 0; } catch (e) {}
-    }
+    // Force inline reset for Safari HTML5 Media Engine
+    centerVid.src = videoUrl;
+    centerVid.load();
 
     const playPromise = centerVid.play();
     if (playPromise !== undefined) {
       playPromise.catch(() => {
-        setTimeout(cleanUpAndResolve, 1000);
+        setTimeout(cleanUpAndResolve, 1200);
       });
     }
 
@@ -176,6 +200,7 @@ function updateCharacterMedia(playerKey, stateType) {
   if (videoEl.dataset.currentFile !== videoUrl) {
     videoEl.dataset.currentFile = videoUrl;
     videoEl.src = videoUrl;
+    videoEl.load();
     const playPromise = videoEl.play();
     if (playPromise !== undefined) {
       playPromise.catch(() => {});
