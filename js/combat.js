@@ -118,7 +118,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     movesData = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
-  // CHECK IF OPPONENT IS LOCKED IN BEFORE CONSIDERING GUARD MOVES
   const isOpponentLocked = playerKey === 'p1'
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
     : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
@@ -437,33 +436,60 @@ async function executeTurnResolutionPhase() {
           triggerFloatingText(defKey1, 'MISS!!', 'miss');
         } else if (move2.type === 'DEFENSE') {
           if (result.guardSuccess) {
-            await playCenterVideo(defKey1, move2.video || 'guard.mp4', 'BLOCKED!', 1000, move2);
+            const guardVid = move2.video || 'guard.mp4';
+            const vidPromise = playCenterVideo(defKey1, guardVid, 'BLOCKED!', 1500, move2);
+
+            await new Promise(r => setTimeout(r, 600));
+
             if (result.finalDmg === 0) {
               triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
             } else {
               triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
+              await new Promise(r => setTimeout(r, 400));
               triggerFloatingNumber(defKey1, result.finalDmg, false);
             }
+
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+            updateHUD();
+
+            await vidPromise;
           } else {
             triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
+
+            await new Promise(r => setTimeout(r, 500));
+
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-            await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+            const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+
+            // Wait 1 second after hit video starts playing to show LP drop & damage numbers
+            await new Promise(r => setTimeout(r, 1000));
+
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+            updateHUD();
             triggerFloatingNumber(defKey1, result.finalDmg, false);
             applyFaintBuildUp(defender1, defKey1);
+
+            await vidPromise;
           }
         } else {
           if (result.isGlancing) {
             triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+            updateHUD();
             triggerFloatingNumber(defKey1, result.finalDmg, false);
           } else {
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-            await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+            const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+
+            // Wait 1 second after hit video starts playing to show LP drop & damage numbers
+            await new Promise(r => setTimeout(r, 1000));
+
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+            updateHUD();
             triggerFloatingNumber(defKey1, result.finalDmg, false);
             applyFaintBuildUp(defender1, defKey1);
+
+            await vidPromise;
           }
         }
       }
@@ -492,33 +518,60 @@ async function executeTurnResolutionPhase() {
         triggerFloatingText(defKey2, 'MISS!!', 'miss');
       } else if (move1.type === 'DEFENSE') {
         if (result.guardSuccess) {
-          await playCenterVideo(defKey2, move1.video || 'guard.mp4', 'BLOCKED!', 1000, move1);
+          const guardVid = move1.video || 'guard.mp4';
+          const vidPromise = playCenterVideo(defKey2, guardVid, 'BLOCKED!', 1500, move1);
+
+          await new Promise(r => setTimeout(r, 600));
+
           if (result.finalDmg === 0) {
             triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
           } else {
             triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
+            await new Promise(r => setTimeout(r, 400));
             triggerFloatingNumber(defKey2, result.finalDmg, false);
           }
+
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+          updateHUD();
+
+          await vidPromise;
         } else {
           triggerFloatingText(defKey2, 'FAILED TO GUARD!', 'scratch');
+
+          await new Promise(r => setTimeout(r, 500));
+
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+          const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+
+          // Wait 1 second after hit video starts playing to show LP drop & damage numbers
+          await new Promise(r => setTimeout(r, 1000));
+
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+          updateHUD();
           triggerFloatingNumber(defKey2, result.finalDmg, false);
           applyFaintBuildUp(defender2, defKey2);
+
+          await vidPromise;
         }
       } else {
         if (result.isGlancing) {
           triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+          updateHUD();
           triggerFloatingNumber(defKey2, result.finalDmg, false);
         } else {
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+          const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+
+          // Wait 1 second after hit video starts playing to show LP drop & damage numbers
+          await new Promise(r => setTimeout(r, 1000));
+
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+          updateHUD();
           triggerFloatingNumber(defKey2, result.finalDmg, false);
           applyFaintBuildUp(defender2, defKey2);
+
+          await vidPromise;
         }
       }
     }
