@@ -5,11 +5,20 @@ let battleBGM = null;
 function playSelectionBGM() {
   if (selectionBGM) return;
 
-  selectionBGM = new Audio('assets/sounds/matchup.mp3');
-  selectionBGM.loop = true;
-  selectionBGM.volume = 0.5;
+  try {
+    selectionBGM = new Audio('assets/sounds/matchup.mp3');
+    selectionBGM.loop = true;
+    selectionBGM.volume = 0.5;
 
-  selectionBGM.play().catch(() => {});
+    const playPromise = selectionBGM.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        console.warn("Mobile autoplay restricted. BGM will unlock on first tap.");
+      });
+    }
+  } catch (e) {
+    console.warn("Audio load error:", e);
+  }
 }
 
 function stopSelectionBGM() {
@@ -23,11 +32,18 @@ function stopSelectionBGM() {
 function playBattleBGM() {
   if (battleBGM) return;
 
-  battleBGM = new Audio('assets/sounds/matchup1.mp3');
-  battleBGM.loop = true;
-  battleBGM.volume = 0.5;
+  try {
+    battleBGM = new Audio('assets/sounds/matchup1.mp3');
+    battleBGM.loop = true;
+    battleBGM.volume = 0.5;
 
-  battleBGM.play().catch(() => {});
+    const playPromise = battleBGM.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {});
+    }
+  } catch (e) {
+    console.warn("Audio load error:", e);
+  }
 }
 
 function stopBattleBGM() {
@@ -49,18 +65,17 @@ let vsSelectionState = {
   p1Index: 0,
   p1IsCPU: false,
   p1Difficulty: 'normal',
-  p2Index: 1, // Default P2 to Nigo
-  p2IsCPU: true, // Permanently locked to CPU
+  p2Index: 1,
+  p2IsCPU: true,
   p2Difficulty: 'normal'
 };
 
-// Single Consolidated DOM Initialization Listener
+// Global Initialization & Mobile Audio Unlock
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     const res = await fetch('data/riders.json');
     if (res.ok) {
       const allRiders = await res.json();
-      // Only keep active riders
       const activeRiders = allRiders.filter(r => r.active === true);
       if (activeRiders.length > 0) {
         AVAILABLE_RIDERS = activeRiders;
@@ -72,14 +87,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   updateSelectionUI();
 
-  // Autoplay Unlock Listener
+  // Bypass Mobile Autoplay Restrictions on First Touch
   const unlockAudio = () => {
     playSelectionBGM();
     window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
     window.removeEventListener('keydown', unlockAudio);
   };
 
   window.addEventListener('click', unlockAudio);
+  window.addEventListener('touchstart', unlockAudio, { passive: true });
   window.addEventListener('keydown', unlockAudio);
 });
 
@@ -144,7 +161,6 @@ function handleBackStep() {
 function updateSelectionUI() {
   if (!AVAILABLE_RIDERS || AVAILABLE_RIDERS.length === 0) return;
 
-  // Boundary safety check for selection indices
   if (vsSelectionState.p1Index >= AVAILABLE_RIDERS.length) vsSelectionState.p1Index = 0;
   if (vsSelectionState.p2Index >= AVAILABLE_RIDERS.length) vsSelectionState.p2Index = 0;
 
