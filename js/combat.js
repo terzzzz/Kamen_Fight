@@ -351,14 +351,16 @@ async function executeTurnResolutionPhase() {
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
-  // Process Instant Utility Effects
-  if (p1Move && p1Move.faintRecovery) {
+  // Process Instant Utility Effects (Only trigger floating text if faint meter > 0)
+  if (p1Move && p1Move.faintRecovery && gameState.p1.faintMeter > 0) {
+    const recovered = Math.min(gameState.p1.faintMeter, p1Move.faintRecovery);
     gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
-    triggerFloatingText('p1', `FAINT -${p1Move.faintRecovery}`, 'heal');
+    triggerFloatingText('p1', `FAINT -${recovered}`, 'heal');
   }
-  if (p2Move && p2Move.faintRecovery) {
+  if (p2Move && p2Move.faintRecovery && gameState.p2.faintMeter > 0) {
+    const recovered = Math.min(gameState.p2.faintMeter, p2Move.faintRecovery);
     gameState.p2.faintMeter = Math.max(0, gameState.p2.faintMeter - p2Move.faintRecovery);
-    triggerFloatingText('p2', `FAINT -${p2Move.faintRecovery}`, 'heal');
+    triggerFloatingText('p2', `FAINT -${recovered}`, 'heal');
   }
 
   const battleMsg = document.getElementById('battle-message');
@@ -604,7 +606,7 @@ async function executeTurnResolutionPhase() {
         if (player.isFainted) {
           player.isFainted = false;
           player.faintMeter = 0;
-        } else if (!player.tookCleanHitThisRound) {
+        } else if (!player.tookCleanHitThisRound && player.faintMeter > 0) {
           player.faintMeter = Math.max(0, player.faintMeter - FAINT_CFG.ROUND_RECOVERY);
         }
         player.tookCleanHitThisRound = false;
