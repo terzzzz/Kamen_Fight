@@ -18,7 +18,7 @@ function getTransformFlip(player, playerKey, moveObj = null) {
   return shouldFlip ? 'scaleX(-1)' : 'scaleX(1)';
 }
 
-// SAFE NON-BLOCKING PRELOADER WITH DIRECT PATH CACHING
+// SAFE NON-BLOCKING PRELOADER
 async function preloadRiderVideos(riderId, riderMoves = {}) {
   if (!riderId) return;
 
@@ -36,25 +36,10 @@ async function preloadRiderVideos(riderId, riderMoves = {}) {
 
   const videoFiles = Array.from(new Set([...baseVideoFiles, ...moveVideos]));
 
-  const BATCH_SIZE = 4;
-  for (let i = 0; i < videoFiles.length; i += BATCH_SIZE) {
-    const batch = videoFiles.slice(i, i + BATCH_SIZE);
-    await Promise.all(batch.map(async (file) => {
-      const rawUrl = `assets/videos/${riderId}/${file}`;
-      if (gameState.videoCache[rawUrl]) return;
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const res = await fetch(rawUrl, { method: 'HEAD', signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        gameState.videoCache[rawUrl] = rawUrl;
-      } catch (e) {
-        gameState.videoCache[rawUrl] = rawUrl;
-      }
-    }));
-  }
+  videoFiles.forEach(file => {
+    const rawUrl = `assets/videos/${riderId}/${file}`;
+    gameState.videoCache[rawUrl] = rawUrl;
+  });
 }
 
 function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = null, moveObj = null) {
@@ -109,15 +94,22 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.addEventListener('ended', cleanUpAndResolve);
     centerVid.addEventListener('error', cleanUpAndResolve);
 
-    const rawUrl = `assets/videos/${player.id}/${videoFile}`;
+    const riderId = player.id || 'ichigo';
+    const rawUrl = `assets/videos/${riderId}/${videoFile}`;
     const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
-    
-    if (centerVid.src !== videoUrl) {
+
+    if (centerVid.dataset.currentFile !== videoUrl) {
+      centerVid.dataset.currentFile = videoUrl;
       centerVid.src = videoUrl;
-      centerVid.load();
     }
 
-    centerVid.play().catch(() => cleanUpAndResolve());
+    centerVid.currentTime = 0;
+    const playPromise = centerVid.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        setTimeout(cleanUpAndResolve, 1000);
+      });
+    }
 
     fallbackTimer = setTimeout(cleanUpAndResolve, maxDurationMs || 8000);
   });
@@ -180,11 +172,9 @@ function updateCharacterMedia(playerKey, stateType) {
   const rawUrl = `assets/videos/${riderId}/${fileName}`;
   const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
 
-  // PREVENT RESTART STUTTER: Only load and play if source changed or video unstarted
   if (videoEl.dataset.currentFile !== videoUrl) {
     videoEl.dataset.currentFile = videoUrl;
     videoEl.src = videoUrl;
-    videoEl.load();
     const playPromise = videoEl.play();
     if (playPromise !== undefined) {
       playPromise.catch(() => {});
