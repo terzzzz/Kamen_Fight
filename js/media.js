@@ -52,7 +52,7 @@ async function preloadRiderVideos(riderId, riderMoves = {}) {
 
   const baseVideoFiles = [
     'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
-    'hit.mp4', 'hit_physical.mp4', 'guard.mp4', 'windmill_guard.mp4'
+    'hit.mp4', 'hit_physical.mp4', 'guard.mp4', 'windmill_guard.mp4', 'dodge.mp4'
   ];
 
   const moveVideos = Object.values(riderMoves || {})
