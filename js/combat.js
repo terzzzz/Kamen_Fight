@@ -432,37 +432,39 @@ async function executeTurnResolutionPhase() {
 
       let result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
 
-      if (!result.hitLanded) {
-        triggerFloatingText(defKey1, 'MISS!!', 'miss');
-      } else if (move2.type === 'DEFENSE') {
-        if (result.guardSuccess) {
-          await playCenterVideo(defKey1, move2.video || 'guard.mp4', 'BLOCKED!', 1000, move2);
-          if (result.finalDmg === 0) {
-            triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
+      if (result.isOffensive) {
+        if (!result.hitLanded) {
+          triggerFloatingText(defKey1, 'MISS!!', 'miss');
+        } else if (move2.type === 'DEFENSE') {
+          if (result.guardSuccess) {
+            await playCenterVideo(defKey1, move2.video || 'guard.mp4', 'BLOCKED!', 1000, move2);
+            if (result.finalDmg === 0) {
+              triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
+            } else {
+              triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
+              triggerFloatingNumber(defKey1, result.finalDmg, false);
+            }
+            defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           } else {
-            triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
+            triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
+            const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+            await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+            defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
             triggerFloatingNumber(defKey1, result.finalDmg, false);
+            applyFaintBuildUp(defender1, defKey1);
           }
-          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
         } else {
-          triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
-          const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
-          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
-          triggerFloatingNumber(defKey1, result.finalDmg, false);
-          applyFaintBuildUp(defender1, defKey1);
-        }
-      } else {
-        if (result.isGlancing) {
-          triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
-          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
-          triggerFloatingNumber(defKey1, result.finalDmg, false);
-        } else {
-          const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
-          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
-          triggerFloatingNumber(defKey1, result.finalDmg, false);
-          applyFaintBuildUp(defender1, defKey1);
+          if (result.isGlancing) {
+            triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
+            defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+            triggerFloatingNumber(defKey1, result.finalDmg, false);
+          } else {
+            const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+            await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+            defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+            triggerFloatingNumber(defKey1, result.finalDmg, false);
+            applyFaintBuildUp(defender1, defKey1);
+          }
         }
       }
     }
@@ -485,37 +487,39 @@ async function executeTurnResolutionPhase() {
     await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
     let result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
-    if (!result.hitLanded) {
-      triggerFloatingText(defKey2, 'MISS!!', 'miss');
-    } else if (move1.type === 'DEFENSE') {
-      if (result.guardSuccess) {
-        await playCenterVideo(defKey2, move1.video || 'guard.mp4', 'BLOCKED!', 1000, move1);
-        if (result.finalDmg === 0) {
-          triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
+    if (result.isOffensive) {
+      if (!result.hitLanded) {
+        triggerFloatingText(defKey2, 'MISS!!', 'miss');
+      } else if (move1.type === 'DEFENSE') {
+        if (result.guardSuccess) {
+          await playCenterVideo(defKey2, move1.video || 'guard.mp4', 'BLOCKED!', 1000, move1);
+          if (result.finalDmg === 0) {
+            triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
+          } else {
+            triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
+            triggerFloatingNumber(defKey2, result.finalDmg, false);
+          }
+          defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         } else {
-          triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
+          triggerFloatingText(defKey2, 'FAILED TO GUARD!', 'scratch');
+          const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+          await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+          defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
           triggerFloatingNumber(defKey2, result.finalDmg, false);
+          applyFaintBuildUp(defender2, defKey2);
         }
-        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
       } else {
-        triggerFloatingText(defKey2, 'FAILED TO GUARD!', 'scratch');
-        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
-        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
-        triggerFloatingNumber(defKey2, result.finalDmg, false);
-        applyFaintBuildUp(defender2, defKey2);
-      }
-    } else {
-      if (result.isGlancing) {
-        triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
-        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
-        triggerFloatingNumber(defKey2, result.finalDmg, false);
-      } else {
-        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
-        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
-        triggerFloatingNumber(defKey2, result.finalDmg, false);
-        applyFaintBuildUp(defender2, defKey2);
+        if (result.isGlancing) {
+          triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
+          defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+          triggerFloatingNumber(defKey2, result.finalDmg, false);
+        } else {
+          const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+          await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+          defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+          triggerFloatingNumber(defKey2, result.finalDmg, false);
+          applyFaintBuildUp(defender2, defKey2);
+        }
       }
     }
 
@@ -594,8 +598,11 @@ async function executeTurnResolutionPhase() {
 
 // ATTACK RESOLUTION ENGINE
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
-  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') {
-    return { hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
+  const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
+  const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
+
+  if (!isOffensive) {
+    return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
   }
 
   const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
@@ -641,7 +648,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   if (!rolledHit) {
-    return { hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
+    return { isOffensive: true, hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
   }
 
   if (!isGuarding) {
@@ -672,5 +679,5 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
 
-  return { hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, finalDmg: finalDmg };
+  return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, finalDmg: finalDmg };
 }
