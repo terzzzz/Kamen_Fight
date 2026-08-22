@@ -133,6 +133,7 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
+  // Schedule CPU decisions during countdown
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (player && player.isCPU && !player.isFainted) {
@@ -185,15 +186,16 @@ function startRoundCountdown() {
 }
 
 function checkBothPlayersLocked() {
-  // Lock-in confirmation UI updates without prematurely terminating the 5-second countdown timer
-  const flag1El = document.getElementById('p1-action-flag');
-  if (flag1El && gameState.input.isConfirmed) {
-    flag1El.hidden = false;
-  }
+  const p1Ready = gameState.input.isConfirmed || gameState.p1.isFainted;
+  const p2Ready = gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
 
-  const flag2El = document.getElementById('p2-action-flag');
-  if (flag2El && gameState.p2IsConfirmed) {
-    flag2El.hidden = false;
+  if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
+    clearInterval(gameState.timerInterval);
+    setTimeout(() => {
+      if (gameState.roundPhase === 'INPUT') {
+        executeTurnResolutionPhase();
+      }
+    }, 400);
   }
 }
 
@@ -257,6 +259,7 @@ function bindKeyboardInputs() {
 
     if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
+    // AUTO-CHARGING DIRECTION LOGIC
     if (['A', 'D', 'W', 'S'].includes(key)) {
       clearInterval(gameState.input.chargeInterval);
 
@@ -274,6 +277,7 @@ function bindKeyboardInputs() {
       if (keyEl) keyEl.classList.add('active');
     }
 
+    // ACTION BUTTON SELECTION
     if (['J', 'K', 'L', 'I'].includes(key)) {
       if (!gameState.input.heldDirection) {
         triggerFloatingText('p1', 'TAP DIRECTION FIRST!', 'scratch');
@@ -436,9 +440,32 @@ function resetTurnInputState() {
   if (flag2El) flag2El.hidden = true;
 }
 
+// DYNAMIC SCREEN AUTO-SCALER FOR MOBILE & TABLETS
+function autoScaleGameWindow() {
+  const targetWidth = 960;
+  const targetHeight = 640;
+
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+
+  const scaleX = (windowWidth - 10) / targetWidth;
+  const scaleY = (windowHeight - 10) / targetHeight;
+  const scale = Math.min(scaleX, scaleY, 1);
+
+  const containers = document.querySelectorAll('.screen-container, .splash-screen');
+  containers.forEach(el => {
+    el.style.transform = `scale(${scale})`;
+  });
+}
+
+window.addEventListener('resize', autoScaleGameWindow);
+window.addEventListener('orientationchange', () => setTimeout(autoScaleGameWindow, 200));
+
+// INITIALIZE CONTROLS & AUTO-SCALER ON LAUNCH
 window.addEventListener('DOMContentLoaded', () => {
   bindKeyboardInputs();
   bindCommandButtons();
+  autoScaleGameWindow();
 
   if (typeof preloadRiderVideos === 'function') {
     preloadRiderVideos('ichigo');
