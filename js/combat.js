@@ -351,7 +351,7 @@ async function executeTurnResolutionPhase() {
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
-  // Process Instant Utility Effects (Only trigger floating text if faint meter > 0)
+  // Process Instant Utility Effects
   if (p1Move && p1Move.faintRecovery && gameState.p1.faintMeter > 0) {
     const recovered = Math.min(gameState.p1.faintMeter, p1Move.faintRecovery);
     gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
@@ -436,9 +436,7 @@ async function executeTurnResolutionPhase() {
       let result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
 
       if (result.isOffensive) {
-        if (!result.hitLanded) {
-          triggerFloatingText(defKey1, 'MISS!!', 'miss');
-        } else if (move2.type === 'DEFENSE') {
+        if (move2.type === 'DEFENSE') {
           if (result.guardSuccess) {
             const guardVid = move2.video || 'guard.mp4';
             const vidPromise = playCenterVideo(defKey1, guardVid, 'BLOCKED!', 1500, move2);
@@ -476,28 +474,42 @@ async function executeTurnResolutionPhase() {
 
             await vidPromise;
           }
+        } else if (!result.hitLanded) {
+          // Full Dodge / Miss (1-second delayed popup)
+          const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'DODGED!');
+
+          await new Promise(r => setTimeout(r, 1000));
+
+          triggerFloatingText(defKey1, 'MISS!!', 'miss');
+
+          await vidPromise;
+        } else if (result.isGlancing) {
+          // Glancing Hit / Near-miss (1-second delayed damage & popup)
+          const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
+
+          await new Promise(r => setTimeout(r, 1000));
+
+          triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
+          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+          updateHUD();
+          triggerFloatingNumber(defKey1, result.finalDmg, false);
+
+          await vidPromise;
         } else {
-          if (result.isGlancing) {
-            triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
-            defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
-            updateHUD();
-            triggerFloatingNumber(defKey1, result.finalDmg, false);
-          } else {
-            // Clean Hit Landed - Defender gets interrupted!
-            defender1WasInterrupted = true;
+          // Clean Hit Landed - Defender gets interrupted!
+          defender1WasInterrupted = true;
 
-            const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-            const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+          const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+          const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
 
-            await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 1000));
 
-            defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
-            updateHUD();
-            triggerFloatingNumber(defKey1, result.finalDmg, false);
-            applyFaintBuildUp(defender1, defKey1);
+          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+          updateHUD();
+          triggerFloatingNumber(defKey1, result.finalDmg, false);
+          applyFaintBuildUp(defender1, defKey1);
 
-            await vidPromise;
-          }
+          await vidPromise;
         }
       }
     }
@@ -521,9 +533,7 @@ async function executeTurnResolutionPhase() {
     let result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
     if (result.isOffensive) {
-      if (!result.hitLanded) {
-        triggerFloatingText(defKey2, 'MISS!!', 'miss');
-      } else if (move1.type === 'DEFENSE') {
+      if (move1.type === 'DEFENSE') {
         if (result.guardSuccess) {
           const guardVid = move1.video || 'guard.mp4';
           const vidPromise = playCenterVideo(defKey2, guardVid, 'BLOCKED!', 1500, move1);
@@ -559,25 +569,40 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         }
+      } else if (!result.hitLanded) {
+        // Full Dodge / Miss (1-second delayed popup)
+        const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'DODGED!');
+
+        await new Promise(r => setTimeout(r, 1000));
+
+        triggerFloatingText(defKey2, 'MISS!!', 'miss');
+
+        await vidPromise;
+      } else if (result.isGlancing) {
+        // Glancing Hit / Near-miss (1-second delayed damage & popup)
+        const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
+
+        await new Promise(r => setTimeout(r, 1000));
+
+        triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
+        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+        updateHUD();
+        triggerFloatingNumber(defKey2, result.finalDmg, false);
+
+        await vidPromise;
       } else {
-        if (result.isGlancing) {
-          triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
-          defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
-          updateHUD();
-          triggerFloatingNumber(defKey2, result.finalDmg, false);
-        } else {
-          const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+        // Clean Hit Landed
+        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+        const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
-          await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 1000));
 
-          defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
-          updateHUD();
-          triggerFloatingNumber(defKey2, result.finalDmg, false);
-          applyFaintBuildUp(defender2, defKey2);
+        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+        updateHUD();
+        triggerFloatingNumber(defKey2, result.finalDmg, false);
+        applyFaintBuildUp(defender2, defKey2);
 
-          await vidPromise;
-        }
+        await vidPromise;
       }
     }
 
@@ -739,4 +764,3 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, finalDmg: finalDmg };
 }
- 
