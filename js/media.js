@@ -27,7 +27,7 @@ async function preloadRiderVideos(riderId, riderMoves = {}) {
 
   const baseVideoFiles = [
     'idle.mp4', 'mid-air.mp4', 'faint.mp4', 'ko.mp4', 'victory.mp4', 'victory2.mp4',
-    'hit.mp4', 'hit_physical.mp4', 'guard.mp4'
+    'hit.mp4', 'hit_physical.mp4', 'guard.mp4', 'windmill_guard.mp4'
   ];
 
   const moveVideos = Object.values(riderMoves || {})
@@ -101,9 +101,10 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     if (centerVid.dataset.currentFile !== videoUrl) {
       centerVid.dataset.currentFile = videoUrl;
       centerVid.src = videoUrl;
+    } else {
+      try { centerVid.currentTime = 0; } catch (e) {}
     }
 
-    centerVid.currentTime = 0;
     const playPromise = centerVid.play();
     if (playPromise !== undefined) {
       playPromise.catch(() => {
