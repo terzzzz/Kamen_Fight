@@ -1,9 +1,9 @@
 // SAFE GLOBAL DECLARATIONS
 var CHARGE_TIMES = CHARGE_TIMES || {
-  'A': 800,   // Defense
-  'D': 1300,  // Offense
-  'W': 2000,  // Air/Buffs
-  'S': 2600   // Energy/Specials
+  'A': 1280,  // Defense (800 * 8/5)
+  'D': 2080,  // Offense (1300 * 8/5)
+  'W': 3200,  // Air/Buffs (2000 * 8/5)
+  'S': 4160   // Energy/Specials (2600 * 8/5)
 };
 
 var DO_NOTHING_MOVE = DO_NOTHING_MOVE || {
@@ -26,7 +26,7 @@ var FALLBACK_ICHIGO_MOVES = {
   "W+J": { name: "Typhoon Charge", type: "UTILITY", chiCost: 3, baseDamage: 0, hitChance: 100, video: "charge_up.mp4", buff: { id: "charge_speed", label: "CHARGE SPEED +25%", type: "speed", duration: 3 } },
   "W+K": { name: "Typhoon Focus", type: "UTILITY", chiCost: 2, baseDamage: 0, hitChance: 100, video: "charge_up.mp4", buff: { id: "focus", label: "S-ATK +20%", type: "attack", duration: 2 } },
   "D+J": { name: "Standard Punch", type: "PHYSICAL", chiCost: 0, baseDamage: 60, hitChance: 75, video: "punch.mp4" },
-  "D+K": { name: "Standard Kick", type: "PHYSICAL", chiCost: 0, baseDamage: 70, hitChance: 78, video: "kick.mp4" },
+  "D+K": { name: "Standard Kick", type: "PHYSICAL", chiCost: 0, baseDamage: 78, hitChance: 78, video: "kick.mp4" },
   "D+L": { name: "Combo Punch", type: "PHYSICAL", chiCost: 1, baseDamage: 120, hitChance: 72, video: "combo_punch.mp4" },
   "D+I": { name: "Combo Kick", type: "PHYSICAL", chiCost: 1, baseDamage: 110, hitChance: 75, video: "combo_kick.mp4", unmirrored: true },
   "S+J": { name: "Rider Power Chop", type: "SPECIAL", chiCost: 3, baseDamage: 200, hitChance: 70, video: "power_chop.mp4" },
@@ -42,7 +42,7 @@ var FALLBACK_ICHIGO_MOVES = {
 let gameState = {
   roundCounter: 1,
   roundPhase: 'IDLE',
-  turnTimerSeconds: 5,
+  turnTimerSeconds: 8,
   timerInterval: null,
   p1Moves: {},
   p2Moves: {},
@@ -56,6 +56,7 @@ let gameState = {
   p2IsConfirmed: false,
   p2ActiveChargePercent: 100,
   input: {
+    acceptingInputs: false,
     heldDirection: null,
     chargeStartTime: 0,
     currentPercent: 0,
@@ -75,6 +76,11 @@ function getMoveForPlayer(playerKey, moveKey) {
 function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
+
+  // Grace period to ignore residual inputs from prior round
+  setTimeout(() => {
+    if (gameState.input) gameState.input.acceptingInputs = true;
+  }, 400);
 
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
@@ -128,18 +134,18 @@ function startRoundCountdown() {
   }, 1200);
 
   clearInterval(gameState.timerInterval);
-  gameState.turnTimerSeconds = 5;
+  gameState.turnTimerSeconds = 8;
 
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Schedule CPU decisions AFTER countdown banner disappears (1.8s - 3.8s)
+  // Schedule CPU decision during countdown
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (player && player.isCPU && !player.isFainted) {
       if (slot === 'p2' && gameState.p2AlwaysIdle) return;
 
-      const thinkTime = Math.floor(Math.random() * 2000 + 1800);
+      const thinkTime = Math.floor(Math.random() * 2000 + 3000);
       setTimeout(() => {
         if (gameState.roundPhase !== 'INPUT') return;
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
@@ -152,6 +158,7 @@ function startRoundCountdown() {
     }
   });
 
+  // COUNTDOWN STRICTLY RUNS FOR FULL 8 SECONDS
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
 
@@ -161,16 +168,22 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
+      // Auto-commit P1 if timer expires without explicit confirmation
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
           gameState.p1.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p1');
         } else {
-          confirmPlayerAction('DO_NOTHING', 'p1');
+          if (gameState.input.heldDirection) {
+            confirmPlayerAction(`${gameState.input.heldDirection}+J`, 'p1');
+          } else {
+            confirmPlayerAction('DO_NOTHING', 'p1');
+          }
         }
       }
 
+      // Auto-commit P2 if timer expires without explicit confirmation
       if (!gameState.p2IsConfirmed) {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
           const mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
@@ -187,17 +200,8 @@ function startRoundCountdown() {
 }
 
 function checkBothPlayersLocked() {
-  const p1Ready = gameState.input.isConfirmed || gameState.p1.isFainted;
-  const p2Ready = gameState.p2IsConfirmed || gameState.p2.isFainted || gameState.p2AlwaysIdle;
-
-  if (p1Ready && p2Ready && gameState.roundPhase === 'INPUT') {
-    clearInterval(gameState.timerInterval);
-    setTimeout(() => {
-      if (gameState.roundPhase === 'INPUT') {
-        executeTurnResolutionPhase();
-      }
-    }, 400);
-  }
+  // Visual state check only; timer handles turn execution when it reaches 0s.
+  return;
 }
 
 function returnToCharSelect() {
@@ -261,7 +265,7 @@ function bindKeyboardInputs() {
       return;
     }
 
-    if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
+    if (gameState.roundPhase !== 'INPUT' || !gameState.input.acceptingInputs || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
     // AUTO-CHARGING DIRECTION LOGIC
     if (['A', 'D', 'W', 'S'].includes(key)) {
@@ -462,6 +466,7 @@ function simulateCPUButtonPress(moveKey) {
 
 function resetTurnInputState() {
   resetCharge();
+  gameState.input.acceptingInputs = false;
   gameState.input.isConfirmed = false;
   gameState.input.selectedMoveKey = null;
   gameState.input.lockInTime = 0;
