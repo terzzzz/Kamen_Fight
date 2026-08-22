@@ -77,7 +77,7 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // Grace period to ignore residual inputs from prior round
+  // 400ms Grace Period: ignores residual inputs from prior round
   setTimeout(() => {
     if (gameState.input) gameState.input.acceptingInputs = true;
   }, 400);
@@ -168,22 +168,17 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      // Auto-commit P1 if timer expires without explicit confirmation
+      // Timeout Penalty: If human fails to confirm in 8s, force DO_NOTHING
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
           gameState.p1.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p1');
         } else {
-          if (gameState.input.heldDirection) {
-            confirmPlayerAction(`${gameState.input.heldDirection}+J`, 'p1');
-          } else {
-            confirmPlayerAction('DO_NOTHING', 'p1');
-          }
+          confirmPlayerAction('DO_NOTHING', 'p1');
         }
       }
 
-      // Auto-commit P2 if timer expires without explicit confirmation
       if (!gameState.p2IsConfirmed) {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
           const mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
@@ -200,7 +195,6 @@ function startRoundCountdown() {
 }
 
 function checkBothPlayersLocked() {
-  // Visual state check only; timer handles turn execution when it reaches 0s.
   return;
 }
 
