@@ -739,3 +739,4 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, finalDmg: finalDmg };
 }
+ 
