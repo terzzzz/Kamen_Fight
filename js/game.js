@@ -350,6 +350,28 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
   const player = gameState[playerKey];
   if (!player) return;
 
+  // CHECK OPPONENT LOCK-IN STATUS BEFORE ALLOWING GUARD
+  const isOpponentLocked = playerKey === 'p1' 
+    ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
+    : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
+
+  if (moveKey.startsWith('A+')) {
+    if (!isOpponentLocked) {
+      triggerFloatingText(playerKey, 'NO GUARD UNTIL OPPONENT ACTS!', 'scratch');
+
+      const statusEl = playerKey === 'p1' 
+        ? (document.getElementById('charge-status-display') || document.getElementById('charge-status'))
+        : document.getElementById('p2-charge-status-display');
+
+      if (statusEl) {
+        statusEl.textContent = 'CANNOT GUARD UNTIL OPPONENT SELECTS AN ACTION!';
+        statusEl.style.color = '#ff0055';
+      }
+      resetCharge();
+      return;
+    }
+  }
+
   if (moveKey !== 'DO_NOTHING') {
     const move = getMoveForPlayer(playerKey, moveKey);
     const chiCost = move.chiCost || 0;
@@ -374,7 +396,6 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.input.selectedMoveKey = moveKey;
     gameState.input.lockInTime = gameState.turnTimerSeconds;
     
-    // BIND EXACT LIVE CHARGE PERCENTAGE
     const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : Math.max(10, gameState.input.currentPercent || 10);
     gameState.p1.activeChargePercent = lockedPercent;
     clearInterval(gameState.input.chargeInterval);
