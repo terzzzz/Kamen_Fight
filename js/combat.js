@@ -109,7 +109,7 @@ async function startBattle(matchConfig) {
   }
 }
 
-// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & DIFFICULTY
+// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & OPPONENT LOCK STATUS
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
@@ -118,24 +118,39 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     movesData = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
+  // CHECK IF OPPONENT IS LOCKED IN BEFORE CONSIDERING GUARD MOVES
+  const isOpponentLocked = playerKey === 'p1'
+    ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
+    : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
+
+  let availableMoves = { ...movesData };
+  if (!isOpponentLocked) {
+    Object.keys(availableMoves).forEach(key => {
+      const m = availableMoves[key];
+      if (key.startsWith('A+') || (m && m.type === 'DEFENSE')) {
+        delete availableMoves[key];
+      }
+    });
+  }
+
   const difficulty = playerKey === 'p1' 
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
   let chosenKey = null;
   if (typeof selectCPUMove === 'function') {
-    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty);
+    chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
 
-  if (chosenKey && movesData[chosenKey] && typeof movesData[chosenKey] === 'object') {
-    const moveCost = movesData[chosenKey].chiCost || 0;
+  if (chosenKey && availableMoves[chosenKey] && typeof availableMoves[chosenKey] === 'object') {
+    const moveCost = availableMoves[chosenKey].chiCost || 0;
     if (moveCost <= cpuPlayer.chi) {
       return chosenKey;
     }
   }
 
-  const affordableKeys = Object.keys(movesData).filter(key => {
-    const move = movesData[key];
+  const affordableKeys = Object.keys(availableMoves).filter(key => {
+    const move = availableMoves[key];
     return move && typeof move === 'object' && (move.chiCost || 0) <= cpuPlayer.chi;
   });
 
@@ -293,6 +308,20 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
+function applyFaintBuildUp(player, playerKey) {
+  if (!player.isFainted) {
+    player.tookCleanHitThisRound = true;
+    player.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, player.faintMeter + FAINT_CFG.HIT_BUILDUP);
+    
+    if (player.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
+      player.isFainted = true;
+      const stunOverlay = document.getElementById(`${playerKey}-stun-overlay`);
+      if (stunOverlay) stunOverlay.hidden = false;
+      triggerFloatingText(playerKey, 'STUNNED!!', 'scratch');
+    }
+  }
+}
+
 // MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
@@ -323,6 +352,7 @@ async function executeTurnResolutionPhase() {
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
+  // Process Instant Utility Effects
   if (p1Move && p1Move.faintRecovery) {
     gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
     triggerFloatingText('p1', `FAINT -${p1Move.faintRecovery}`, 'heal');
@@ -346,29 +376,31 @@ async function executeTurnResolutionPhase() {
   let p2IsIdle = p2MoveKey === 'DO_NOTHING';
   let p1GoesFirst = false;
 
-  let p1IsDefensive = p1Move.type === 'DEFENSE';
-  let p2IsDefensive = p2Move.type === 'DEFENSE';
-
   let p1IsS = p1MoveKey.startsWith('S');
   let p2IsS = p2MoveKey.startsWith('S');
   let p1IsD = p1MoveKey.startsWith('D');
   let p2IsD = p2MoveKey.startsWith('D');
 
-  // TURN PRIORITY ENGINE
-  if (p1IsDefensive && !p2IsDefensive) {
-    p1GoesFirst = true; // Defense ALWAYS executes first
-  } else if (!p1IsDefensive && p2IsDefensive) {
-    p1GoesFirst = false; // Defense ALWAYS executes first
-  } else if (!p1IsIdle && p2IsIdle) {
+  if (!p1IsIdle && p2IsIdle) {
     p1GoesFirst = true;
   } else if (p1IsIdle && !p2IsIdle) {
     p1GoesFirst = false;
-  } else if (p1IsS && p2IsD) {
-    p1GoesFirst = true; // Special beats Physical
+  } 
+  else if (p1IsS && p2IsD) {
+    p1GoesFirst = true;
   } else if (p1IsD && p2IsS) {
-    p1GoesFirst = false; // Special beats Physical
+    p1GoesFirst = false;
   } else {
-    p1GoesFirst = p1Time >= p2Time;
+    let p1IsDefensive = p1Move.type === 'DEFENSE';
+    let p2IsDefensive = p2Move.type === 'DEFENSE';
+
+    if (p1IsDefensive && !p2IsDefensive) {
+      p1GoesFirst = false;
+    } else if (!p1IsDefensive && p2IsDefensive) {
+      p1GoesFirst = true;
+    } else {
+      p1GoesFirst = p1Time >= p2Time;
+    }
   }
 
   let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
@@ -386,8 +418,6 @@ async function executeTurnResolutionPhase() {
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
   // STEP 1 EXECUTION
-  let attack1Result = { hitLanded: false, isGlancing: false };
-
   if (move1.type !== 'IDLE' && key1 !== 'DO_NOTHING') {
     if (move1.buff) applyBuff(attacker1, move1.buff.id, move1.buff.label, move1.buff.type, move1.buff.duration);
     handleAirborneState(attacker1, key1, move1);
@@ -395,27 +425,57 @@ async function executeTurnResolutionPhase() {
     attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
     updateHUD();
 
-    if (move1.type === 'DEFENSE' && (move2.type === 'IDLE' || move2.type === 'BUFF' || move2.type === 'UTILITY')) {
+    if (move1.type === 'DEFENSE') {
       await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000, move1);
     } else {
       await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
-      attack1Result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
+
+      let result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
+
+      if (!result.hitLanded) {
+        triggerFloatingText(defKey1, 'MISS!!', 'miss');
+      } else if (move2.type === 'DEFENSE') {
+        if (result.guardSuccess) {
+          await playCenterVideo(defKey1, move2.video || 'guard.mp4', 'BLOCKED!', 1000, move2);
+          if (result.finalDmg === 0) {
+            triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
+          } else {
+            triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
+            triggerFloatingNumber(defKey1, result.finalDmg, false);
+          }
+          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+        } else {
+          triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
+          const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+          await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+          triggerFloatingNumber(defKey1, result.finalDmg, false);
+          applyFaintBuildUp(defender1, defKey1);
+        }
+      } else {
+        if (result.isGlancing) {
+          triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
+          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+          triggerFloatingNumber(defKey1, result.finalDmg, false);
+        } else {
+          const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+          await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+          defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
+          triggerFloatingNumber(defKey1, result.finalDmg, false);
+          applyFaintBuildUp(defender1, defKey1);
+        }
+      }
     }
 
-    if (attack1Result.hitLanded && key1.startsWith('D')) {
+    if (key1.startsWith('D')) {
       const chiGain = (key1 === 'D+J' || key1 === 'D+K') ? 2 : 3;
       attacker1.chi = Math.min(16, attacker1.chi + chiGain);
     }
     updateHUD();
-
-    if (attack1Result.hitLanded && !attack1Result.isGlancing && (move1.type === 'MELEE' || move1.type === 'PROJECTILE' || move1.type === 'SPECIAL' || move1.type === 'PHYSICAL')) {
-      const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-      await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
-    }
   }
 
-  // STEP 2 EXECUTION (Cancelled immediately if defender2 was KO'd or Stunned in Step 1)
-  if (defender2.lp > 0 && !defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
+  // STEP 2 EXECUTION (Excludes Guard moves that were already processed during Step 1)
+  if (defender2.lp > 0 && !defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
 
@@ -423,19 +483,48 @@ async function executeTurnResolutionPhase() {
     updateHUD();
 
     await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
-    let attack2Result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
+    let result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
-    if (attack2Result.hitLanded && key2.startsWith('D')) {
+    if (!result.hitLanded) {
+      triggerFloatingText(defKey2, 'MISS!!', 'miss');
+    } else if (move1.type === 'DEFENSE') {
+      if (result.guardSuccess) {
+        await playCenterVideo(defKey2, move1.video || 'guard.mp4', 'BLOCKED!', 1000, move1);
+        if (result.finalDmg === 0) {
+          triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
+        } else {
+          triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
+          triggerFloatingNumber(defKey2, result.finalDmg, false);
+        }
+        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+      } else {
+        triggerFloatingText(defKey2, 'FAILED TO GUARD!', 'scratch');
+        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+        triggerFloatingNumber(defKey2, result.finalDmg, false);
+        applyFaintBuildUp(defender2, defKey2);
+      }
+    } else {
+      if (result.isGlancing) {
+        triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
+        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+        triggerFloatingNumber(defKey2, result.finalDmg, false);
+      } else {
+        const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
+        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+        defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
+        triggerFloatingNumber(defKey2, result.finalDmg, false);
+        applyFaintBuildUp(defender2, defKey2);
+      }
+    }
+
+    if (key2.startsWith('D')) {
       const chiGain = (key2 === 'D+J' || key2 === 'D+K') ? 2 : 3;
       attacker2.chi = Math.min(16, attacker2.chi + chiGain);
     }
     updateHUD();
-
-    if (attack2Result.hitLanded && !attack2Result.isGlancing && (move2.type === 'MELEE' || move2.type === 'PROJECTILE' || move2.type === 'SPECIAL' || move2.type === 'PHYSICAL')) {
-      const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-      await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
-    }
-  } else if (defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING') {
+  } else if (defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
@@ -505,47 +594,58 @@ async function executeTurnResolutionPhase() {
 
 // ATTACK RESOLUTION ENGINE
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
-  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') return { hitLanded: false, isGlancing: false };
+  if (atkMove.type !== 'MELEE' && atkMove.type !== 'PROJECTILE' && atkMove.type !== 'SPECIAL' && atkMove.type !== 'FINISHER' && atkMove.type !== 'PHYSICAL') {
+    return { hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
+  }
 
   const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
   const defChargeRatio = Math.max(0.5, (defender.activeChargePercent || 100) / 100);
 
-  // 1. HIT & EVASION CALCULATION
-  let baseHitChance = atkMove.hitChance || 80;
-  let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
-  let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
+  let isGuarding = defMove.type === 'DEFENSE';
+  let guardSuccess = false;
+  let damageRatio = 1.0;
 
+  // 1. GUARD EVALUATION
+  if (isGuarding) {
+    const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
+
+    if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
+      let effectiveCounterChance = 70 * defChargeRatio;
+      if (!atkMove.unblockable && Math.random() * 100 < effectiveCounterChance) {
+        guardSuccess = true;
+        damageRatio = 0.0;
+      }
+    } else if (defMoveKey === `A+${atkButton}` || defMove.name.includes('Guard')) {
+      guardSuccess = true;
+      let effectiveHighBlockChance = 20 * defChargeRatio;
+      let rolledHighBlock = Math.random() * 100 < effectiveHighBlockChance;
+      damageRatio = rolledHighBlock ? 0.20 : 0.70;
+    }
+  }
+
+  // 2. HIT & EVASION CALCULATION
   let rolledHit = false;
-  if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
+  let isGlancing = false;
+
+  if (isGuarding) {
+    rolledHit = true;
+  } else if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
     rolledHit = true;
   } else {
+    let baseHitChance = atkMove.hitChance || 80;
+    let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
+    let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
+
     let effectiveHitChance = Math.max(10, ((baseHitChance + attackerHitBonus) * atkChargeRatio) - defenderEvasionBonus);
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
   if (!rolledHit) {
-    triggerFloatingText(defenderKey, 'MISS!!', 'miss');
-    return { hitLanded: false, isGlancing: false };
+    return { hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
   }
 
-  let isGlancing = Math.random() * 100 < 15; 
-
-  // 2. DEFENSE & GUARD RATIOS
-  let damageRatio = 1.0;
-  if (defMove.type === 'DEFENSE') {
-    const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
-    if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
-      let effectiveCounterChance = 70 * defChargeRatio;
-      if (atkMove.unblockable) {
-        damageRatio = 1.0;
-      } else if (Math.random() * 100 < effectiveCounterChance) {
-        damageRatio = 0.0;
-      }
-    } else if (defMoveKey === `A+${atkButton}` || defMove.name.includes('Guard')) {
-      let effectiveHighBlockChance = 20 * defChargeRatio;
-      let rolledHighBlock = Math.random() * 100 < effectiveHighBlockChance;
-      damageRatio = rolledHighBlock ? 0.20 : 0.70;
-    }
+  if (!isGuarding) {
+    isGlancing = Math.random() * 100 < 15;
   }
 
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
@@ -572,33 +672,5 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
 
-  if (isGlancing) {
-    triggerFloatingText(defenderKey, 'Near-miss!!', 'scratch');
-  }
-
-  if (finalDmg > 0) {
-    defender.lp = Math.max(0, defender.lp - finalDmg);
-
-    if (isGlancing) {
-      setTimeout(() => triggerFloatingNumber(defenderKey, finalDmg, false), 250);
-    } else {
-      triggerFloatingNumber(defenderKey, finalDmg, false);
-    }
-
-    if (!isGlancing && !defender.isFainted) {
-      defender.tookCleanHitThisRound = true;
-      defender.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, defender.faintMeter + FAINT_CFG.HIT_BUILDUP);
-      
-      if (defender.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
-        defender.isFainted = true;
-        
-        const stunOverlay = document.getElementById(`${defenderKey}-stun-overlay`);
-        if (stunOverlay) stunOverlay.hidden = false;
-
-        triggerFloatingText(defenderKey, 'STUNNED!!', 'scratch');
-      }
-    }
-  }
-
-  return { hitLanded: finalDmg > 0, isGlancing: isGlancing };
+  return { hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, finalDmg: finalDmg };
 }
