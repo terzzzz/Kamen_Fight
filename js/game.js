@@ -145,8 +145,9 @@ function startRoundCountdown() {
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
         player.activeChargePercent = Math.floor(Math.random() * 26 + 75);
-        confirmPlayerAction(moveKey, slot);
-        simulateCPUButtonPress(moveKey);
+        if (confirmPlayerAction(moveKey, slot)) {
+          simulateCPUButtonPress(moveKey);
+        }
       }, thinkTime);
     }
   });
@@ -228,12 +229,15 @@ function returnToCharSelect() {
 
 function bindKeyboardInputs() {
   const handleContinue = () => {
+    if (typeof unlockMobileVideos === 'function') unlockMobileVideos();
     if (gameState.roundPhase === 'GAME_OVER' && gameState.canContinueFromGameOver) {
       returnToCharSelect();
     }
   };
 
   window.addEventListener('keydown', (e) => {
+    if (typeof unlockMobileVideos === 'function') unlockMobileVideos();
+
     if (gameState.roundPhase === 'GAME_OVER') {
       handleContinue();
       return;
@@ -347,15 +351,20 @@ function resetCharge() {
 }
 
 function confirmPlayerAction(moveKey, playerKey = 'p1') {
+  if (typeof unlockMobileVideos === 'function') unlockMobileVideos();
+
   const player = gameState[playerKey];
-  if (!player) return;
+  if (!player) return false;
 
   // CHECK OPPONENT LOCK-IN STATUS BEFORE ALLOWING GUARD
   const isOpponentLocked = playerKey === 'p1' 
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
     : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
 
-  if (moveKey.startsWith('A+')) {
+  const move = getMoveForPlayer(playerKey, moveKey);
+  const isGuardMove = moveKey.startsWith('A+') || (move && move.type === 'DEFENSE');
+
+  if (isGuardMove) {
     if (!isOpponentLocked) {
       triggerFloatingText(playerKey, 'NO GUARD UNTIL OPPONENT ACTS!', 'scratch');
 
@@ -367,13 +376,12 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
         statusEl.textContent = 'CANNOT GUARD UNTIL OPPONENT SELECTS AN ACTION!';
         statusEl.style.color = '#ff0055';
       }
-      resetCharge();
-      return;
+      if (playerKey === 'p1') resetCharge();
+      return false;
     }
   }
 
   if (moveKey !== 'DO_NOTHING') {
-    const move = getMoveForPlayer(playerKey, moveKey);
     const chiCost = move.chiCost || 0;
 
     if (player.chi < chiCost) {
@@ -387,7 +395,7 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
         statusEl.textContent = `NOT ENOUGH CHI FOR ${move.name.toUpperCase()}! (NEEDS ${chiCost} CHI)`;
         statusEl.style.color = '#ff0055';
       }
-      return;
+      return false;
     }
   }
 
@@ -421,6 +429,7 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
   }
 
   checkBothPlayersLocked();
+  return true;
 }
 
 function bindCommandButtons() {
@@ -430,6 +439,7 @@ function bindCommandButtons() {
 
     const handlePressDown = (e) => {
       e.preventDefault();
+      if (typeof unlockMobileVideos === 'function') unlockMobileVideos();
       window.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
     };
 
@@ -492,6 +502,9 @@ window.addEventListener('DOMContentLoaded', () => {
   bindKeyboardInputs();
   bindCommandButtons();
   autoScaleGameWindow();
+
+  document.addEventListener('touchstart', unlockMobileVideos, { once: true });
+  document.addEventListener('click', unlockMobileVideos, { once: true });
 
   if (typeof preloadRiderVideos === 'function') {
     preloadRiderVideos('ichigo');
