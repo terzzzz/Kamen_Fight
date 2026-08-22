@@ -239,7 +239,7 @@ function bindKeyboardInputs() {
       return;
     }
 
-    const key = e.key.toUpperCase();
+    const key = e.key ? e.key.toUpperCase() : '';
 
     if (e.key === '0') {
       gameState.p2AlwaysIdle = !gameState.p2AlwaysIdle;
@@ -257,38 +257,50 @@ function bindKeyboardInputs() {
       return;
     }
 
-    const keyEl = document.getElementById(`key-${key}`);
-    if (keyEl) keyEl.classList.add('active');
-
     if (gameState.roundPhase !== 'INPUT' || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
+    // AUTO-CHARGING DIRECTION LOGIC
     if (['A', 'D', 'W', 'S'].includes(key)) {
-      if (gameState.input.heldDirection !== key) {
-        resetCharge();
-        gameState.input.heldDirection = key;
-        gameState.input.chargeStartTime = Date.now();
-        gameState.input.chargeInterval = setInterval(updateChargeProgress, 30);
-      }
+      // Clear previous charge interval
+      clearInterval(gameState.input.chargeInterval);
+
+      // Reset active button highlights on D-pad
+      ['W', 'A', 'S', 'D'].forEach(dir => {
+        const keyEl = document.getElementById(`key-${dir}`);
+        if (keyEl) keyEl.classList.remove('active');
+      });
+
+      // Set/restart direction and start charging from 0%
+      gameState.input.heldDirection = key;
+      gameState.input.chargeStartTime = Date.now();
+      gameState.input.currentPercent = 0;
+      gameState.input.chargeInterval = setInterval(updateChargeProgress, 30);
+
+      // Keep current direction button visually highlighted while charging
+      const keyEl = document.getElementById(`key-${key}`);
+      if (keyEl) keyEl.classList.add('active');
     }
 
+    // ACTION BUTTON SELECTION
     if (['J', 'K', 'L', 'I'].includes(key)) {
-      if (!gameState.input.heldDirection) return;
+      if (!gameState.input.heldDirection) {
+        triggerFloatingText('p1', 'TAP DIRECTION FIRST!', 'scratch');
+        return;
+      }
+
+      // Visual flash for action button
+      const actKeyEl = document.getElementById(`key-${key}`);
+      if (actKeyEl) {
+        actKeyEl.classList.add('active');
+        setTimeout(() => actKeyEl.classList.remove('active'), 200);
+      }
+
       confirmPlayerAction(`${gameState.input.heldDirection}+${key}`, 'p1');
     }
   });
 
   window.addEventListener('click', handleContinue);
-
-  window.addEventListener('keyup', (e) => {
-    const key = e.key.toUpperCase();
-
-    const keyEl = document.getElementById(`key-${key}`);
-    if (keyEl) keyEl.classList.remove('active');
-
-    if (key === gameState.input.heldDirection && !gameState.input.isConfirmed) {
-      resetCharge();
-    }
-  });
+  window.addEventListener('touchstart', handleContinue, { passive: true });
 }
 
 function updateChargeProgress() {
@@ -311,7 +323,7 @@ function updateChargeProgress() {
 
   const statusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
   if (statusEl) {
-    statusEl.textContent = `CHARGING [${gameState.input.heldDirection}]: ${gameState.input.currentPercent}%`;
+    statusEl.textContent = `CHARGING [${gameState.input.heldDirection}]: ${gameState.input.currentPercent}% (TAP ACTION TO LOCK)`;
     statusEl.style.color = gameState.input.currentPercent >= 100 ? '#00ffcc' : '#ffcc00';
   }
 }
@@ -321,6 +333,11 @@ function resetCharge() {
   gameState.input.heldDirection = null;
   gameState.input.currentPercent = 0;
 
+  ['W', 'A', 'S', 'D'].forEach(dir => {
+    const keyEl = document.getElementById(`key-${dir}`);
+    if (keyEl) keyEl.classList.remove('active');
+  });
+
   const fillEl = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill') || document.querySelector('.charge-fill');
   if (fillEl) {
     fillEl.style.width = '0%';
@@ -329,7 +346,7 @@ function resetCharge() {
 
   const statusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
   if (statusEl) {
-    statusEl.textContent = 'HOLD DIRECTION TO CHARGE';
+    statusEl.textContent = 'TAP DIRECTION TO START CHARGE';
     statusEl.style.color = '#00ffcc';
   }
 }
@@ -392,20 +409,11 @@ function bindCommandButtons() {
 
     const handlePressDown = (e) => {
       e.preventDefault();
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: key }));
-    };
-
-    const handlePressUp = (e) => {
-      e.preventDefault();
-      window.dispatchEvent(new KeyboardEvent('keyup', { key: key }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
     };
 
     btn.onmousedown = handlePressDown;
-    btn.onmouseup = handlePressUp;
-
     btn.addEventListener('touchstart', handlePressDown, { passive: false });
-    btn.addEventListener('touchend', handlePressUp, { passive: false });
-    btn.addEventListener('touchcancel', handlePressUp, { passive: false });
   });
 }
 
@@ -437,8 +445,11 @@ function resetTurnInputState() {
   if (flag2El) flag2El.hidden = true;
 }
 
-// Background Preloading on Launch
+// INITIALIZE CONTROLS & PRELOAD ASSETS ON LAUNCH
 window.addEventListener('DOMContentLoaded', () => {
+  bindKeyboardInputs();
+  bindCommandButtons();
+
   if (typeof preloadRiderVideos === 'function') {
     preloadRiderVideos('ichigo');
     preloadRiderVideos('nigo');
