@@ -650,3 +650,54 @@ body {
     z-index: 10;
   }
 }
+
+/* ENLARGED & BOLD ARCADE WORD ART HUD LABELS */
+.stat-label {
+  font-family: 'Impact', 'Trebuchet MS', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #ffea00;
+  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 8px rgba(255, 234, 0, 0.6);
+  letter-spacing: 1px;
+}
+
+.stat-value-styled {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 1.35rem;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 10px rgba(255, 255, 255, 0.8);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.stat-value-large {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #00ffff;
+  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 12px rgba(0, 255, 255, 0.9);
+}
+
+/* 1-SECOND LP FLASH ANIMATIONS */
+.lp-flash-damage {
+  color: #ff1144 !important;
+  text-shadow: 2px 2px 0px #000, 0px 0px 14px #ff0044, 0px 0px 25px #ff0000 !important;
+}
+
+.lp-flash-heal {
+  color: #00ff66 !important;
+  text-shadow: 2px 2px 0px #000, 0px 0px 14px #00ff66, 0px 0px 25px #00ff00 !important;
+}
+
+/* ANTI-OVERLAP SPATIAL OFFSET POSITIONS FOR POPUPS */
+.damage-popup.popup-text {
+  top: 22% !important; /* Positions status text (MISS, DODGED, EVADED) above numbers */
+  font-size: 1.4rem;
+  z-index: 105;
+}
+
+.damage-popup.popup-number {
+  top: 48% !important; /* Positions damage/heal numbers below status text */
+  font-size: 1.8rem;
+  z-index: 106;
+}
