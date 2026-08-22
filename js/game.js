@@ -373,19 +373,24 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.input.isConfirmed = true;
     gameState.input.selectedMoveKey = moveKey;
     gameState.input.lockInTime = gameState.turnTimerSeconds;
-    gameState.p1.activeChargePercent = Math.max(10, gameState.p1.activeChargePercent || gameState.input.currentPercent || 100);
+    
+    // BIND EXACT LIVE CHARGE PERCENTAGE
+    const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : Math.max(10, gameState.input.currentPercent || 10);
+    gameState.p1.activeChargePercent = lockedPercent;
     clearInterval(gameState.input.chargeInterval);
 
     const flagEl = document.getElementById('p1-action-flag');
     if (flagEl) {
       flagEl.hidden = false;
-      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p1.activeChargePercent}%!`;
+      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${lockedPercent}%!`;
     }
   } else if (playerKey === 'p2') {
     gameState.p2IsConfirmed = true;
     gameState.p2SelectedMoveKey = moveKey;
     gameState.p2LockInTime = gameState.turnTimerSeconds;
-    gameState.p2.activeChargePercent = Math.max(10, gameState.p2.activeChargePercent || 100);
+    if (!gameState.p2.activeChargePercent) {
+      gameState.p2.activeChargePercent = 100;
+    }
 
     const flagEl = document.getElementById('p2-action-flag');
     if (flagEl) {
