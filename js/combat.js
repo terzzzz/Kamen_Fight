@@ -72,7 +72,6 @@ async function startBattle(matchConfig) {
 
     gameState.roundCounter = 1;
 
-    // 1. SHOW TRANSITION SPLASH SCREEN (REMOVING HIDDEN ATTRIBUTE)
     if (splashNames) splashNames.textContent = `${gameState.p1.name.toUpperCase()} VS ${gameState.p2.name.toUpperCase()}`;
     if (splashRound) splashRound.textContent = "PRELOADING ASSETS...";
     if (transitionScreen) transitionScreen.hidden = false;
@@ -94,7 +93,6 @@ async function startBattle(matchConfig) {
   } catch (err) {
     console.error("Match error:", err);
   } finally {
-    // 2. HIDE SPLASH SCREEN & UNHIDE BATTLE SCREEN SAFELY
     if (transitionScreen) transitionScreen.hidden = true;
     if (battleScreen) battleScreen.hidden = false;
 
@@ -325,7 +323,6 @@ async function executeTurnResolutionPhase() {
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
-  // Process Instant Utility Effects
   if (p1Move && p1Move.faintRecovery) {
     gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
     triggerFloatingText('p1', `FAINT -${p1Move.faintRecovery}`, 'heal');
@@ -349,31 +346,29 @@ async function executeTurnResolutionPhase() {
   let p2IsIdle = p2MoveKey === 'DO_NOTHING';
   let p1GoesFirst = false;
 
+  let p1IsDefensive = p1Move.type === 'DEFENSE';
+  let p2IsDefensive = p2Move.type === 'DEFENSE';
+
   let p1IsS = p1MoveKey.startsWith('S');
   let p2IsS = p2MoveKey.startsWith('S');
   let p1IsD = p1MoveKey.startsWith('D');
   let p2IsD = p2MoveKey.startsWith('D');
 
-  if (!p1IsIdle && p2IsIdle) {
+  // TURN PRIORITY ENGINE
+  if (p1IsDefensive && !p2IsDefensive) {
+    p1GoesFirst = true; // Defense ALWAYS executes first
+  } else if (!p1IsDefensive && p2IsDefensive) {
+    p1GoesFirst = false; // Defense ALWAYS executes first
+  } else if (!p1IsIdle && p2IsIdle) {
     p1GoesFirst = true;
   } else if (p1IsIdle && !p2IsIdle) {
     p1GoesFirst = false;
-  } 
-  else if (p1IsS && p2IsD) {
-    p1GoesFirst = true;
+  } else if (p1IsS && p2IsD) {
+    p1GoesFirst = true; // Special beats Physical
   } else if (p1IsD && p2IsS) {
-    p1GoesFirst = false;
+    p1GoesFirst = false; // Special beats Physical
   } else {
-    let p1IsDefensive = p1Move.type === 'DEFENSE';
-    let p2IsDefensive = p2Move.type === 'DEFENSE';
-
-    if (p1IsDefensive && !p2IsDefensive) {
-      p1GoesFirst = false;
-    } else if (!p1IsDefensive && p2IsDefensive) {
-      p1GoesFirst = true;
-    } else {
-      p1GoesFirst = p1Time >= p2Time;
-    }
+    p1GoesFirst = p1Time >= p2Time;
   }
 
   let attacker1 = p1GoesFirst ? gameState.p1 : gameState.p2;
@@ -594,7 +589,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
       defender.tookCleanHitThisRound = true;
       defender.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, defender.faintMeter + FAINT_CFG.HIT_BUILDUP);
       
-      // INSTANT FAINT & STUN INTERRUPT
       if (defender.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
         defender.isFainted = true;
         
