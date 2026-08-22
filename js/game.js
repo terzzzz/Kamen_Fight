@@ -133,13 +133,13 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Schedule CPU decisions during countdown
+  // Schedule CPU decisions AFTER countdown banner disappears (1.8s - 3.8s)
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (player && player.isCPU && !player.isFainted) {
       if (slot === 'p2' && gameState.p2AlwaysIdle) return;
 
-      const thinkTime = Math.floor(Math.random() * 1200 + 1000);
+      const thinkTime = Math.floor(Math.random() * 2000 + 1800);
       setTimeout(() => {
         if (gameState.roundPhase !== 'INPUT') return;
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
