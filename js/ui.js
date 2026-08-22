@@ -182,7 +182,7 @@ function updateSelectionUI() {
       p1DiffDisplay.textContent = 'N/A';
       p1DiffDisplay.classList.remove('hard');
     } else {
-      p1DiffDisplay.textContent = vsSelectionState.p1Difficulty.toUpperCase() + (vsSelectionState.p1Difficulty === 'hard' ? ' (+30% LP)' : '');
+      p1DiffDisplay.textContent = vsSelectionState.p1Difficulty.toUpperCase();
       p1DiffDisplay.classList.toggle('hard', vsSelectionState.p1Difficulty === 'hard');
     }
   }
@@ -201,7 +201,7 @@ function updateSelectionUI() {
 
   const p2DiffDisplay = document.getElementById('p2-diff-display');
   if (p2DiffDisplay) {
-    p2DiffDisplay.textContent = vsSelectionState.p2Difficulty.toUpperCase() + (vsSelectionState.p2Difficulty === 'hard' ? ' (+30% LP)' : '');
+    p2DiffDisplay.textContent = vsSelectionState.p2Difficulty.toUpperCase();
     p2DiffDisplay.classList.toggle('hard', vsSelectionState.p2Difficulty === 'hard');
   }
 
