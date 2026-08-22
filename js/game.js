@@ -25,14 +25,15 @@ var FALLBACK_ICHIGO_MOVES = {
   "W+I": { name: "Rider High Jump", type: "UTILITY", chiCost: 3, baseDamage: 0, hitChance: 100, video: "jump.mp4", grantsAirborne: 2 },
   "W+J": { name: "Typhoon Charge", type: "UTILITY", chiCost: 3, baseDamage: 0, hitChance: 100, video: "charge_up.mp4", buff: { id: "charge_speed", label: "CHARGE SPEED +25%", type: "speed", duration: 3 } },
   "W+K": { name: "Typhoon Focus", type: "UTILITY", chiCost: 2, baseDamage: 0, hitChance: 100, video: "charge_up.mp4", buff: { id: "focus", label: "S-ATK +20%", type: "attack", duration: 2 } },
-  "D+J": { name: "Standard Punch", type: "PHYSICAL", chiCost: 0, baseDamage: 60, hitChance: 75, video: "punch.mp4" },
-  "D+K": { name: "Standard Kick", type: "PHYSICAL", chiCost: 0, baseDamage: 78, hitChance: 78, video: "kick.mp4" },
-  "D+L": { name: "Combo Punch", type: "PHYSICAL", chiCost: 1, baseDamage: 120, hitChance: 72, video: "combo_punch.mp4" },
-  "D+I": { name: "Combo Kick", type: "PHYSICAL", chiCost: 1, baseDamage: 110, hitChance: 75, video: "combo_kick.mp4", unmirrored: true },
-  "S+J": { name: "Rider Power Chop", type: "SPECIAL", chiCost: 3, baseDamage: 200, hitChance: 70, video: "power_chop.mp4" },
-  "S+K": { name: "Rider Head Crusher", type: "SPECIAL", chiCost: 4, baseDamage: 240, hitChance: 65, video: "head_crusher.mp4" },
-  "S+L": { name: "Rider Kick", type: "SPECIAL", chiCost: 6, baseDamage: 430, hitChance: 60, video: "rider_kick.mp4" },
-  "S+I": { name: "Kirimomi Kick", type: "SPECIAL", chiCost: 10, baseDamage: 550, hitChance: 66, video: "kirimomi_kick.mp4" },
+  "W+L": { name: "Typhoon Emission", type: "UTILITY", chiCost: 1, baseDamage: 0, hitChance: 100, video: "mind.mp4", faintRecovery: 15 },
+  "D+J": { name: "Standard Punch", type: "PHYSICAL", chiCost: 0, baseDamage: 66, hitChance: 85, video: "punch.mp4" },
+  "D+K": { name: "Standard Kick", type: "PHYSICAL", chiCost: 0, baseDamage: 86, hitChance: 88, video: "kick.mp4" },
+  "D+L": { name: "Combo Punch", type: "PHYSICAL", chiCost: 1, baseDamage: 132, hitChance: 82, video: "combo_punch.mp4" },
+  "D+I": { name: "Combo Kick", type: "PHYSICAL", chiCost: 1, baseDamage: 121, hitChance: 85, video: "combo_kick.mp4", unmirrored: true },
+  "S+J": { name: "Rider Power Chop", type: "SPECIAL", chiCost: 3, baseDamage: 200, hitChance: 80, video: "power_chop.mp4" },
+  "S+K": { name: "Rider Head Crusher", type: "SPECIAL", chiCost: 4, baseDamage: 240, hitChance: 75, video: "head_crusher.mp4" },
+  "S+L": { name: "Rider Kick", type: "SPECIAL", chiCost: 6, baseDamage: 430, hitChance: 70, video: "rider_kick.mp4" },
+  "S+I": { name: "Kirimomi Kick", type: "SPECIAL", chiCost: 10, baseDamage: 550, hitChance: 76, video: "kirimomi_kick.mp4" },
   "A+I": { name: "Windmill Guard", type: "DEFENSE", chiCost: 3, baseDamage: 0, hitChance: 100, video: "windmill_guard.mp4", unmirrored: true },
   "A+J": { name: "High Guard", type: "DEFENSE", chiCost: 0, baseDamage: 0, hitChance: 100, video: "guard.mp4" },
   "A+K": { name: "Mid Guard", type: "DEFENSE", chiCost: 0, baseDamage: 0, hitChance: 100, video: "guard.mp4" },
@@ -158,18 +159,16 @@ function startRoundCountdown() {
 
       const thinkTime = Math.floor(Math.random() * 2000 + 3000);
       setTimeout(() => {
-        if (gameState.roundPhase !== 'INPUT') return;
+        if (gameState.roundPhase !== 'INPUT' || (slot === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed)) return;
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
         player.activeChargePercent = Math.floor(Math.random() * 26 + 75);
-        if (confirmPlayerAction(moveKey, slot)) {
-          simulateCPUButtonPress(moveKey, slot);
-        }
+        confirmPlayerAction(moveKey, slot);
       }, thinkTime);
     }
   });
 
-  // COUNTDOWN STRICTLY RUNS FOR FULL 8 SECONDS
+  // COUNTDOWN TIMER
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
 
@@ -179,7 +178,7 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      // Timeout Penalty: If human fails to confirm in 8s, force DO_NOTHING
+      // Timeout Penalty: If player fails to confirm in time, force DO_NOTHING
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
@@ -410,10 +409,13 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     }
   }
 
-  if (playerKey === 'p1') {
+  let newlyConfirmed = false;
+
+  if (playerKey === 'p1' && !gameState.input.isConfirmed) {
     gameState.input.isConfirmed = true;
     gameState.input.selectedMoveKey = moveKey;
     gameState.input.lockInTime = gameState.turnTimerSeconds;
+    newlyConfirmed = true;
     
     const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : Math.max(10, gameState.input.currentPercent || 10);
     gameState.p1.activeChargePercent = lockedPercent;
@@ -424,10 +426,12 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
       flagEl.hidden = false;
       flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${lockedPercent}%!`;
     }
-  } else if (playerKey === 'p2') {
+  } else if (playerKey === 'p2' && !gameState.p2IsConfirmed) {
     gameState.p2IsConfirmed = true;
     gameState.p2SelectedMoveKey = moveKey;
     gameState.p2LockInTime = gameState.turnTimerSeconds;
+    newlyConfirmed = true;
+
     if (!gameState.p2.activeChargePercent) {
       gameState.p2.activeChargePercent = 100;
     }
@@ -436,6 +440,37 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     if (flagEl) {
       flagEl.hidden = false;
       flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p2.activeChargePercent}%!`;
+    }
+  }
+
+  // 2-SECOND TIMER EXTENSION LOGIC FOR UNLOCKED OPPONENT
+  if (newlyConfirmed && gameState.roundPhase === 'INPUT') {
+    const otherKey = playerKey === 'p1' ? 'p2' : 'p1';
+    const otherPlayer = gameState[otherKey];
+    const isOtherConfirmed = otherKey === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed;
+
+    if (otherPlayer && !otherPlayer.isFainted && !isOtherConfirmed && !(otherKey === 'p2' && gameState.p2AlwaysIdle)) {
+      // Extend timer by +2s so the unconfirmed rider can select/switch actions or Guard
+      gameState.turnTimerSeconds += 2;
+
+      const timerEl = document.getElementById('turn-timer');
+      if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+
+      triggerFloatingText(otherKey, 'REACTION TIME +2s!', 'scratch');
+
+      // AI CPU Reaction re-evaluation if CPU is the remaining rider
+      if (otherPlayer.isCPU) {
+        const reactionDelay = Math.floor(Math.random() * 800 + 600);
+        setTimeout(() => {
+          if (gameState.roundPhase !== 'INPUT') return;
+          const stillConfirmed = otherKey === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed;
+          if (!stillConfirmed) {
+            const chosenKey = getCPUMoveChoice(otherPlayer, player, otherKey);
+            otherPlayer.activeChargePercent = Math.floor(Math.random() * 26 + 75);
+            confirmPlayerAction(chosenKey, otherKey);
+          }
+        }, reactionDelay);
+      }
     }
   }
 
