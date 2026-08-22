@@ -52,19 +52,19 @@
       </div>
     </div>
 
-    <div id="vs-error-banner" class="error-banner" style="display: none;">
+    <div id="vs-error-banner" class="error-banner" hidden>
       AT LEAST ONE PLAYER MUST BE SET TO CPU FOR LOCAL VS MODE!
     </div>
 
     <div class="selection-actions">
       <button id="back-btn" class="nav-btn" onclick="handleBackStep()" disabled>BACK</button>
       <button id="confirm-btn" class="action-btn" onclick="handleConfirmStep()">CONFIRM P1</button>
-      <button id="start-game-btn" class="action-btn start-glow" onclick="validateAndStartMatch()" style="display: none;">START GAME</button>
+      <button id="start-game-btn" class="action-btn start-glow" onclick="validateAndStartMatch()" hidden>START GAME</button>
     </div>
   </div>
 
   <!-- MATCH TRANSITION SPLASH SCREEN (HIDDEN ON BOOT) -->
-  <div id="match-transition-screen" class="splash-screen" style="display: none;">
+  <div id="match-transition-screen" class="splash-screen" hidden>
     <div class="splash-content">
       <h1 id="splash-round-text">GET READY FOR THE FIGHT!</h1>
       <h2 id="splash-names-text">P1 VS P2</h2>
@@ -72,7 +72,7 @@
   </div>
 
   <!-- MAIN BATTLE SCREEN (HIDDEN ON BOOT) -->
-  <div id="battle-screen" class="screen-container" style="display: none;">
+  <div id="battle-screen" class="screen-container" hidden>
     
     <!-- TOP HUD BAR -->
     <div class="hud-bar">
@@ -117,25 +117,25 @@
       </div>
     </div>
 
-    <div id="battle-message" class="battle-banner" style="display: none;"></div>
+    <div id="battle-message" class="battle-banner" hidden></div>
 
     <!-- VIEWPORT -->
     <div class="battle-viewport">
       <div class="player-box" id="p1-box">
         <video id="p1-video" autoplay muted playsinline></video>
-        <img id="p1-sprite" style="display: none;">
-        <div id="p1-stun-overlay" class="stun-effect" style="display: none;">STUNNED</div>
+        <img id="p1-sprite" hidden>
+        <div id="p1-stun-overlay" class="stun-effect" hidden>STUNNED</div>
       </div>
 
-      <div class="center-action-box" id="center-box" style="display: none;">
-        <div id="center-action-label" class="action-overlay-label" style="display: none;"></div>
+      <div class="center-action-box" id="center-box" hidden>
+        <div id="center-action-label" class="action-overlay-label" hidden></div>
         <video id="center-video" autoplay muted playsinline></video>
       </div>
 
       <div class="player-box" id="p2-box">
         <video id="p2-video" autoplay muted playsinline></video>
-        <img id="p2-sprite" style="display: none;">
-        <div id="p2-stun-overlay" class="stun-effect" style="display: none;">STUNNED</div>
+        <img id="p2-sprite" hidden>
+        <div id="p2-stun-overlay" class="stun-effect" hidden>STUNNED</div>
       </div>
     </div>
 
@@ -146,7 +146,7 @@
         <div class="charge-track">
           <div id="p1-charge-fill" class="charge-fill" style="width: 0%;">0%</div>
         </div>
-        <div id="p1-action-flag" class="action-flag" style="display: none;">LOCKED!</div>
+        <div id="p1-action-flag" class="action-flag" hidden>LOCKED!</div>
       </div>
 
       <div class="pad-container">
@@ -171,191 +171,12 @@
     </div>
   </div>
 
-  <!-- SCRIPT IMPORTS (LOADED IN DEPENDENCY ORDER) -->
+  <!-- SCRIPT IMPORTS -->
   <script src="data/items.js"></script>
   <script src="js/game.js"></script>
   <script src="js/media.js"></script>
   <script src="js/combat.js"></script>
   <script src="js/item.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/ui.js"></script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kamen Fight</title>
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-
-  <!-- CHARACTER SELECTION SCREEN (VISIBLE ON BOOT) -->
-  <div id="vs-select-screen" class="screen-container">
-    <h1 id="vs-header-text">STEP 1: SELECT PLAYER 1 RIDER</h1>
-
-    <div class="selection-layout">
-      <!-- P1 Selection Card -->
-      <div id="p1-card" class="rider-card active-slot">
-        <h2>PLAYER 1</h2>
-        <div class="portrait-box">
-          <img id="p1-img" src="assets/images/icons/ichigo.png" alt="Player 1 Rider">
-        </div>
-        <h3 id="p1-name-display">Kamen Rider Ichigo</h3>
-        <div class="card-controls">
-          <button id="p1-left-btn" onclick="cycleRider('p1', -1)">&lt;</button>
-          <span id="p1-type-display" class="type-badge" onclick="toggleControlType('p1')">HUMAN</span>
-          <button id="p1-right-btn" onclick="cycleRider('p1', 1)">&gt;</button>
-        </div>
-        <div class="difficulty-control-group">
-          <span class="diff-label">DIFFICULTY:</span>
-          <span id="p1-diff-display" class="diff-badge" onclick="toggleDifficulty('p1')">N/A</span>
-        </div>
-      </div>
-
-      <div class="vs-divider">VS</div>
-
-      <!-- P2 Selection Card -->
-      <div id="p2-card" class="rider-card locked-slot">
-        <h2>PLAYER 2</h2>
-        <div class="portrait-box">
-          <img id="p2-img" src="assets/images/icons/ichigo.png" alt="Player 2 Rider">
-        </div>
-        <h3 id="p2-name-display">Kamen Rider Ichigo</h3>
-        <div class="card-controls">
-          <button id="p2-left-btn" onclick="cycleRider('p2', -1)" disabled>&lt;</button>
-          <span id="p2-type-display" class="type-badge" onclick="toggleControlType('p2')">CPU</span>
-          <button id="p2-right-btn" onclick="cycleRider('p2', 1)">&gt;</button>
-        </div>
-        <div class="difficulty-control-group">
-          <span class="diff-label">DIFFICULTY:</span>
-          <span id="p2-diff-display" class="diff-badge" onclick="toggleDifficulty('p2')">NORMAL</span>
-        </div>
-      </div>
-    </div>
-
-    <div id="vs-error-banner" class="error-banner" style="display: none;">
-      AT LEAST ONE PLAYER MUST BE SET TO CPU FOR LOCAL VS MODE!
-    </div>
-
-    <div class="selection-actions">
-      <button id="back-btn" class="nav-btn" onclick="handleBackStep()" disabled>BACK</button>
-      <button id="confirm-btn" class="action-btn" onclick="handleConfirmStep()">CONFIRM P1</button>
-      <button id="start-game-btn" class="action-btn start-glow" onclick="validateAndStartMatch()" style="display: none;">START GAME</button>
-    </div>
-  </div>
-
-  <!-- MATCH TRANSITION SPLASH SCREEN (HIDDEN ON BOOT) -->
-  <div id="match-transition-screen" class="splash-screen" style="display: none;">
-    <div class="splash-content">
-      <h1 id="splash-round-text">GET READY FOR THE FIGHT!</h1>
-      <h2 id="splash-names-text">P1 VS P2</h2>
-    </div>
-  </div>
-
-  <!-- MAIN BATTLE SCREEN (HIDDEN ON BOOT) -->
-  <div id="battle-screen" class="screen-container" style="display: none;">
-    
-    <!-- TOP HUD BAR -->
-    <div class="hud-bar">
-      <!-- P1 Stats -->
-      <div class="player-hud p1-hud">
-        <h2 id="p1-name">Kamen Rider Ichigo</h2>
-        <div class="stat-line">LP: <span id="p1-lp">1050</span></div>
-        <div class="stat-line">CHI: <span id="p1-chi">10</span> / 16</div>
-
-        <div class="faint-bar-wrapper">
-          <span class="faint-label">FAINT</span>
-          <div class="faint-track">
-            <div id="p1-faint-fill" class="faint-fill"></div>
-          </div>
-        </div>
-
-        <div id="p1-status" class="status-tag">NORMAL</div>
-        <div id="p1-buff-tray" class="buff-tray"></div>
-      </div>
-
-      <!-- Center Round Info -->
-      <div class="center-hud">
-        <div id="turn-display" class="round-title">ROUND 1</div>
-        <div id="turn-timer" class="timer-display">TIME: 5s</div>
-      </div>
-
-      <!-- P2 Stats -->
-      <div class="player-hud p2-hud">
-        <h2 id="p2-name">Kamen Rider Ichigo</h2>
-        <div class="stat-line">LP: <span id="p2-lp">1050</span></div>
-        <div class="stat-line">CHI: <span id="p2-chi">10</span> / 16</div>
-
-        <div class="faint-bar-wrapper">
-          <span class="faint-label">FAINT</span>
-          <div class="faint-track">
-            <div id="p2-faint-fill" class="faint-fill"></div>
-          </div>
-        </div>
-
-        <div id="p2-status" class="status-tag">NORMAL</div>
-        <div id="p2-buff-tray" class="buff-tray"></div>
-      </div>
-    </div>
-
-    <div id="battle-message" class="battle-banner" style="display: none;"></div>
-
-    <!-- VIEWPORT -->
-    <div class="battle-viewport">
-      <div class="player-box" id="p1-box">
-        <video id="p1-video" autoplay muted playsinline></video>
-        <img id="p1-sprite" style="display: none;">
-        <div id="p1-stun-overlay" class="stun-effect" style="display: none;">STUNNED</div>
-      </div>
-
-      <div class="center-action-box" id="center-box" style="display: none;">
-        <div id="center-action-label" class="action-overlay-label" style="display: none;"></div>
-        <video id="center-video" autoplay muted playsinline></video>
-      </div>
-
-      <div class="player-box" id="p2-box">
-        <video id="p2-video" autoplay muted playsinline></video>
-        <img id="p2-sprite" style="display: none;">
-        <div id="p2-stun-overlay" class="stun-effect" style="display: none;">STUNNED</div>
-      </div>
-    </div>
-
-    <!-- CONTROLS PANEL -->
-    <div class="controls-panel">
-      <div class="charge-bar-wrapper">
-        <div id="charge-status-display" class="charge-status">HOLD DIRECTION TO CHARGE</div>
-        <div class="charge-track">
-          <div id="p1-charge-fill" class="charge-fill" style="width: 0%;">0%</div>
-        </div>
-        <div id="p1-action-flag" class="action-flag" style="display: none;">LOCKED!</div>
-      </div>
-
-      <div class="pad-container">
-        <div class="d-pad">
-          <button class="pad-btn" id="key-W">W</button>
-          <div class="d-pad-middle">
-            <button class="pad-btn" id="key-A">A</button>
-            <button class="pad-btn" id="key-S">S</button>
-            <button class="pad-btn" id="key-D">D</button>
-          </div>
-        </div>
-
-        <div class="action-pad">
-          <button class="pad-btn" id="key-I">I</button>
-          <div class="action-pad-middle">
-            <button class="pad-btn" id="key-J">J</button>
-            <button class="pad-btn" id="key-K">K</button>
-            <button class="pad-btn" id="key-L">L</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="js/game.js"></script>
-  <script src="js/media.js"></script>
-  <script src="js/combat.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/ui.js"></script>
 </body>
