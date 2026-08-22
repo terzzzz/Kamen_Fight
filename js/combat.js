@@ -160,7 +160,24 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   return 'D+J';
 }
 
-// FLOATING POPUP GENERATORS
+// LP COLOR FLASH CONTROLLER (1 SEC FLASH ON DAMAGE/HEAL)
+function triggerLPFlash(slotKey, isHeal = false) {
+  const lpEl = document.getElementById(`${slotKey}-lp`);
+  if (!lpEl) return;
+
+  const flashClass = isHeal ? 'lp-flash-heal' : 'lp-flash-damage';
+  lpEl.classList.remove('lp-flash-heal', 'lp-flash-damage');
+  
+  // Force browser layout repaint to restart CSS transition
+  void lpEl.offsetWidth;
+  lpEl.classList.add(flashClass);
+
+  setTimeout(() => {
+    lpEl.classList.remove(flashClass);
+  }, 1000);
+}
+
+// FLOATING POPUP GENERATORS WITH ANTI-OVERLAP POSITIONS
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
   if (!container) return;
@@ -168,8 +185,11 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const roundedAmount = Math.round(amount);
   if (roundedAmount <= 0) return;
 
+  // Trigger HUD LP Flash animation
+  triggerLPFlash(slotKey, isHeal);
+
   const popup = document.createElement('div');
-  popup.className = `damage-popup ${isHeal ? 'heal' : 'damage'}`;
+  popup.className = `damage-popup popup-number ${isHeal ? 'heal' : 'damage'}`;
   popup.textContent = isHeal ? `+${roundedAmount}` : `-${roundedAmount}`;
 
   container.appendChild(popup);
@@ -184,7 +204,7 @@ function triggerFloatingText(slotKey, text, customClass = '') {
   if (!container) return;
 
   const popup = document.createElement('div');
-  popup.className = `damage-popup ${customClass}`;
+  popup.className = `damage-popup popup-text ${customClass}`;
   popup.textContent = text;
 
   container.appendChild(popup);
@@ -253,7 +273,7 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-// HUD DISPLAY UPDATER
+// HUD DISPLAY UPDATER WITH ENLARGED WORD-ART LABELS
 function updateHUD() {
   if (gameState.p1) {
     const p1Name = document.getElementById('p1-name');
@@ -262,13 +282,13 @@ function updateHUD() {
     
     if (p1Name) p1Name.textContent = `[P1] ${gameState.p1.name}`;
     if (p1Lp) {
-      p1Lp.textContent = `${gameState.p1.lp} / ${gameState.p1.maxLp}`;
+      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-styled">${gameState.p1.lp} / ${gameState.p1.maxLp}</span>`;
     }
     if (p1Chi) {
       const maxChi = gameState.p1.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (gameState.p1.chi / maxChi) * 100));
       p1Chi.innerHTML = `
-        <span class="stat-value-large">${gameState.p1.chi}</span>
+        <span class="stat-label">CHI:</span> <span class="stat-value-large">${gameState.p1.chi}</span>
         <div class="chi-bar-track">
           <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
@@ -282,13 +302,13 @@ function updateHUD() {
     
     if (p2Name) p2Name.textContent = `[P2] ${gameState.p2.name}`;
     if (p2Lp) {
-      p2Lp.textContent = `${gameState.p2.lp} / ${gameState.p2.maxLp}`;
+      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-styled">${gameState.p2.lp} / ${gameState.p2.maxLp}</span>`;
     }
     if (p2Chi) {
       const maxChi = gameState.p2.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (gameState.p2.chi / maxChi) * 100));
       p2Chi.innerHTML = `
-        <span class="stat-value-large">${gameState.p2.chi}</span>
+        <span class="stat-label">CHI:</span> <span class="stat-value-large">${gameState.p2.chi}</span>
         <div class="chi-bar-track">
           <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
