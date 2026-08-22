@@ -77,6 +77,17 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
+  // 1. ADD +1 CHI AT THE START OF EACH ROUND (EXCEPT ROUND 1)
+  if (gameState.roundCounter > 1) {
+    ['p1', 'p2'].forEach(slot => {
+      const player = gameState[slot];
+      if (player) {
+        const maxChi = player.maxChi || 16;
+        player.chi = Math.min(maxChi, player.chi + 1);
+      }
+    });
+  }
+
   // 400ms Grace Period: ignores residual inputs from prior round
   setTimeout(() => {
     if (gameState.input) gameState.input.acceptingInputs = true;
