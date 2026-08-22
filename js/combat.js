@@ -416,6 +416,8 @@ async function executeTurnResolutionPhase() {
   let atkKey2 = p1GoesFirst ? 'p2' : 'p1';
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
+  let defender1WasInterrupted = false;
+
   // STEP 1 EXECUTION
   if (move1.type !== 'IDLE' && key1 !== 'DO_NOTHING') {
     if (move1.buff) applyBuff(attacker1, move1.buff.id, move1.buff.label, move1.buff.type, move1.buff.duration);
@@ -454,6 +456,8 @@ async function executeTurnResolutionPhase() {
 
             await vidPromise;
           } else {
+            // Guard Failed - Defender takes hit and gets interrupted
+            defender1WasInterrupted = true;
             triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
 
             await new Promise(r => setTimeout(r, 500));
@@ -461,7 +465,6 @@ async function executeTurnResolutionPhase() {
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
             const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
 
-            // Wait 1 second after hit video starts playing to show LP drop & damage numbers
             await new Promise(r => setTimeout(r, 1000));
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
@@ -478,10 +481,12 @@ async function executeTurnResolutionPhase() {
             updateHUD();
             triggerFloatingNumber(defKey1, result.finalDmg, false);
           } else {
+            // Clean Hit Landed - Defender gets interrupted!
+            defender1WasInterrupted = true;
+
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
             const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
 
-            // Wait 1 second after hit video starts playing to show LP drop & damage numbers
             await new Promise(r => setTimeout(r, 1000));
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
@@ -502,8 +507,8 @@ async function executeTurnResolutionPhase() {
     updateHUD();
   }
 
-  // STEP 2 EXECUTION (Excludes Guard moves that were already processed during Step 1)
-  if (defender2.lp > 0 && !defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
+  // STEP 2 EXECUTION (Cancelled if defender was hit and interrupted in Step 1)
+  if (defender2.lp > 0 && !defender2.isFainted && !defender1WasInterrupted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
 
@@ -543,7 +548,6 @@ async function executeTurnResolutionPhase() {
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
           const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
-          // Wait 1 second after hit video starts playing to show LP drop & damage numbers
           await new Promise(r => setTimeout(r, 1000));
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
@@ -563,7 +567,6 @@ async function executeTurnResolutionPhase() {
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
           const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
-          // Wait 1 second after hit video starts playing to show LP drop & damage numbers
           await new Promise(r => setTimeout(r, 1000));
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
@@ -581,7 +584,7 @@ async function executeTurnResolutionPhase() {
       attacker2.chi = Math.min(16, attacker2.chi + chiGain);
     }
     updateHUD();
-  } else if (defender2.isFainted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
+  } else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
