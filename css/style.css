@@ -244,6 +244,8 @@ body {
 
 /* TOP HUD BAR & BATTLE VIEWPORT STYLES */
 .hud-bar {
+  position: relative;
+  z-index: 30; /* Elevated above center video box */
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -335,10 +337,14 @@ body {
 }
 
 .buff-tray {
+  position: relative;
+  z-index: 35;
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
   margin-top: 4px;
+  max-width: 100%;
+  pointer-events: none;
 }
 
 .buff-tag {
@@ -348,10 +354,20 @@ body {
   font-size: 0.65rem;
   padding: 2px 5px;
   border-radius: 3px;
+  white-space: nowrap;
+  font-weight: bold;
+  box-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
 }
 
-.buff-tag.speed { border-color: var(--text-yellow); color: var(--text-yellow); }
-.buff-tag.attack { border-color: var(--text-red); color: var(--text-red); }
+.buff-tag.speed { 
+  border-color: var(--text-yellow); 
+  color: var(--text-yellow); 
+}
+
+.buff-tag.attack { 
+  border-color: var(--text-red); 
+  color: var(--text-red); 
+}
 
 .center-hud {
   text-align: center;
@@ -387,6 +403,7 @@ body {
   height: 320px;
   margin-bottom: 10px;
   position: relative;
+  z-index: 10;
 }
 
 .player-box {
@@ -616,4 +633,20 @@ body {
 .splash-content h2 {
   font-size: 1.8rem;
   color: var(--border-cyan);
+}
+
+/* MOBILE SCREEN SCALING ADJUSTMENTS */
+@media screen and (max-width: 768px) {
+  .buff-tag {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+  }
+  
+  .hud-bar {
+    z-index: 30;
+  }
+
+  .center-action-box {
+    z-index: 10;
+  }
 }
