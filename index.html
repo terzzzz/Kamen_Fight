@@ -2,176 +2,183 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <!-- FULL MOBILE VIEWPORT & LANDSCAPE FIT FIX -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kamen Rider Fighting Game Engine v2</title>
+  <title>Kamen Fight</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <!-- CHARACTER SELECTION SCREEN -->
+  <!-- CHARACTER SELECTION SCREEN (VISIBLE ON BOOT) -->
   <div id="vs-select-screen" class="screen-container">
-    <h1>STEP 2: SELECT PLAYER 2 RIDER (CPU)</h1>
-    
+    <h1 id="vs-header-text">STEP 1: SELECT PLAYER 1 RIDER</h1>
+
     <div class="selection-layout">
-      <!-- Player 1 Card -->
+      <!-- P1 Selection Card -->
       <div id="p1-card" class="rider-card active-slot">
         <h2>PLAYER 1</h2>
         <div class="portrait-box">
-          <img id="p1-portrait" src="assets/portraits/ichigo.png" alt="Player 1 Rider">
+          <img id="p1-img" src="assets/images/icons/ichigo.png" alt="Player 1 Rider">
         </div>
-        <h3 id="p1-name">Kamen Rider Ichigo</h3>
+        <h3 id="p1-name-display">Kamen Rider Ichigo</h3>
         <div class="card-controls">
-          <button id="p1-prev-btn">&lt;</button>
-          <span id="p1-type-badge" class="type-badge">HUMAN</span>
-          <button id="p1-next-btn">&gt;</button>
-        </div>
-      </div>
-
-      <!-- Retro VS Divider -->
-      <div class="vs-divider">VS</div>
-
-      <!-- Player 2 Card -->
-      <div id="p2-card" class="rider-card active-slot">
-        <h2>PLAYER 2</h2>
-        <div class="portrait-box">
-          <img id="p2-portrait" src="assets/portraits/nigo.png" alt="Player 2 Rider">
-        </div>
-        <h3 id="p2-name">Kamen Rider Nigo</h3>
-        <div class="card-controls">
-          <button id="p2-prev-btn">&lt;</button>
-          <span id="p2-type-badge" class="type-badge">CPU</span>
-          <button id="p2-next-btn">&gt;</button>
+          <button id="p1-left-btn" onclick="cycleRider('p1', -1)">&lt;</button>
+          <span id="p1-type-display" class="type-badge" onclick="toggleControlType('p1')">HUMAN</span>
+          <button id="p1-right-btn" onclick="cycleRider('p1', 1)">&gt;</button>
         </div>
         <div class="difficulty-control-group">
           <span class="diff-label">DIFFICULTY:</span>
-          <span id="p2-diff-badge" class="diff-badge hard">HARD</span>
+          <span id="p1-diff-display" class="diff-badge" onclick="toggleDifficulty('p1')">N/A</span>
         </div>
       </div>
+
+      <div class="vs-divider">VS</div>
+
+      <!-- P2 Selection Card -->
+      <div id="p2-card" class="rider-card locked-slot">
+        <h2>PLAYER 2</h2>
+        <div class="portrait-box">
+          <img id="p2-img" src="assets/images/icons/ichigo.png" alt="Player 2 Rider">
+        </div>
+        <h3 id="p2-name-display">Kamen Rider Ichigo</h3>
+        <div class="card-controls">
+          <button id="p2-left-btn" onclick="cycleRider('p2', -1)" disabled>&lt;</button>
+          <span id="p2-type-display" class="type-badge" onclick="toggleControlType('p2')">CPU</span>
+          <button id="p2-right-btn" onclick="cycleRider('p2', 1)">&gt;</button>
+        </div>
+        <div class="difficulty-control-group">
+          <span class="diff-label">DIFFICULTY:</span>
+          <span id="p2-diff-display" class="diff-badge" onclick="toggleDifficulty('p2')">NORMAL</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="vs-error-banner" class="error-banner" hidden>
+      AT LEAST ONE PLAYER MUST BE SET TO CPU FOR LOCAL VS MODE!
     </div>
 
     <div class="selection-actions">
-      <button id="back-btn" class="nav-btn">BACK</button>
-      <button id="confirm-p2-btn" class="action-btn start-glow">CONFIRM P2</button>
+      <button id="back-btn" class="nav-btn" onclick="handleBackStep()" disabled>BACK</button>
+      <button id="confirm-btn" class="action-btn" onclick="handleConfirmStep()">CONFIRM P1</button>
+      <button id="start-game-btn" class="action-btn start-glow" onclick="validateAndStartMatch()" hidden>START GAME</button>
     </div>
   </div>
 
-  <!-- MAIN BATTLE SCREEN -->
-  <div id="battle-screen" class="screen-container hidden">
-    <!-- Top HUD Bar -->
+  <!-- MATCH TRANSITION SPLASH SCREEN (HIDDEN ON BOOT) -->
+  <div id="match-transition-screen" class="splash-screen" hidden>
+    <div class="splash-content">
+      <h1 id="splash-round-text">GET READY FOR THE FIGHT!</h1>
+      <h2 id="splash-names-text">P1 VS P2</h2>
+    </div>
+  </div>
+
+  <!-- MAIN BATTLE SCREEN (HIDDEN ON BOOT) -->
+  <div id="battle-screen" class="screen-container" hidden>
+    
+    <!-- TOP HUD BAR -->
     <div class="hud-bar">
-      <!-- P1 HUD -->
+      <!-- P1 Stats -->
       <div class="player-hud p1-hud">
-        <h2 id="p1-hud-name">[P1] Kamen Rider Ichigo</h2>
-        <div class="stat-line">
-          <span class="stat-label">LP:</span> 
-          <span id="p1-lp-val" class="stat-value-styled">1050</span> / <span id="p1-max-lp-val">1050</span>
-        </div>
-        <div class="stat-line">
-          <span class="stat-label">CHI:</span> 
-          <span id="p1-chi-val" class="stat-value-large">5</span>
-          <div class="chi-bar-track">
-            <div id="p1-chi-fill" class="chi-bar-fill"></div>
-          </div>
-        </div>
+        <h2 id="p1-name">Kamen Rider Ichigo</h2>
+        <div class="stat-line"><span id="p1-lp"></span></div>
+        <div class="stat-line"><span id="p1-chi"></span></div>
+
         <div class="faint-bar-wrapper">
+          <span class="faint-label">FAINT</span>
           <div class="faint-track">
             <div id="p1-faint-fill" class="faint-fill"></div>
           </div>
-          <span class="faint-label">FAINT</span>
         </div>
+
+        <div id="p1-status" class="status-tag">NORMAL</div>
         <div id="p1-buff-tray" class="buff-tray"></div>
       </div>
 
-      <!-- Center HUD Timer & Round -->
+      <!-- Center Round Info -->
       <div class="center-hud">
-        <div class="round-title">ROUND 1</div>
-        <div id="timer-display" class="timer-display">TIME: 5s</div>
+        <div id="turn-display" class="round-title">ROUND 1</div>
+        <div id="turn-timer" class="timer-display">TIME: 8s</div>
       </div>
 
-      <!-- P2 HUD -->
+      <!-- P2 Stats -->
       <div class="player-hud p2-hud">
-        <h2 id="p2-hud-name">[P2] Kamen Rider Nigo</h2>
-        <div class="stat-line">
-          <span class="stat-label">LP:</span> 
-          <span id="p2-lp-val" class="stat-value-styled">1200</span> / <span id="p2-max-lp-val">1200</span>
-        </div>
-        <div class="stat-line">
-          <span class="stat-label">CHI:</span> 
-          <span id="p2-chi-val" class="stat-value-large">10</span>
-          <div class="chi-bar-track">
-            <div id="p2-chi-fill" class="chi-bar-fill"></div>
-          </div>
-        </div>
+        <h2 id="p2-name">Kamen Rider Ichigo</h2>
+        <div class="stat-line"><span id="p2-lp"></span></div>
+        <div class="stat-line"><span id="p2-chi"></span></div>
+
         <div class="faint-bar-wrapper">
+          <span class="faint-label">FAINT</span>
           <div class="faint-track">
             <div id="p2-faint-fill" class="faint-fill"></div>
           </div>
-          <span class="faint-label">FAINT</span>
         </div>
+
+        <div id="p2-status" class="status-tag">NORMAL</div>
         <div id="p2-buff-tray" class="buff-tray"></div>
       </div>
     </div>
 
-    <!-- Golden VS Match Banner -->
-    <div id="battle-banner" class="battle-banner">
-      P1: Rider Flying Knee (10%) VS P2: Rider Power Kick (81%)
-    </div>
+    <div id="battle-message" class="battle-banner" hidden></div>
 
-    <!-- Battle Stage Viewport -->
+    <!-- VIEWPORT -->
     <div class="battle-viewport">
-      <!-- P1 Standby Box -->
-      <div id="p1-box" class="player-box">
-        <video id="p1-video" autoplay loop muted playsinline src="assets/videos/ichigo_idle.mp4"></video>
+      <div class="player-box" id="p1-box">
+        <video id="p1-video" autoplay muted playsinline></video>
+        <img id="p1-sprite" hidden>
+        <div id="p1-stun-overlay" class="stun-effect" hidden>STUNNED</div>
       </div>
 
-      <!-- Center Action Clashing Box -->
-      <div id="center-action-box" class="center-action-box">
-        <div id="action-overlay-label" class="action-overlay-label">[P2] Kamen Rider Nigo : DODGED!!</div>
-        <video id="center-video" autoplay muted playsinline src="assets/videos/clash.mp4"></video>
+      <div class="center-action-box" id="center-box" hidden>
+        <div id="center-action-label" class="action-overlay-label" hidden></div>
+        <video id="center-video" autoplay muted playsinline></video>
       </div>
 
-      <!-- P2 Standby Box -->
-      <div id="p2-box" class="player-box">
-        <video id="p2-video" autoplay loop muted playsinline src="assets/videos/nigo_idle.mp4"></video>
+      <div class="player-box" id="p2-box">
+        <video id="p2-video" autoplay muted playsinline></video>
+        <img id="p2-sprite" hidden>
+        <div id="p2-stun-overlay" class="stun-effect" hidden>STUNNED</div>
       </div>
     </div>
 
-    <!-- On-Screen Virtual Arcade Controls -->
+    <!-- CONTROLS PANEL -->
     <div class="controls-panel">
       <div class="charge-bar-wrapper">
-        <span id="charge-status" class="charge-status">TAP DIRECTION TO START CHARGE</span>
+        <div id="charge-status-display" class="charge-status">TAP DIRECTION TO CHARGE</div>
         <div class="charge-track">
-          <div id="charge-fill" class="charge-fill">0%</div>
+          <div id="p1-charge-fill" class="charge-fill" style="width: 0%;">0%</div>
         </div>
+        <div id="p1-action-flag" class="action-flag" hidden>LOCKED!</div>
       </div>
 
       <div class="pad-container">
-        <!-- D-Pad Direction Controls -->
         <div class="d-pad">
-          <button class="pad-btn" data-key="W">W</button>
+          <button class="pad-btn" id="key-W">W</button>
           <div class="d-pad-middle">
-            <button class="pad-btn" data-key="A">A</button>
-            <button class="pad-btn" data-key="S">S</button>
-            <button class="pad-btn" data-key="D">D</button>
+            <button class="pad-btn" id="key-A">A</button>
+            <button class="pad-btn" id="key-S">S</button>
+            <button class="pad-btn" id="key-D">D</button>
           </div>
         </div>
 
-        <!-- Action Attack Controls -->
         <div class="action-pad">
-          <button class="pad-btn" data-key="I">I</button>
+          <button class="pad-btn" id="key-I">I</button>
           <div class="action-pad-middle">
-            <button class="pad-btn" data-key="J">J</button>
-            <button class="pad-btn" data-key="K">K</button>
-            <button class="pad-btn" data-key="L">L</button>
+            <button class="pad-btn" id="key-J">J</button>
+            <button class="pad-btn" id="key-K">K</button>
+            <button class="pad-btn" id="key-L">L</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- JavaScript Modules -->
+  <!-- SCRIPT IMPORTS -->
+  <script src="data/items.js"></script>
+  <script src="js/item.js"></script>
   <script src="js/ai.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/media.js"></script>
   <script src="js/combat.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
 </body>
 </html>
