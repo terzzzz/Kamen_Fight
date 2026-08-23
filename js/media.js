@@ -1,3 +1,7 @@
+/**
+ * media.js - Video & Animation Controller
+ */
+
 // IOS MOBILE VIDEO UNLOCKER
 let mobileVideosUnlocked = false;
 
@@ -11,7 +15,6 @@ function unlockMobileVideos() {
     v.setAttribute('playsinline', '');
     v.setAttribute('webkit-playsinline', '');
     
-    // Warm up center and player video instances on direct touch
     const p = v.play();
     if (p !== undefined) {
       p.then(() => {
@@ -27,15 +30,19 @@ function unlockMobileVideos() {
 function getTransformFlip(player, playerKey, moveObj = null) {
   if (!player) return 'scaleX(1)';
 
-  const nativeFacing = player.sourceFacing || (player.id === 'nigo' ? 'right' : 'left');
+  // Priority: Move-level sourceFacing -> Player sourceFacing -> ID Fallback
+  const nativeFacing = (moveObj && moveObj.sourceFacing) 
+    ? moveObj.sourceFacing 
+    : (player.sourceFacing || (player.id === 'nigo' ? 'right' : 'left'));
 
   let shouldFlip = false;
   if (nativeFacing === 'left') {
-    shouldFlip = (playerKey === 'p1');
+    shouldFlip = (playerKey === 'p1'); // Left-facing asset flips for P1 to face right
   } else {
-    shouldFlip = (playerKey === 'p2');
+    shouldFlip = (playerKey === 'p2'); // Right-facing asset flips for P2 to face left
   }
 
+  // Move-specific manual mirror toggle
   if (moveObj && moveObj.unmirrored) {
     shouldFlip = !shouldFlip;
   }
@@ -99,6 +106,7 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     centerVid.setAttribute('playsinline', '');
     centerVid.setAttribute('webkit-playsinline', '');
 
+    // Ensure mirror match palette is strictly applied to P2 and removed for P1
     centerVid.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
     centerVid.style.transform = getTransformFlip(player, playerKey, moveObj);
 
@@ -125,7 +133,6 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
     const rawUrl = `assets/videos/${riderId}/${videoFile}`;
     const videoUrl = (gameState.videoCache && gameState.videoCache[rawUrl]) || rawUrl;
 
-    // Force inline reset for Safari HTML5 Media Engine
     centerVid.src = videoUrl;
     centerVid.load();
 
@@ -186,9 +193,8 @@ function updateCharacterMedia(playerKey, stateType) {
   videoEl.setAttribute('playsinline', '');
   videoEl.setAttribute('webkit-playsinline', '');
 
-  if (playerKey === 'p2') {
-    videoEl.classList.toggle('p2-mirror-palette', isMirrorMatch);
-  }
+  // Toggle mirror match palette specifically per slot
+  videoEl.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
 
   const isLoopingState = ['idle.mp4', 'mid-air.mp4', 'faint.mp4'].includes(fileName);
   videoEl.loop = isLoopingState;
