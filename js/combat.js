@@ -421,7 +421,12 @@ async function executeTurnResolutionPhase() {
     } else if (!p1IsDefensive && p2IsDefensive) {
       p1GoesFirst = true;
     } else {
-      p1GoesFirst = p1Time >= p2Time;
+      // EQUAL MOVE TIER PRIORITY: 50/50 COIN FLIP ON TIME TIES
+      if (p1Time === p2Time) {
+        p1GoesFirst = Math.random() < 0.5;
+      } else {
+        p1GoesFirst = p1Time > p2Time;
+      }
     }
   }
 
