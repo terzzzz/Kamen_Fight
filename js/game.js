@@ -467,7 +467,6 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
         const timerEl = document.getElementById('turn-timer');
         if (timerEl) {
           timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
-          // Visual flash effect on the center timer display
           timerEl.style.color = '#00ffcc';
           timerEl.style.textShadow = '0 0 15px #00ffcc';
           setTimeout(() => {
@@ -559,6 +558,11 @@ window.addEventListener('DOMContentLoaded', () => {
   bindKeyboardInputs();
   bindCommandButtons();
   autoScaleGameWindow();
+
+  // LOAD PERSISTENT AI KNOWLEDGE ON BOOT
+  if (typeof loadAIKnowledge === 'function') {
+    loadAIKnowledge();
+  }
 
   document.addEventListener('touchstart', unlockMobileVideos, { once: true });
   document.addEventListener('click', unlockMobileVideos, { once: true });
