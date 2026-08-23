@@ -160,24 +160,24 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   return 'D+J';
 }
 
-// LP COLOR FLASH CONTROLLER (1 SEC FLASH ON DAMAGE/HEAL)
+// DIRECT DOM TARGET LP COLOR FLASH
 function triggerLPFlash(slotKey, isHeal = false) {
-  const lpEl = document.getElementById(`${slotKey}-lp`);
-  if (!lpEl) return;
+  const lpContainer = document.getElementById(`${slotKey}-lp`);
+  if (!lpContainer) return;
 
+  const targetEl = lpContainer.querySelector('.stat-value-styled') || lpContainer;
   const flashClass = isHeal ? 'lp-flash-heal' : 'lp-flash-damage';
-  lpEl.classList.remove('lp-flash-heal', 'lp-flash-damage');
   
-  // Force browser layout repaint to restart CSS transition
-  void lpEl.offsetWidth;
-  lpEl.classList.add(flashClass);
+  targetEl.classList.remove('lp-flash-heal', 'lp-flash-damage');
+  void targetEl.offsetWidth;
+  targetEl.classList.add(flashClass);
 
   setTimeout(() => {
-    lpEl.classList.remove(flashClass);
+    targetEl.classList.remove(flashClass);
   }, 1000);
 }
 
-// FLOATING POPUP GENERATORS WITH ANTI-OVERLAP POSITIONS
+// FLOATING POPUP GENERATORS
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
   if (!container) return;
@@ -185,7 +185,6 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const roundedAmount = Math.round(amount);
   if (roundedAmount <= 0) return;
 
-  // Trigger HUD LP Flash animation
   triggerLPFlash(slotKey, isHeal);
 
   const popup = document.createElement('div');
@@ -273,47 +272,46 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-// HUD DISPLAY UPDATER WITH ENLARGED WORD-ART LABELS
+// HUD DISPLAY UPDATER WITH DOUBLE-LABEL CLEANUP
 function updateHUD() {
-  if (gameState.p1) {
-    const p1Name = document.getElementById('p1-name');
-    const p1Lp = document.getElementById('p1-lp');
-    const p1Chi = document.getElementById('p1-chi');
-    
-    if (p1Name) p1Name.textContent = `[P1] ${gameState.p1.name}`;
-    if (p1Lp) {
-      p1Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-styled">${gameState.p1.lp} / ${gameState.p1.maxLp}</span>`;
-    }
-    if (p1Chi) {
-      const maxChi = gameState.p1.maxChi || 16;
-      const chiPct = Math.min(100, Math.max(0, (gameState.p1.chi / maxChi) * 100));
-      p1Chi.innerHTML = `
-        <span class="stat-label">CHI:</span> <span class="stat-value-large">${gameState.p1.chi}</span>
-        <div class="chi-bar-track">
-          <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
-        </div>`;
-    }
-  }
+  ['p1', 'p2'].forEach(slot => {
+    const player = gameState[slot];
+    if (!player) return;
 
-  if (gameState.p2) {
-    const p2Name = document.getElementById('p2-name');
-    const p2Lp = document.getElementById('p2-lp');
-    const p2Chi = document.getElementById('p2-chi');
-    
-    if (p2Name) p2Name.textContent = `[P2] ${gameState.p2.name}`;
-    if (p2Lp) {
-      p2Lp.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-styled">${gameState.p2.lp} / ${gameState.p2.maxLp}</span>`;
+    const nameEl = document.getElementById(`${slot}-name`);
+    const lpEl = document.getElementById(`${slot}-lp`);
+    const chiEl = document.getElementById(`${slot}-chi`);
+
+    if (nameEl) nameEl.textContent = `[${slot.toUpperCase()}] ${player.name}`;
+
+    if (lpEl) {
+      if (lpEl.parentElement) {
+        Array.from(lpEl.parentElement.childNodes).forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.includes('LP:')) {
+            node.nodeValue = node.nodeValue.replace(/LP:\s*/gi, '');
+          }
+        });
+      }
+      lpEl.innerHTML = `<span class="stat-label">LP:</span> <span class="stat-value-styled">${player.lp} / ${player.maxLp}</span>`;
     }
-    if (p2Chi) {
-      const maxChi = gameState.p2.maxChi || 16;
-      const chiPct = Math.min(100, Math.max(0, (gameState.p2.chi / maxChi) * 100));
-      p2Chi.innerHTML = `
-        <span class="stat-label">CHI:</span> <span class="stat-value-large">${gameState.p2.chi}</span>
+
+    if (chiEl) {
+      if (chiEl.parentElement) {
+        Array.from(chiEl.parentElement.childNodes).forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.includes('CHI:')) {
+            node.nodeValue = node.nodeValue.replace(/CHI:\s*/gi, '');
+          }
+        });
+      }
+      const maxChi = player.maxChi || 16;
+      const chiPct = Math.min(100, Math.max(0, (player.chi / maxChi) * 100));
+      chiEl.innerHTML = `
+        <span class="stat-label">CHI:</span> <span class="stat-value-large">${player.chi}</span>
         <div class="chi-bar-track">
           <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
     }
-  }
+  });
 
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
@@ -370,18 +368,6 @@ async function executeTurnResolutionPhase() {
   const defaultMove = { name: 'Do Nothing', type: 'IDLE', baseDamage: 0, chiCost: 0 };
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
-
-  // Process Instant Utility Effects
-  if (p1Move && p1Move.faintRecovery && gameState.p1.faintMeter > 0) {
-    const recovered = Math.min(gameState.p1.faintMeter, p1Move.faintRecovery);
-    gameState.p1.faintMeter = Math.max(0, gameState.p1.faintMeter - p1Move.faintRecovery);
-    triggerFloatingText('p1', `FAINT -${recovered}`, 'heal');
-  }
-  if (p2Move && p2Move.faintRecovery && gameState.p2.faintMeter > 0) {
-    const recovered = Math.min(gameState.p2.faintMeter, p2Move.faintRecovery);
-    gameState.p2.faintMeter = Math.max(0, gameState.p2.faintMeter - p2Move.faintRecovery);
-    triggerFloatingText('p2', `FAINT -${recovered}`, 'heal');
-  }
 
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
@@ -445,6 +431,13 @@ async function executeTurnResolutionPhase() {
     if (move1.buff) applyBuff(attacker1, move1.buff.id, move1.buff.label, move1.buff.type, move1.buff.duration);
     handleAirborneState(attacker1, key1, move1);
 
+    // Sequential Faint Recovery execution for Move 1
+    if (move1.faintRecovery && attacker1.faintMeter > 0) {
+      const recovered = Math.min(attacker1.faintMeter, move1.faintRecovery);
+      attacker1.faintMeter = Math.max(0, attacker1.faintMeter - move1.faintRecovery);
+      triggerFloatingText(atkKey1, `FAINT -${recovered}`, 'heal');
+    }
+
     attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
     updateHUD();
 
@@ -476,7 +469,6 @@ async function executeTurnResolutionPhase() {
 
             await vidPromise;
           } else {
-            // Guard Failed - Defender takes hit and gets interrupted
             defender1WasInterrupted = true;
             triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
 
@@ -495,7 +487,6 @@ async function executeTurnResolutionPhase() {
             await vidPromise;
           }
         } else if (!result.hitLanded) {
-          // Full Dodge / Miss (1-second delayed popup)
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'DODGED!');
 
           await new Promise(r => setTimeout(r, 1000));
@@ -504,7 +495,6 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else if (result.isGlancing) {
-          // Glancing Hit / Near-miss (1-second delayed damage & popup)
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
 
           await new Promise(r => setTimeout(r, 1000));
@@ -516,7 +506,6 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else {
-          // Clean Hit Landed - Defender gets interrupted!
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
@@ -545,6 +534,13 @@ async function executeTurnResolutionPhase() {
   if (defender2.lp > 0 && !defender2.isFainted && !defender1WasInterrupted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
+
+    // Sequential Faint Recovery execution for Move 2
+    if (move2.faintRecovery && attacker2.faintMeter > 0) {
+      const recovered = Math.min(attacker2.faintMeter, move2.faintRecovery);
+      attacker2.faintMeter = Math.max(0, attacker2.faintMeter - move2.faintRecovery);
+      triggerFloatingText(atkKey2, `FAINT -${recovered}`, 'heal');
+    }
 
     attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
     updateHUD();
@@ -590,7 +586,6 @@ async function executeTurnResolutionPhase() {
           await vidPromise;
         }
       } else if (!result.hitLanded) {
-        // Full Dodge / Miss (1-second delayed popup)
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'DODGED!');
 
         await new Promise(r => setTimeout(r, 1000));
@@ -599,7 +594,6 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else if (result.isGlancing) {
-        // Glancing Hit / Near-miss (1-second delayed damage & popup)
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
 
         await new Promise(r => setTimeout(r, 1000));
@@ -611,7 +605,6 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else {
-        // Clean Hit Landed
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
