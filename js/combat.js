@@ -248,10 +248,10 @@ function renderBuffTrays() {
 
     tray.innerHTML = '';
 
-    if (player.activeBuffs) {
+    if (player.activeBuffs && player.activeBuffs.length > 0) {
       player.activeBuffs.forEach(b => {
         const tag = document.createElement('div');
-        tag.className = `buff-tag ${b.type}`;
+        tag.className = `buff-tag ${b.type || 'attack'}`;
         tag.textContent = `${b.label} (${b.roundsLeft}R)`;
         tray.appendChild(tag);
       });
