@@ -184,8 +184,6 @@ body {
   background: #3b111e;
 }
 
-
-
 /* SMOOTH RETRO ARCADE "VS" DIVIDER */
 .vs-divider {
   font-family: 'Impact', 'Arial Black', sans-serif;
@@ -213,10 +211,6 @@ body {
     text-shadow: 0 0 14px rgba(255, 51, 85, 0.8), 2px 2px 0px #000;
   }
 }
-
-
-
-
 
 .error-banner {
   background: rgba(255, 42, 95, 0.2);
@@ -272,7 +266,7 @@ body {
 /* TOP HUD BAR & BATTLE VIEWPORT STYLES */
 .hud-bar {
   position: relative;
-  z-index: 30; /* Elevated above center video box */
+  z-index: 30;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -306,8 +300,11 @@ body {
 }
 
 .stat-value-large {
-  font-size: 1.2rem;
-  color: #fff;
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #00ffff;
+  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 12px rgba(0, 255, 255, 0.9);
 }
 
 .chi-bar-track {
@@ -537,6 +534,18 @@ body {
   text-shadow: 0 0 10px rgba(255, 204, 0, 0.8), 2px 2px 0px #000;
 }
 
+.damage-popup.popup-text {
+  top: 22% !important;
+  font-size: 1.4rem;
+  z-index: 105;
+}
+
+.damage-popup.popup-number {
+  top: 48% !important;
+  font-size: 1.8rem;
+  z-index: 106;
+}
+
 @keyframes floatPopup {
   0% {
     opacity: 0;
@@ -662,22 +671,6 @@ body {
   color: var(--border-cyan);
 }
 
-/* MOBILE SCREEN SCALING ADJUSTMENTS */
-@media screen and (max-width: 768px) {
-  .buff-tag {
-    font-size: 0.6rem;
-    padding: 1px 4px;
-  }
-  
-  .hud-bar {
-    z-index: 30;
-  }
-
-  .center-action-box {
-    z-index: 10;
-  }
-}
-
 /* ENLARGED & BOLD ARCADE WORD ART HUD LABELS */
 .stat-label {
   font-family: 'Impact', 'Trebuchet MS', sans-serif;
@@ -697,14 +690,6 @@ body {
   transition: color 0.3s ease, text-shadow 0.3s ease;
 }
 
-.stat-value-large {
-  font-family: 'Impact', 'Arial Black', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: #00ffff;
-  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 12px rgba(0, 255, 255, 0.9);
-}
-
 /* 1-SECOND LP FLASH ANIMATIONS */
 .lp-flash-damage {
   color: #ff1144 !important;
@@ -716,15 +701,18 @@ body {
   text-shadow: 2px 2px 0px #000, 0px 0px 14px #00ff66, 0px 0px 25px #00ff00 !important;
 }
 
-/* ANTI-OVERLAP SPATIAL OFFSET POSITIONS FOR POPUPS */
-.damage-popup.popup-text {
-  top: 22% !important; /* Positions status text (MISS, DODGED, EVADED) above numbers */
-  font-size: 1.4rem;
-  z-index: 105;
-}
+/* MOBILE SCREEN SCALING ADJUSTMENTS */
+@media screen and (max-width: 768px) {
+  .buff-tag {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+  }
+  
+  .hud-bar {
+    z-index: 30;
+  }
 
-.damage-popup.popup-number {
-  top: 48% !important; /* Positions damage/heal numbers below status text */
-  font-size: 1.8rem;
-  z-index: 106;
+  .center-action-box {
+    z-index: 10;
+  }
 }
