@@ -268,3 +268,4 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'hard'
 }
 
 window.selectCPUMove = selectCPUMove;
+ 
