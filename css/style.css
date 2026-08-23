@@ -185,42 +185,37 @@ body {
 }
 
 
-/* VIOLENT RETRO ARCADE "VS" DIVIDER */
+
+/* SMOOTH RETRO ARCADE "VS" DIVIDER */
 .vs-divider {
   font-family: 'Impact', 'Arial Black', sans-serif;
-  font-size: 3.8rem;
+  font-size: 3.5rem;
   font-weight: 900;
   font-style: italic;
-  color: #ff0033;
-  letter-spacing: 3px;
+  color: #e60033;
+  letter-spacing: 2px;
   text-shadow: 
-    0 0 8px #ff0000,
-    0 0 18px #ff0033,
-    0 0 30px #990000,
-    3px 4px 0px #000;
-  transform: skewX(-12deg);
-  animation: violentVsPulse 0.6s infinite alternate ease-in-out;
+    0 0 10px rgba(230, 0, 51, 0.6),
+    2px 2px 0px #000;
+  transform: skewX(-10deg);
+  animation: smoothVsPulse 2s infinite alternate ease-in-out;
   display: inline-block;
-  margin: 0 10px;
+  margin: 0 15px;
 }
 
-@keyframes violentVsPulse {
+@keyframes smoothVsPulse {
   0% {
-    transform: skewX(-12deg) scale(1) rotate(-2deg);
-    filter: drop-shadow(0 0 8px #ff0000);
-    color: #ff0033;
-  }
-  50% {
-    transform: skewX(-14deg) scale(1.18) rotate(3deg);
-    filter: drop-shadow(0 0 25px #ff0055) drop-shadow(0 0 40px #ff0000);
-    color: #ff3300;
+    transform: skewX(-10deg) scale(1);
+    text-shadow: 0 0 8px rgba(230, 0, 51, 0.5), 2px 2px 0px #000;
   }
   100% {
-    transform: skewX(-10deg) scale(1.08) rotate(-3deg);
-    filter: drop-shadow(0 0 15px #cc0000);
-    color: #cc0022;
+    transform: skewX(-10deg) scale(1.04);
+    text-shadow: 0 0 14px rgba(255, 51, 85, 0.8), 2px 2px 0px #000;
   }
 }
+
+
+
 
 
 .error-banner {
