@@ -351,6 +351,12 @@ function applyFaintBuildUp(player, playerKey) {
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
+  // TRACK HP/FAINT BEFORE RESOLUTION FOR ACCUMULATED AI
+  const p1StartLp = gameState.p1.lp;
+  const p2StartLp = gameState.p2.lp;
+  const p1StartFaint = gameState.p1.faintMeter;
+  const p2StartFaint = gameState.p2.faintMeter;
+
   let p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
   if (!p1MoveKey && gameState.p1.isCPU) {
     p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
@@ -649,6 +655,39 @@ async function executeTurnResolutionPhase() {
 
     if (battleMsg) battleMsg.hidden = true;
 
+    // --- RECORD ACCUMULATED KNOWLEDGE FOR CPU ---
+    const p1DmgTaken = p1StartLp - gameState.p1.lp;
+    const p2DmgTaken = p2StartLp - gameState.p2.lp;
+
+    if (gameState.p2.isCPU && window.globalAIKnowledge) {
+      const wasSuccessful = window.calculateMoveSuccess(gameState.p2, gameState.p1, p2MoveKey, {
+        damageDealt: p1DmgTaken,
+        damageTaken: p2DmgTaken,
+        cpuWasHit: p2DmgTaken > 0,
+        cpuWasInterrupted: defender1WasInterrupted && attacker2 === gameState.p1,
+        oppWasGuarded: p1Move.type === 'DEFENSE',
+        chiSpent: p2Move.chiCost || 0,
+        oppAttemptedAttack: p1Move.type !== 'DEFENSE' && p1Move.type !== 'IDLE',
+        faintRecovered: Math.max(0, p2StartFaint - gameState.p2.faintMeter)
+      });
+      window.globalAIKnowledge.recordTurnOutcome(gameState.p2, gameState.p1, p1MoveKey, p2MoveKey, wasSuccessful);
+    }
+
+    if (gameState.p1.isCPU && window.globalAIKnowledge) {
+      const wasSuccessful = window.calculateMoveSuccess(gameState.p1, gameState.p2, p1MoveKey, {
+        damageDealt: p2DmgTaken,
+        damageTaken: p1DmgTaken,
+        cpuWasHit: p1DmgTaken > 0,
+        cpuWasInterrupted: defender1WasInterrupted && attacker2 === gameState.p2,
+        oppWasGuarded: p2Move.type === 'DEFENSE',
+        chiSpent: p1Move.chiCost || 0,
+        oppAttemptedAttack: p2Move.type !== 'DEFENSE' && p2Move.type !== 'IDLE',
+        faintRecovered: Math.max(0, p1StartFaint - gameState.p1.faintMeter)
+      });
+      window.globalAIKnowledge.recordTurnOutcome(gameState.p1, gameState.p2, p2MoveKey, p1MoveKey, wasSuccessful);
+    }
+    // --------------------------------------------
+
     processRoundBuffs(gameState.p1);
     processRoundBuffs(gameState.p2);
 
@@ -801,4 +840,3 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, isMatchingGuard: isMatchingGuard, chiGained: chiGained, finalDmg: finalDmg };
 }
-  
