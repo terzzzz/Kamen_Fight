@@ -1,4 +1,4 @@
-// SELECT CPU MOVE BASED ON AFFORDABLE MOVES, RIDER IDENTITY & DIFFICULTY LEVEL
+// SELECT CPU MOVE BASED ON DYNAMIC WEIGHTING SYSTEM & SITUATIONAL MODIFIERS
 function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'normal') {
   if (!movesData || Object.keys(movesData).length === 0) return 'D+J';
 
@@ -8,6 +8,7 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
   const cpuLp = cpuPlayer.lp || 1;
   const cpuMaxLp = cpuPlayer.maxLp || 1000;
   const isIchigo = cpuPlayer.id === 'ichigo';
+  const isNigo = cpuPlayer.id === 'nigo';
 
   // 1. Get all currently affordable moves
   const affordableKeys = Object.keys(movesData).filter(key => {
@@ -17,173 +18,192 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
 
   if (affordableKeys.length === 0) return 'D+J';
 
-  // Helper function to safely check if a move key is affordable and valid
   const canUse = (key) => affordableKeys.includes(key);
 
-  // Read opponent state
-  let isOpponentConfirmed = false;
-  let oppMoveKey = null;
-  let oppMove = null;
+  // Read contextual battlefield state
+  const activeBuffs = cpuPlayer.activeBuffs || [];
+  const isAirborne = (cpuPlayer.airborneTicks && cpuPlayer.airborneTicks > 0) ||
+                     activeBuffs.some(b => b.id === 'airborne_boost' || b.id === 'airborne' || b.id === 'hit_buff');
+  const hasPowerBuff = activeBuffs.some(b => b.id === 'power_stance' || b.id === 'power_focus' || b.id === 'focus');
+  const isOpponentStunned = opponentPlayer.isFainted || (opponentPlayer.faintMeter >= 100);
+  const faint = cpuPlayer.faintMeter || 0;
+  const isLowHealth = (cpuLp / cpuMaxLp) <= 0.30;
 
+  // Read opponent incoming move (if confirmed)
+  let isOpponentConfirmed = false;
+  let oppMove = null;
   if (typeof gameState !== 'undefined') {
     const oppSlot = cpuPlayer === gameState.p1 ? 'p2' : 'p1';
     isOpponentConfirmed = oppSlot === 'p1' ? gameState.input?.isConfirmed : gameState.p2IsConfirmed;
-    oppMoveKey = oppSlot === 'p1' ? gameState.input?.selectedMoveKey : gameState.p2SelectedMoveKey;
+    const oppMoveKey = oppSlot === 'p1' ? gameState.input?.selectedMoveKey : gameState.p2SelectedMoveKey;
     if (isOpponentConfirmed && oppMoveKey && typeof getMoveForPlayer === 'function') {
       oppMove = getMoveForPlayer(oppSlot, oppMoveKey);
     }
   }
 
   // ----------------------------------------------------
-  // 2. NORMAL DIFFICULTY
+  // 2. NORMAL DIFFICULTY: Casual & Forgiving AI
   // ----------------------------------------------------
   if (difficulty === 'normal') {
-    if (cpuPlayer.faintMeter >= 75) {
-      const recoveryKey = affordableKeys.find(k => movesData[k].faintRecovery && movesData[k].faintRecovery > 0);
-      if (recoveryKey && Math.random() < 0.6) return recoveryKey;
+    // High faint emergency check
+    if (faint >= 75 && canUse('W+L') && Math.random() < 0.60) {
+      return 'W+L';
     }
-    return affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
+
+    // 25% Wildcard Chance (Casual mistake / random action)
+    if (Math.random() < 0.25) {
+      return affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
+    }
+
+    // Lighter utility scoring with large random noise (±35) for human-like inconsistency
+    let nBestKey = affordableKeys[0];
+    let nHighestScore = -Infinity;
+
+    affordableKeys.forEach(key => {
+      const move = movesData[key];
+      let score = (move.baseDamage || 0) * 0.8;
+
+      if (isAirborne && key === 'S+L') score += 150;
+      if (isOpponentStunned && key.startsWith('S')) score += 150;
+      if (key.startsWith('A+')) score -= 80;
+
+      // Heavy noise creates unpredictable, casual play
+      score += (Math.random() * 70) - 35;
+
+      if (score > nHighestScore) {
+        nHighestScore = score;
+        nBestKey = key;
+      }
+    });
+
+    return nBestKey;
   }
 
   // ----------------------------------------------------
-  // 3. HARD DIFFICULTY: Top-Tier Strategic Assessment
+  // 3. HARD DIFFICULTY: DYNAMIC UTILITY WEIGHTING SYSTEM
   // ----------------------------------------------------
-  if (difficulty === 'hard') {
-    const isOpponentStunned = opponentPlayer.isFainted || (opponentPlayer.faintMeter >= 100);
-    const activeBuffs = cpuPlayer.activeBuffs || [];
 
-    // =========================================================================
-    // 【PRIORITY 1: STUN PUNISH】
-    // =========================================================================
-    if (isOpponentStunned) {
-      if (cpuChi >= 10 && canUse('S+I')) return 'S+I';
-      if (cpuChi >= (isIchigo ? 6 : 7) && canUse('S+L')) return 'S+L';
-      if (cpuChi >= (isIchigo ? 4 : 5) && canUse('S+K')) return 'S+K';
-      if (canUse('D+L')) return 'D+L';
-      if (canUse('D+I')) return 'D+I';
-      return canUse('D+K') ? 'D+K' : affordableKeys[0];
-    }
-
-    // =========================================================================
-    // 【PRIORITY 2: LETHAL CHECK (Resource-Efficient)】
-    // =========================================================================
-    if (oppLp <= 350) {
-      // 1. Cheapest Lethal (0 Chi)
-      if (oppLp <= 85 && canUse('D+K')) return 'D+K';
-      // 2. Low-Cost Lethal (1 Chi)
-      if (oppLp <= 140 && canUse('D+L')) return 'D+L';
-      // 3. Ultimate Lethal (6-7 Chi)
-      const sLReqChi = isIchigo ? 6 : 7;
-      if (cpuChi >= sLReqChi && canUse('S+L')) return 'S+L';
-    }
-
-    // =========================================================================
-    // 【PRIORITY 3: REACTION GUARD (A+I)】
-    // =========================================================================
-    if (isOpponentConfirmed && oppMove && canUse('A+I') && cpuChi >= 3) {
-      const isDamagingSpecial = oppMove.type === 'SPECIAL' && (oppMove.baseDamage > 0 || oppMove.damage > 0);
-      const isCrisisPhysical = (cpuLp / cpuMaxLp) <= 0.30 && oppMove.type === 'PHYSICAL';
-      
-      if (isDamagingSpecial || isCrisisPhysical) {
-        return 'A+I';
-      }
-    }
-
-    // =========================================================================
-    // 【PRIORITY 4: SMART FAINT MANAGEMENT】
-    // =========================================================================
-    const faint = cpuPlayer.faintMeter || 0;
-    const sLReqFaintChi = isIchigo ? 1 : 2;
-
-    if (canUse('W+L') && cpuChi >= sLReqFaintChi) {
-      if (faint >= 75) return 'W+L';
-      if (faint >= 60 && oppChi >= 3 && oppLp > 200 && Math.random() < 0.85) {
-        return 'W+L';
-      }
-    }
-
-    // =========================================================================
-    // 【ICHIGO - Skill Specialist Strategy】
-    // =========================================================================
-    if (isIchigo) {
-      const hasFocus = activeBuffs.some(b => b.id === 'focus');
-      if (!hasFocus && canUse('W+K') && Math.random() < 0.40) return 'W+K';
-
-      if (cpuChi >= 10 && canUse('S+I') && Math.random() < 0.75) return 'S+I';
-      if (cpuChi >= 6 && canUse('S+L') && Math.random() < 0.65) return 'S+L';
-      if (cpuChi >= 4 && canUse('S+K') && Math.random() < 0.45) return 'S+K';
-
-      if (canUse('D+K') && Math.random() < 0.50) return 'D+K';
-      if (canUse('D+I') && Math.random() < 0.40) return 'D+I';
-      if (canUse('D+L') && Math.random() < 0.40) return 'D+L';
-      // Intentionally falls through to Step 4 if no RNG triggered
-    }
-
-    // =========================================================================
-    // 【NIGO - Power Specialist Strategy】
-    // =========================================================================
-    if (cpuPlayer.id === 'nigo') {
-      const hasPowerBuff = activeBuffs.some(b => b.id === 'power_stance' || b.id === 'power_focus' || b.id === 'focus');
-      if (!hasPowerBuff && canUse('W+K')) return 'W+K';
-
-      const hasHitBuff = cpuPlayer.airborneTicks > 0 || activeBuffs.some(b => b.id === 'airborne_boost' || b.id === 'hit_buff');
-
-      // Prepare jump combo only when close to having enough Chi for Rider Kick (7 Chi)
-      if (!hasHitBuff && cpuChi >= 9 && canUse('W+I') && cpuPlayer.airborneTicks === 0 && Math.random() < 0.60) {
-        return 'W+I';
-      }
-      if (hasHitBuff && cpuChi >= 7 && canUse('S+L')) {
-        return 'S+L';
-      }
-
-      if (hasPowerBuff) {
-        if (canUse('D+I') && Math.random() < 0.55) return 'D+I';
-        if (canUse('D+L') && Math.random() < 0.70) return 'D+L';
-      }
-
-      if (cpuChi >= 10 && canUse('S+I') && Math.random() < 0.65) return 'S+I';
-      if (cpuChi >= 7 && canUse('S+L') && Math.random() < 0.50) return 'S+L';
-      if (canUse('D+L') && Math.random() < 0.50) return 'D+L';
-      if (canUse('D+K') && Math.random() < 0.60) return 'D+K';
-      // Intentionally falls through to Step 4 if no RNG triggered
+  // WILDCARD / YOLO ROLL (6% chance to throw a surprise move)
+  const WILDCARD_CHANCE = 0.06;
+  if (Math.random() < WILDCARD_CHANCE && !isOpponentStunned && faint < 75) {
+    const wildKeys = affordableKeys.filter(k => !k.startsWith('A+'));
+    if (wildKeys.length > 0) {
+      return wildKeys[Math.floor(Math.random() * wildKeys.length)];
     }
   }
 
-  // ----------------------------------------------------
-  // 4. STEP 4: HEURISTIC EVALUATION (Smart Fallback)
-  // ----------------------------------------------------
   let bestKey = affordableKeys[0];
-  let highestScore = -9999;
+  let highestScore = -Infinity;
 
   affordableKeys.forEach(key => {
     const move = movesData[key];
     let score = 0;
 
+    // --- BASE WEIGHT: Expected Damage ---
     const baseDmg = move.baseDamage || move.damage || 0;
-    const accuracyVal = move.hitChance !== undefined ? move.hitChance : (move.accuracy !== undefined ? move.accuracy : 100);
-    const hitRate = accuracyVal / 100;
-    score += (baseDmg * hitRate) * 2;
+    const accuracy = move.hitChance !== undefined ? move.hitChance : (move.accuracy !== undefined ? move.accuracy : 100);
+    const hitRate = Math.max(0.1, accuracy / 100);
+    
+    score += (baseDmg * hitRate) * 1.5;
 
-    if (move.unmirrored) score += 40;
+    if (move.unmirrored) score += 25;
 
-    if (isOpponentConfirmed && oppMove && oppMove.type === 'SPECIAL' && key === 'A+I') {
-      score += 300;
+    // =========================================================================
+    // DYNAMIC CONDITION 1: AIRBORNE STATE
+    // =========================================================================
+    if (isAirborne) {
+      if (key === 'S+L') score += 350;
+      if (key === 'D+L') score += 120;
+      if (key === 'W+I' || key === 'W+K') score -= 500;
+      if (['A+J', 'A+K', 'A+L', 'A+I'].includes(key)) score -= 200;
     }
 
-    if (cpuPlayer.faintMeter >= 75 && move.faintRecovery) {
-      score += move.faintRecovery * 10;
+    // =========================================================================
+    // DYNAMIC CONDITION 2: OPPONENT STUNNED / FAINTED
+    // =========================================================================
+    if (isOpponentStunned) {
+      if (key === 'S+I') score += 400;
+      if (key === 'S+L') score += 300;
+      if (key === 'S+K') score += 200;
+      if (['D+L', 'D+I', 'D+K'].includes(key)) score += 100;
+      if (key === 'W+K' || key === 'W+I') score -= 250;
+      if (key.startsWith('A+')) score -= 500;
     }
 
-    if ((opponentPlayer.faintMeter >= 100 || opponentPlayer.isFainted) && move.type === 'SPECIAL') {
-      score += 300;
+    // =========================================================================
+    // DYNAMIC CONDITION 3: LETHAL FINISHING (RAW DAMAGE CHECK)
+    // =========================================================================
+    if (baseDmg >= oppLp) {
+      // Prioritize guaranteed kills, scaling higher for safer/higher accuracy moves
+      score += 400 + (hitRate * 100);
+    } else if (oppLp <= 200) {
+      if (key === 'D+L' || key === 'D+K') score += 80;
+      if (key === 'S+L') score += 180;
     }
 
-    // Heavy penalty for non-reaction guard moves
+    // =========================================================================
+    // DYNAMIC CONDITION 4: REACTION GUARD (A+I)
+    // =========================================================================
+    if (isOpponentConfirmed && oppMove && key === 'A+I' && cpuChi >= 3) {
+      const isDangerousSpecial = oppMove.type === 'SPECIAL' && (oppMove.baseDamage > 0 || oppMove.damage > 0);
+      if (isDangerousSpecial) score += 320;
+      if (isLowHealth && oppMove.type === 'PHYSICAL') score += 180;
+    }
+
     if (['A+J', 'A+K', 'A+L'].includes(key)) {
-      score -= 200;
+      score -= 150;
     }
 
-    score += Math.random() * 5;
+    // =========================================================================
+    // DYNAMIC CONDITION 5: BUFF & JUMP UTILITY
+    // =========================================================================
+    if (key === 'W+K') {
+      if (hasPowerBuff) {
+        score -= 400;
+      } else if (isLowHealth) {
+        score -= 200;
+      } else {
+        score += 35;
+      }
+    }
+
+    if (key === 'W+I') {
+      if (isAirborne) {
+        score -= 500;
+      } else if (cpuChi >= (isIchigo ? 6 : 7)) {
+        score += 85;
+      } else {
+        score -= 80;
+      }
+    }
+
+    // =========================================================================
+    // DYNAMIC CONDITION 6: FAINT CRISIS
+    // =========================================================================
+    if (key === 'W+L' && move.faintRecovery) {
+      if (faint >= 75) score += 280;
+      else if (faint >= 50) score += 90;
+      else score -= 100;
+    }
+
+    // =========================================================================
+    // DYNAMIC CONDITION 7: CHARACTER PERSONALITY FLAVORS
+    // =========================================================================
+    if (isNigo) {
+      if (key === 'D+L') score += 45;
+      if (key === 'D+I') score += 35;
+      if (key === 'S+L') score += 50;
+      if (hasPowerBuff && baseDmg > 0) score += 40;
+    }
+
+    if (isIchigo) {
+      if (key === 'S+K') score += 35;
+      if (key === 'D+K') score += 30;
+      if (hitRate >= 0.95) score += 25;
+    }
+
+    // Organic random noise (±8)
+    score += (Math.random() * 16) - 8;
 
     if (score > highestScore) {
       highestScore = score;
