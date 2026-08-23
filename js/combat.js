@@ -49,6 +49,7 @@ async function startBattle(matchConfig) {
       faintMeter: 0,
       activeBuffs: [],
       airborneTicks: 0,
+      airborneAppliedRound: 0,
       activeChargePercent: 100,
       isFainted: false,
       tookCleanHitThisRound: false
@@ -65,6 +66,7 @@ async function startBattle(matchConfig) {
       faintMeter: 0,
       activeBuffs: [],
       airborneTicks: 0,
+      airborneAppliedRound: 0,
       activeChargePercent: 100,
       isFainted: false,
       tookCleanHitThisRound: false
@@ -213,7 +215,7 @@ function triggerFloatingText(slotKey, text, customClass = '') {
   }, 2500);
 }
 
-// BUFF & AIRBORNE STATE MANAGEMENT
+// BUFF & AIRBORNE STATE MANAGEMENT (FIXED FOR BUG 1: PRESERVES FULL CAST DURATION)
 function applyBuff(player, buffId, label, buffType, durationRounds) {
   if (!player.activeBuffs) player.activeBuffs = [];
   player.activeBuffs = player.activeBuffs.filter(b => b.id !== buffId);
@@ -221,14 +223,19 @@ function applyBuff(player, buffId, label, buffType, durationRounds) {
     id: buffId,
     label: label,
     type: buffType,
-    roundsLeft: durationRounds
+    roundsLeft: durationRounds,
+    appliedRound: gameState.roundCounter
   });
   renderBuffTrays();
 }
 
 function processRoundBuffs(player) {
   if (!player.activeBuffs) return;
-  player.activeBuffs.forEach(b => b.roundsLeft--);
+  player.activeBuffs.forEach(b => {
+    if (b.appliedRound !== gameState.roundCounter) {
+      b.roundsLeft--;
+    }
+  });
   player.activeBuffs = player.activeBuffs.filter(b => b.roundsLeft > 0);
   renderBuffTrays();
 }
@@ -255,10 +262,11 @@ function renderBuffTrays() {
 function handleAirborneState(player, moveKey, move) {
   if (move && move.grantsAirborne) {
     player.airborneTicks = move.grantsAirborne;
+    player.airborneAppliedRound = gameState.roundCounter;
   } else if (player.airborneTicks > 0) {
     if (move && move.forcesLanding) {
       player.airborneTicks = 0;
-    } else {
+    } else if (player.airborneAppliedRound !== gameState.roundCounter) {
       player.airborneTicks--;
     }
   }
@@ -431,7 +439,6 @@ async function executeTurnResolutionPhase() {
     if (move1.buff) applyBuff(attacker1, move1.buff.id, move1.buff.label, move1.buff.type, move1.buff.duration);
     handleAirborneState(attacker1, key1, move1);
 
-    // Sequential Faint Recovery execution for Move 1
     if (move1.faintRecovery && attacker1.faintMeter > 0) {
       const recovered = Math.min(attacker1.faintMeter, move1.faintRecovery);
       attacker1.faintMeter = Math.max(0, attacker1.faintMeter - move1.faintRecovery);
@@ -530,12 +537,11 @@ async function executeTurnResolutionPhase() {
     updateHUD();
   }
 
-  // STEP 2 EXECUTION (Cancelled if defender was hit and interrupted in Step 1)
+  // STEP 2 EXECUTION
   if (defender2.lp > 0 && !defender2.isFainted && !defender1WasInterrupted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
 
-    // Sequential Faint Recovery execution for Move 2
     if (move2.faintRecovery && attacker2.faintMeter > 0) {
       const recovered = Math.min(attacker2.faintMeter, move2.faintRecovery);
       attacker2.faintMeter = Math.max(0, attacker2.faintMeter - move2.faintRecovery);
@@ -708,7 +714,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let guardSuccess = false;
   let damageRatio = 1.0;
 
-  // 1. GUARD EVALUATION
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
@@ -726,7 +731,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
-  // 2. HIT & EVASION CALCULATION
   let rolledHit = false;
   let isGlancing = false;
 
@@ -755,7 +759,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     damageRatio *= 0.85; 
   }
 
-  // 3. ATTACK MULTIPLIERS
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
   let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon' || b.id === 'typhoon_speed')) ? 1.25 : 1.0;
 
