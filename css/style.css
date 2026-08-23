@@ -56,33 +56,52 @@ body {
   transform-origin: center center;
 }
 
-/* CHARACTER SELECTION SCREEN STYLES */
+/* CHARACTER SELECTION SCREEN STYLES (RESPONSIVE LANDSCAPE FIX) */
+#vs-select-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
 #vs-select-screen h1 {
   text-align: center;
   color: var(--text-yellow);
-  font-size: 1.8rem;
-  margin-bottom: 10px;
+  font-size: 1.4rem;
+  margin: 0;
   text-shadow: 0 0 8px rgba(255, 204, 0, 0.5);
+  flex-shrink: 0;
 }
 
 .selection-layout {
   display: flex;
-  justify-content: space-around;
+  flex-direction: row;
+  justify-content: center;
   align-items: center;
-  flex-grow: 1;
-  margin-bottom: 10px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  gap: 15px;
 }
 
 .rider-card {
-  width: 340px;
+  width: 280px;
+  max-width: 38vw;
+  max-height: 80vh;
   background: var(--card-bg);
   border: 2px solid #334155;
-  padding: 12px;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   border-radius: 6px;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .rider-card.active-slot {
@@ -91,26 +110,27 @@ body {
 }
 
 .rider-card.locked-slot {
-  opacity: 0.5;
-  filter: grayscale(0.6);
+  opacity: 0.4;
+  filter: grayscale(0.8);
 }
 
 .rider-card h2 {
-  font-size: 1.2rem;
+  font-size: 1rem;
   color: var(--text-main);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .portrait-box {
-  width: 220px;
-  height: 200px;
+  width: 100%;
+  max-width: 180px;
+  height: 130px;
   background: #000;
   border: 2px solid var(--border-cyan);
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 10px;
+  margin: 4px 0;
 }
 
 .portrait-box img {
@@ -120,26 +140,26 @@ body {
 }
 
 .rider-card h3 {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   color: var(--text-yellow);
-  margin-bottom: 10px;
+  margin: 4px 0;
   text-align: center;
 }
 
 .card-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin: 4px 0;
 }
 
 .card-controls button {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   background: #1a2235;
   border: 1px solid var(--border-cyan);
   color: #fff;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
 }
@@ -154,19 +174,20 @@ body {
   background: #111827;
   border: 1px solid var(--border-cyan);
   color: var(--border-cyan);
-  padding: 6px 14px;
-  font-size: 0.95rem;
+  padding: 4px 10px;
+  font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
-  min-width: 90px;
+  min-width: 75px;
   text-align: center;
 }
 
 .difficulty-control-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
+  gap: 6px;
+  font-size: 0.8rem;
+  margin-top: 2px;
 }
 
 .diff-label {
@@ -177,8 +198,8 @@ body {
   background: #1f293d;
   border: 1px solid var(--text-yellow);
   color: var(--text-yellow);
-  padding: 3px 10px;
-  font-size: 0.85rem;
+  padding: 2px 8px;
+  font-size: 0.75rem;
   font-weight: bold;
   cursor: pointer;
 }
@@ -189,10 +210,10 @@ body {
   background: #3b111e;
 }
 
-/* SMOOTH RETRO ARCADE "VS" DIVIDER */
+/* RETRO ARCADE "VS" DIVIDER */
 .vs-divider {
   font-family: 'Impact', 'Arial Black', sans-serif;
-  font-size: 4rem;
+  font-size: 2.8rem;
   font-weight: 900;
   font-style: italic;
   color: #e60033;
@@ -203,7 +224,8 @@ body {
   transform: skewX(-10deg);
   animation: smoothVsPulse 2s infinite alternate ease-in-out;
   display: inline-block;
-  margin: 0 15px;
+  margin: 0 5px;
+  flex-shrink: 0;
 }
 
 @keyframes smoothVsPulse {
@@ -231,12 +253,14 @@ body {
 .selection-actions {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 16px;
+  margin-top: 6px;
+  flex-shrink: 0;
 }
 
 .nav-btn, .action-btn {
-  padding: 12px 28px;
-  font-size: 1.1rem;
+  padding: 8px 22px;
+  font-size: 0.95rem;
   font-weight: bold;
   background: #1a2235;
   border: 2px solid var(--border-cyan);
@@ -419,15 +443,16 @@ body {
   margin-top: 2px;
 }
 
+/* GOLDEN VS BANNER */
 .battle-banner {
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(0, 0, 0, 0.92);
   border: 2px solid var(--text-yellow);
   color: var(--text-yellow);
   text-align: center;
   padding: 6px 12px;
   font-weight: bold;
-  margin: 4px 0;
-  font-size: 1.1rem;
+  margin: 4px 0 0 0;
+  font-size: 1rem;
   width: 100%;
   letter-spacing: 0.5px;
 }
@@ -482,6 +507,7 @@ body {
   letter-spacing: 2px;
 }
 
+/* CENTER ACTION VIDEO CONTAINER */
 .center-action-box {
   position: absolute;
   left: 50%;
@@ -501,19 +527,26 @@ body {
   object-position: center 25%;
 }
 
+/* IN-GAME MESSAGE SUB-BAR (PINNED DIRECTLY BELOW THE GOLDEN BANNER) */
 .action-overlay-label {
   position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  border: 1px solid var(--border-cyan);
+  top: 0;
+  left: 0;
+  width: 100%;
+  transform: none;
+  background: rgba(8, 9, 13, 0.95);
+  border-bottom: 1px solid var(--border-cyan);
+  border-top: none;
+  border-left: none;
+  border-right: none;
   color: var(--text-yellow);
-  padding: 5px 14px;
-  font-size: 0.95rem;
+  padding: 4px 8px;
+  font-size: 0.85rem;
   font-weight: bold;
-  z-index: 12;
+  z-index: 25;
+  text-align: center;
   white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
 }
 
 /* FLOATING POPUPS DIRECTLY OVER CHARACTER BOXES */
