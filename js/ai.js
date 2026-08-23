@@ -3,8 +3,13 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
   if (!movesData || Object.keys(movesData).length === 0) return 'D+J';
 
   const cpuChi = cpuPlayer.chi || 0;
+  const oppChi = opponentPlayer.chi || 0;
+  const oppLp = opponentPlayer.lp || 1;
+  const cpuLp = cpuPlayer.lp || 1;
+  const cpuMaxLp = cpuPlayer.maxLp || 1000;
+  const isIchigo = cpuPlayer.id === 'ichigo';
 
-  // 1. Filter moves affordable with current Chi
+  // 1. Get all currently affordable moves
   const affordableKeys = Object.keys(movesData).filter(key => {
     const move = movesData[key];
     return move && typeof move === 'object' && (move.chiCost || 0) <= cpuChi;
@@ -12,6 +17,10 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
 
   if (affordableKeys.length === 0) return 'D+J';
 
+  // Helper function to safely check if a move key is affordable and valid
+  const canUse = (key) => affordableKeys.includes(key);
+
+  // Read opponent state
   let isOpponentConfirmed = false;
   let oppMoveKey = null;
   let oppMove = null;
@@ -26,7 +35,7 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
   }
 
   // ----------------------------------------------------
-  // 2. NORMAL DIFFICULTY: Balanced / Semi-random
+  // 2. NORMAL DIFFICULTY
   // ----------------------------------------------------
   if (difficulty === 'normal') {
     if (cpuPlayer.faintMeter >= 75) {
@@ -37,86 +46,144 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
   }
 
   // ----------------------------------------------------
-  // 3. HARD DIFFICULTY: KAMEN RIDER NIGO OPTIMAL STRATEGY
+  // 3. HARD DIFFICULTY: Top-Tier Strategic Assessment
   // ----------------------------------------------------
-  if (difficulty === 'hard' && cpuPlayer.id === 'nigo') {
-    // A. REACTION GUARD (Red Shutter Guard A+I)
-    if (isOpponentConfirmed && oppMove && oppMove.type === 'SPECIAL' && cpuChi >= 3 && movesData['A+I']) {
-      return 'A+I';
-    }
-    if (isOpponentConfirmed && oppMove && oppMove.type === 'PHYSICAL' && (cpuPlayer.lp / cpuPlayer.maxLp) <= 0.30 && cpuChi >= 3 && movesData['A+I']) {
-      return 'A+I';
-    }
+  if (difficulty === 'hard') {
+    const isOpponentStunned = opponentPlayer.isFainted || (opponentPlayer.faintMeter >= 100);
+    const activeBuffs = cpuPlayer.activeBuffs || [];
 
-    // B. FAINT EMERGENCY (Battle Cry W+L)
-    if (cpuPlayer.faintMeter >= 50 && cpuChi >= 2 && movesData['W+L']) {
-      return 'W+L';
-    }
-
-    // C. HIGH CHI & FINISHER EXECUTION (Aggressive Special Usage)
-    if (opponentPlayer.isFainted) {
-      if (cpuChi >= 10 && movesData['S+I']) return 'S+I';
-      if (cpuChi >= 7 && movesData['S+L']) return 'S+L';
-      if (cpuChi >= 5 && movesData['S+K']) return 'S+K';
+    // =========================================================================
+    // 【PRIORITY 1: STUN PUNISH】
+    // =========================================================================
+    if (isOpponentStunned) {
+      if (cpuChi >= 10 && canUse('S+I')) return 'S+I';
+      if (cpuChi >= (isIchigo ? 6 : 7) && canUse('S+L')) return 'S+L';
+      if (cpuChi >= (isIchigo ? 4 : 5) && canUse('S+K')) return 'S+K';
+      if (canUse('D+L')) return 'D+L';
+      if (canUse('D+I')) return 'D+I';
+      return canUse('D+K') ? 'D+K' : affordableKeys[0];
     }
 
-    // Spend accumulated Chi on heavy Specials when Chi is high (>= 5)
-    if (cpuChi >= 10 && movesData['S+I'] && Math.random() < 0.80) return 'S+I'; // Typhoon Power Break
-    if (cpuChi >= 7 && movesData['S+L'] && Math.random() < 0.70) return 'S+L';  // Rider Power Kick
-    if (cpuChi >= 5 && movesData['S+K'] && Math.random() < 0.50) return 'S+K';  // Rider Flying Knee
-
-    // D. BUFF MAINTENANCE (Power Focus W+K) - Only cast if NOT already buffed
-    const hasPowerStance = cpuPlayer.activeBuffs && cpuPlayer.activeBuffs.some(b => b.id === 'power_stance' || b.id === 'power_focus' || b.id === 'focus');
-    if (!hasPowerStance && cpuChi >= 1 && movesData['W+K'] && Math.random() < 0.85) {
-      return 'W+K';
+    // =========================================================================
+    // 【PRIORITY 2: LETHAL CHECK (Resource-Efficient)】
+    // =========================================================================
+    if (oppLp <= 350) {
+      // 1. Cheapest Lethal (0 Chi)
+      if (oppLp <= 85 && canUse('D+K')) return 'D+K';
+      // 2. Low-Cost Lethal (1 Chi)
+      if (oppLp <= 140 && canUse('D+L')) return 'D+L';
+      // 3. Ultimate Lethal (6-7 Chi)
+      const sLReqChi = isIchigo ? 6 : 7;
+      if (cpuChi >= sLReqChi && canUse('S+L')) return 'S+L';
     }
 
-    // E. AIRBORNE COUNTER (+15% Hit Passive)
-    if (opponentPlayer.airborneTicks > 0) {
-      if (cpuChi >= 3 && movesData['W+I'] && cpuPlayer.airborneTicks === 0) return 'W+I';
-      if (cpuChi >= 1 && movesData['D+L']) return 'D+L';
+    // =========================================================================
+    // 【PRIORITY 3: REACTION GUARD (A+I)】
+    // =========================================================================
+    if (isOpponentConfirmed && oppMove && canUse('A+I') && cpuChi >= 3) {
+      const isDamagingSpecial = oppMove.type === 'SPECIAL' && (oppMove.baseDamage > 0 || oppMove.damage > 0);
+      const isCrisisPhysical = (cpuLp / cpuMaxLp) <= 0.30 && oppMove.type === 'PHYSICAL';
+      
+      if (isDamagingSpecial || isCrisisPhysical) {
+        return 'A+I';
+      }
     }
 
-    // F. HIGH EV PHYSICAL NEUTRAL TRADES
-    if (cpuChi >= 1 && movesData['D+L'] && Math.random() < 0.60) return 'D+L';
-    if (cpuChi >= 1 && movesData['D+I'] && Math.random() < 0.50) return 'D+I';
-    if (movesData['D+K'] && Math.random() < 0.60) return 'D+K';
-    if (movesData['D+J']) return 'D+J';
+    // =========================================================================
+    // 【PRIORITY 4: SMART FAINT MANAGEMENT】
+    // =========================================================================
+    const faint = cpuPlayer.faintMeter || 0;
+    const sLReqFaintChi = isIchigo ? 1 : 2;
+
+    if (canUse('W+L') && cpuChi >= sLReqFaintChi) {
+      if (faint >= 75) return 'W+L';
+      if (faint >= 60 && oppChi >= 3 && oppLp > 200 && Math.random() < 0.85) {
+        return 'W+L';
+      }
+    }
+
+    // =========================================================================
+    // 【ICHIGO - Skill Specialist Strategy】
+    // =========================================================================
+    if (isIchigo) {
+      const hasFocus = activeBuffs.some(b => b.id === 'focus');
+      if (!hasFocus && canUse('W+K') && Math.random() < 0.40) return 'W+K';
+
+      if (cpuChi >= 10 && canUse('S+I') && Math.random() < 0.75) return 'S+I';
+      if (cpuChi >= 6 && canUse('S+L') && Math.random() < 0.65) return 'S+L';
+      if (cpuChi >= 4 && canUse('S+K') && Math.random() < 0.45) return 'S+K';
+
+      if (canUse('D+K') && Math.random() < 0.50) return 'D+K';
+      if (canUse('D+I') && Math.random() < 0.40) return 'D+I';
+      if (canUse('D+L') && Math.random() < 0.40) return 'D+L';
+      // Intentionally falls through to Step 4 if no RNG triggered
+    }
+
+    // =========================================================================
+    // 【NIGO - Power Specialist Strategy】
+    // =========================================================================
+    if (cpuPlayer.id === 'nigo') {
+      const hasPowerBuff = activeBuffs.some(b => b.id === 'power_stance' || b.id === 'power_focus' || b.id === 'focus');
+      if (!hasPowerBuff && canUse('W+K')) return 'W+K';
+
+      const hasHitBuff = cpuPlayer.airborneTicks > 0 || activeBuffs.some(b => b.id === 'airborne_boost' || b.id === 'hit_buff');
+
+      // Prepare jump combo only when close to having enough Chi for Rider Kick (7 Chi)
+      if (!hasHitBuff && cpuChi >= 9 && canUse('W+I') && cpuPlayer.airborneTicks === 0 && Math.random() < 0.60) {
+        return 'W+I';
+      }
+      if (hasHitBuff && cpuChi >= 7 && canUse('S+L')) {
+        return 'S+L';
+      }
+
+      if (hasPowerBuff) {
+        if (canUse('D+I') && Math.random() < 0.55) return 'D+I';
+        if (canUse('D+L') && Math.random() < 0.70) return 'D+L';
+      }
+
+      if (cpuChi >= 10 && canUse('S+I') && Math.random() < 0.65) return 'S+I';
+      if (cpuChi >= 7 && canUse('S+L') && Math.random() < 0.50) return 'S+L';
+      if (canUse('D+L') && Math.random() < 0.50) return 'D+L';
+      if (canUse('D+K') && Math.random() < 0.60) return 'D+K';
+      // Intentionally falls through to Step 4 if no RNG triggered
+    }
   }
 
   // ----------------------------------------------------
-  // 4. GENERAL / FALLBACK WEIGHTED SCORING
+  // 4. STEP 4: HEURISTIC EVALUATION (Smart Fallback)
   // ----------------------------------------------------
   let bestKey = affordableKeys[0];
-  let highestScore = -999;
+  let highestScore = -9999;
 
   affordableKeys.forEach(key => {
     const move = movesData[key];
     let score = 0;
 
-    score += (move.baseDamage || 0) * 1.5;
+    const baseDmg = move.baseDamage || move.damage || 0;
+    const accuracyVal = move.hitChance !== undefined ? move.hitChance : (move.accuracy !== undefined ? move.accuracy : 100);
+    const hitRate = accuracyVal / 100;
+    score += (baseDmg * hitRate) * 2;
 
-    if (isOpponentConfirmed && oppMove && oppMove.type === 'SPECIAL' && move.type === 'DEFENSE') {
-      score += 220;
+    if (move.unmirrored) score += 40;
+
+    if (isOpponentConfirmed && oppMove && oppMove.type === 'SPECIAL' && key === 'A+I') {
+      score += 300;
     }
 
-    if (cpuPlayer.faintMeter >= 60 && move.faintRecovery) {
-      score += move.faintRecovery * 5;
+    if (cpuPlayer.faintMeter >= 75 && move.faintRecovery) {
+      score += move.faintRecovery * 10;
     }
 
-    if ((opponentPlayer.faintMeter >= 70 || opponentPlayer.isFainted) && move.type === 'SPECIAL') {
-      score += 180;
+    if ((opponentPlayer.faintMeter >= 100 || opponentPlayer.isFainted) && move.type === 'SPECIAL') {
+      score += 300;
     }
 
-    if (move.buff && (!cpuPlayer.activeBuffs || cpuPlayer.activeBuffs.length === 0)) {
-      score += 80;
+    // Heavy penalty for non-reaction guard moves
+    if (['A+J', 'A+K', 'A+L'].includes(key)) {
+      score -= 200;
     }
 
-    if (cpuPlayer.lp < cpuPlayer.maxLp * 0.25 && move.type === 'DEFENSE') {
-      score += 60;
-    }
-
-    score += Math.random() * 20;
+    score += Math.random() * 5;
 
     if (score > highestScore) {
       highestScore = score;
