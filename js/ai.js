@@ -10,9 +10,8 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
     return move && typeof move === 'object' && (move.chiCost || 0) <= cpuChi;
   });
 
-  if (affordableKeys.length === 0) return 'D+J'; // Fallback free attack
+  if (affordableKeys.length === 0) return 'D+J';
 
-  // Detect opponent's locked-in move from global state if available
   let isOpponentConfirmed = false;
   let oppMoveKey = null;
   let oppMove = null;
@@ -27,10 +26,9 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
   }
 
   // ----------------------------------------------------
-  // 2. NORMAL DIFFICULTY: Balanced / Semi-random selection
+  // 2. NORMAL DIFFICULTY: Balanced / Semi-random
   // ----------------------------------------------------
   if (difficulty === 'normal') {
-    // If CPU is near faint threshold (>= 75%), prioritize faint recovery if available
     if (cpuPlayer.faintMeter >= 75) {
       const recoveryKey = affordableKeys.find(k => movesData[k].faintRecovery && movesData[k].faintRecovery > 0);
       if (recoveryKey && Math.random() < 0.6) return recoveryKey;
@@ -39,16 +37,13 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
   }
 
   // ----------------------------------------------------
-  // 3. HARD DIFFICULTY: NIGO SPECIFIC OPTIMAL STRATEGY
+  // 3. HARD DIFFICULTY: KAMEN RIDER NIGO OPTIMAL STRATEGY
   // ----------------------------------------------------
   if (difficulty === 'hard' && cpuPlayer.id === 'nigo') {
     // A. REACTION GUARD (Red Shutter Guard A+I)
-    // Reaction-void opponent's Special Attack (S-Type) for 100% negation + 15% Dmg Reduction buff
     if (isOpponentConfirmed && oppMove && oppMove.type === 'SPECIAL' && cpuChi >= 3 && movesData['A+I']) {
       return 'A+I';
     }
-
-    // Defensive Guard when under 30% LP against physical attacks
     if (isOpponentConfirmed && oppMove && oppMove.type === 'PHYSICAL' && (cpuPlayer.lp / cpuPlayer.maxLp) <= 0.30 && cpuChi >= 3 && movesData['A+I']) {
       return 'A+I';
     }
@@ -58,16 +53,21 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
       return 'W+L';
     }
 
-    // C. FINISHER EXECUTION (S-Type Moves)
-    if (opponentPlayer.isFainted || opponentPlayer.lp <= 380) {
-      if (cpuChi >= 10 && movesData['S+I'] && opponentPlayer.lp <= 450) return 'S+I'; // Rider Gaeshi (580 dmg)
-      if (cpuChi >= 6 && movesData['S+L']) return 'S+L';  // Nigo Rider Kick (450 dmg)
-      if (cpuChi >= 4 && movesData['S+K']) return 'S+K';  // Rider Power Punch (260 dmg)
+    // C. HIGH CHI & FINISHER EXECUTION (Aggressive Special Usage)
+    if (opponentPlayer.isFainted) {
+      if (cpuChi >= 10 && movesData['S+I']) return 'S+I';
+      if (cpuChi >= 7 && movesData['S+L']) return 'S+L';
+      if (cpuChi >= 5 && movesData['S+K']) return 'S+K';
     }
 
-    // D. BUFF MAINTENANCE (Power Stance W+K)
+    // Spend accumulated Chi on heavy Specials when Chi is high (>= 5)
+    if (cpuChi >= 10 && movesData['S+I'] && Math.random() < 0.80) return 'S+I'; // Typhoon Power Break
+    if (cpuChi >= 7 && movesData['S+L'] && Math.random() < 0.70) return 'S+L';  // Rider Power Kick
+    if (cpuChi >= 5 && movesData['S+K'] && Math.random() < 0.50) return 'S+K';  // Rider Flying Knee
+
+    // D. BUFF MAINTENANCE (Power Focus W+K) - Only cast if NOT already buffed
     const hasPowerStance = cpuPlayer.activeBuffs && cpuPlayer.activeBuffs.some(b => b.id === 'power_stance' || b.id === 'power_focus' || b.id === 'focus');
-    if (!hasPowerStance && cpuChi >= 2 && movesData['W+K'] && Math.random() < 0.85) {
+    if (!hasPowerStance && cpuChi >= 1 && movesData['W+K'] && Math.random() < 0.85) {
       return 'W+K';
     }
 
@@ -77,15 +77,15 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
       if (cpuChi >= 1 && movesData['D+L']) return 'D+L';
     }
 
-    // F. HIGH EXPECTED VALUE (EV) PHYSICAL NEUTRAL TRADES
-    if (cpuChi >= 1 && movesData['D+L'] && Math.random() < 0.65) return 'D+L'; // Power Chop Combo
-    if (cpuChi >= 1 && movesData['D+I'] && Math.random() < 0.50) return 'D+I'; // Sweep Kick
-    if (movesData['D+K'] && Math.random() < 0.60) return 'D+K';                 // Heavy Kick
-    if (movesData['D+J']) return 'D+J';                                         // Heavy Punch
+    // F. HIGH EV PHYSICAL NEUTRAL TRADES
+    if (cpuChi >= 1 && movesData['D+L'] && Math.random() < 0.60) return 'D+L';
+    if (cpuChi >= 1 && movesData['D+I'] && Math.random() < 0.50) return 'D+I';
+    if (movesData['D+K'] && Math.random() < 0.60) return 'D+K';
+    if (movesData['D+J']) return 'D+J';
   }
 
   // ----------------------------------------------------
-  // 4. HARD DIFFICULTY: GENERAL / ICHIGO WEIGHT-BASED SCORING
+  // 4. GENERAL / FALLBACK WEIGHTED SCORING
   // ----------------------------------------------------
   let bestKey = affordableKeys[0];
   let highestScore = -999;
@@ -94,35 +94,28 @@ function selectCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'norma
     const move = movesData[key];
     let score = 0;
 
-    // Favor high base damage
     score += (move.baseDamage || 0) * 1.5;
 
-    // Reactive Guarding for Ichigo/General
     if (isOpponentConfirmed && oppMove && oppMove.type === 'SPECIAL' && move.type === 'DEFENSE') {
-      score += 220; // Strongly counter-guard opponent's special moves
+      score += 220;
     }
 
-    // Prioritize faint recovery when CPU faint meter is high
     if (cpuPlayer.faintMeter >= 60 && move.faintRecovery) {
       score += move.faintRecovery * 5;
     }
 
-    // Prioritize high damage / special moves when opponent is fainted or near faint
     if ((opponentPlayer.faintMeter >= 70 || opponentPlayer.isFainted) && move.type === 'SPECIAL') {
       score += 180;
     }
 
-    // Favor buff setup if CPU currently has no active buffs
     if (move.buff && (!cpuPlayer.activeBuffs || cpuPlayer.activeBuffs.length === 0)) {
       score += 80;
     }
 
-    // Favor defense if CPU health is critically low (< 25% LP)
     if (cpuPlayer.lp < cpuPlayer.maxLp * 0.25 && move.type === 'DEFENSE') {
       score += 60;
     }
 
-    // Slight random factor so Hard AI isn't 100% predictable
     score += Math.random() * 20;
 
     if (score > highestScore) {
