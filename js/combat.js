@@ -280,7 +280,7 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-// HUD DISPLAY UPDATER WITH DOUBLE-LABEL CLEANUP
+// HUD DISPLAY UPDATER WITH DOUBLE-LABEL CLEANUP & SINGLE-LINE CHI FLEX CONTAINER
 function updateHUD() {
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
@@ -311,10 +311,12 @@ function updateHUD() {
           }
         });
       }
+      chiEl.className = 'stat-line stat-line-chi';
       const maxChi = player.maxChi || 16;
       const chiPct = Math.min(100, Math.max(0, (player.chi / maxChi) * 100));
       chiEl.innerHTML = `
-        <span class="stat-label">CHI:</span> <span class="stat-value-large">${player.chi}</span>
+        <span class="stat-label">CHI:</span> 
+        <span class="stat-value-large">${player.chi}</span>
         <div class="chi-bar-track">
           <div class="chi-bar-fill" style="width: ${chiPct}%;"></div>
         </div>`;
