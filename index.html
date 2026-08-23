@@ -89,7 +89,7 @@
           </div>
         </div>
 
-        <div id="p1-status" class="status-tag">NORMAL</div>
+        <div id="p1-status" class="status-tag" hidden>NORMAL</div>
         <div id="p1-buff-tray" class="buff-tray"></div>
       </div>
 
@@ -112,30 +112,31 @@
           </div>
         </div>
 
-        <div id="p2-status" class="status-tag">NORMAL</div>
+        <div id="p2-status" class="status-tag" hidden>NORMAL</div>
         <div id="p2-buff-tray" class="buff-tray"></div>
       </div>
     </div>
 
+    <!-- PRIMARY GOLDEN MATCH BANNER -->
     <div id="battle-message" class="battle-banner" hidden></div>
 
-    <!-- VIEWPORT -->
+    <!-- SECONDARY GOLDEN ACTION BANNER -->
+    <div id="center-action-label" class="action-sub-banner" hidden></div>
+
+    <!-- BATTLE VIEWPORT -->
     <div class="battle-viewport">
       <div class="player-box" id="p1-box">
         <video id="p1-video" autoplay muted playsinline></video>
         <img id="p1-sprite" hidden>
-        <div id="p1-stun-overlay" class="stun-effect" hidden>STUNNED</div>
       </div>
 
       <div class="center-action-box" id="center-box" hidden>
-        <div id="center-action-label" class="action-overlay-label" hidden></div>
         <video id="center-video" autoplay muted playsinline></video>
       </div>
 
       <div class="player-box" id="p2-box">
         <video id="p2-video" autoplay muted playsinline></video>
         <img id="p2-sprite" hidden>
-        <div id="p2-stun-overlay" class="stun-effect" hidden>STUNNED</div>
       </div>
     </div>
 
