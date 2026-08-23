@@ -346,6 +346,22 @@ body {
   font-weight: bold;
 }
 
+/* SINGLE-LINE NON-WRAPPING FLEX CONTAINER FOR CHI DISPLAY */
+.stat-line-chi {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+
+.p1-hud .stat-line-chi {
+  justify-content: flex-start;
+}
+
+.p2-hud .stat-line-chi {
+  justify-content: flex-end;
+}
+
 .stat-label {
   font-family: 'Impact', 'Trebuchet MS', sans-serif;
   font-size: 1.1rem;
@@ -371,13 +387,13 @@ body {
 }
 
 .chi-bar-track {
-  width: 100%;
-  max-width: 140px;
+  width: 140px !important;
+  max-width: 140px !important;
   height: 8px;
   background: #222;
   border: 1px solid var(--border-cyan);
-  display: inline-block;
-  vertical-align: middle;
+  display: block !important;
+  flex-shrink: 0 !important;
 }
 
 .chi-bar-fill {
@@ -778,5 +794,10 @@ body {
 
   .center-action-box {
     z-index: 10;
+  }
+
+  .chi-bar-track {
+    width: 90px !important;
+    max-width: 90px !important;
   }
 }
