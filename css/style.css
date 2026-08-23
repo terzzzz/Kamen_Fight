@@ -1,3 +1,8 @@
+/* ==========================================================================
+   GAME ENGINE MAIN STYLESHEET - css/style.css
+   Full Viewport Utilization & Mobile Landscape Optimization
+   ========================================================================== */
+
 /* FORCE HIDDEN SCREENS & ELEMENTS TO REMAIN HIDDEN */
 [hidden],
 .hidden,
@@ -39,7 +44,7 @@ body {
   padding: 0;
 }
 
-/* FULL-SCREEN CONTAINER (Utilizes 100% of Mobile Viewport) */
+/* FULL-SCREEN CONTAINER (Fills Viewport Completely) */
 .screen-container,
 .splash-screen {
   width: 100vw;
@@ -48,60 +53,40 @@ body {
   max-height: 100%;
   background: var(--panel-bg);
   border: 2px solid var(--border-cyan);
-  box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.25);
   display: flex;
   flex-direction: column;
   position: relative;
   padding: 8px 12px;
-  transform-origin: center center;
 }
 
-/* CHARACTER SELECTION SCREEN STYLES (RESPONSIVE LANDSCAPE FIX) */
-#vs-select-screen {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 16px;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-}
-
+/* CHARACTER SELECTION SCREEN STYLES */
 #vs-select-screen h1 {
   text-align: center;
   color: var(--text-yellow);
-  font-size: 1.4rem;
-  margin: 0;
-  text-shadow: 0 0 8px rgba(255, 204, 0, 0.5);
-  flex-shrink: 0;
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.6);
 }
 
 .selection-layout {
   display: flex;
-  flex-direction: row;
-  justify-content: center;
+  justify-content: space-around;
   align-items: center;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  gap: 15px;
+  flex-grow: 1;
+  margin-bottom: 10px;
 }
 
 .rider-card {
-  width: 280px;
-  max-width: 38vw;
-  max-height: 80vh;
+  width: 340px;
   background: var(--card-bg);
   border: 2px solid #334155;
-  padding: 8px 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
   border-radius: 6px;
   transition: all 0.3s ease;
-  flex-shrink: 0;
 }
 
 .rider-card.active-slot {
@@ -110,27 +95,26 @@ body {
 }
 
 .rider-card.locked-slot {
-  opacity: 0.4;
-  filter: grayscale(0.8);
+  opacity: 0.5;
+  filter: grayscale(0.6);
 }
 
 .rider-card h2 {
-  font-size: 1rem;
+  font-size: 1.2rem;
   color: var(--text-main);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .portrait-box {
-  width: 100%;
-  max-width: 180px;
-  height: 130px;
+  width: 220px;
+  height: 200px;
   background: #000;
   border: 2px solid var(--border-cyan);
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 4px 0;
+  margin-bottom: 10px;
 }
 
 .portrait-box img {
@@ -140,66 +124,55 @@ body {
 }
 
 .rider-card h3 {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   color: var(--text-yellow);
-  margin: 4px 0;
+  margin-bottom: 10px;
   text-align: center;
 }
 
 .card-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 4px 0;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .card-controls button {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: #1a2235;
   border: 1px solid var(--border-cyan);
   color: #fff;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: bold;
   cursor: pointer;
-}
-
-.card-controls button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  border-color: #555;
 }
 
 .type-badge {
   background: #111827;
   border: 1px solid var(--border-cyan);
   color: var(--border-cyan);
-  padding: 4px 10px;
-  font-size: 0.85rem;
+  padding: 6px 14px;
+  font-size: 0.95rem;
   font-weight: bold;
   cursor: pointer;
-  min-width: 75px;
+  min-width: 90px;
   text-align: center;
 }
 
 .difficulty-control-group {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  margin-top: 2px;
-}
-
-.diff-label {
-  color: var(--text-main);
+  gap: 8px;
+  font-size: 0.9rem;
 }
 
 .diff-badge {
   background: #1f293d;
   border: 1px solid var(--text-yellow);
   color: var(--text-yellow);
-  padding: 2px 8px;
-  font-size: 0.75rem;
+  padding: 3px 10px;
+  font-size: 0.85rem;
   font-weight: bold;
   cursor: pointer;
 }
@@ -213,86 +186,45 @@ body {
 /* RETRO ARCADE "VS" DIVIDER */
 .vs-divider {
   font-family: 'Impact', 'Arial Black', sans-serif;
-  font-size: 2.8rem;
+  font-size: 4rem;
   font-weight: 900;
   font-style: italic;
   color: #e60033;
   letter-spacing: 2px;
   text-shadow: 
-    0 0 10px rgba(230, 0, 51, 0.6),
+    0 0 12px rgba(230, 0, 51, 0.7),
     2px 2px 0px #000;
   transform: skewX(-10deg);
   animation: smoothVsPulse 2s infinite alternate ease-in-out;
   display: inline-block;
-  margin: 0 5px;
-  flex-shrink: 0;
+  margin: 0 20px;
 }
 
 @keyframes smoothVsPulse {
-  0% {
-    transform: skewX(-10deg) scale(1);
-    text-shadow: 0 0 8px rgba(230, 0, 51, 0.5), 2px 2px 0px #000;
-  }
-  100% {
-    transform: skewX(-10deg) scale(1.04);
-    text-shadow: 0 0 14px rgba(255, 51, 85, 0.8), 2px 2px 0px #000;
-  }
-}
-
-.error-banner {
-  background: rgba(255, 42, 95, 0.2);
-  border: 1px solid var(--text-red);
-  color: var(--text-red);
-  padding: 8px;
-  text-align: center;
-  font-size: 0.85rem;
-  font-weight: bold;
-  margin-bottom: 10px;
+  0% { transform: skewX(-10deg) scale(1); }
+  100% { transform: skewX(-10deg) scale(1.06); }
 }
 
 .selection-actions {
   display: flex;
   justify-content: center;
-  gap: 16px;
-  margin-top: 6px;
-  flex-shrink: 0;
+  gap: 20px;
 }
 
 .nav-btn, .action-btn {
-  padding: 8px 22px;
-  font-size: 0.95rem;
+  padding: 12px 28px;
+  font-size: 1.1rem;
   font-weight: bold;
   background: #1a2235;
   border: 2px solid var(--border-cyan);
   color: #fff;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
-.nav-btn:disabled {
-  opacity: 0.3;
-  border-color: #555;
-  cursor: not-allowed;
-}
+/* ==========================================================================
+   EXPANDED HUD & STATS BAR
+   ========================================================================== */
 
-.action-btn:hover {
-  background: var(--border-cyan);
-  color: #000;
-  box-shadow: 0 0 12px var(--border-cyan);
-}
-
-.start-glow {
-  border-color: var(--text-yellow);
-  color: var(--text-yellow);
-  animation: pulseYellow 1.5s infinite alternate;
-}
-
-@keyframes pulseYellow {
-  0% { box-shadow: 0 0 5px var(--text-yellow); }
-  100% { box-shadow: 0 0 20px var(--text-yellow); }
-}
-
-/* TOP HUD BAR & BATTLE VIEWPORT STYLES */
 .hud-bar {
   position: relative;
   z-index: 30;
@@ -301,9 +233,9 @@ body {
   align-items: flex-start;
   background: #000;
   border: 2px solid var(--border-cyan);
-  padding: 8px 14px;
-  min-height: 105px;
+  padding: 8px 16px;
   width: 100%;
+  min-height: 105px;
 }
 
 .player-hud {
@@ -321,8 +253,8 @@ body {
 .player-hud h2 {
   font-size: 1.35rem;
   color: var(--border-cyan);
-  margin-bottom: 2px;
   letter-spacing: 0.5px;
+  margin-bottom: 2px;
 }
 
 .stat-line {
@@ -330,12 +262,28 @@ body {
   font-weight: bold;
 }
 
+.stat-label {
+  font-family: 'Impact', 'Trebuchet MS', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #ffea00;
+  text-shadow: 2px 2px 0px #000, 0px 0px 8px rgba(255, 234, 0, 0.6);
+}
+
+.stat-value-styled {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 1.55rem;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 2px 2px 0px #000, 0px 0px 10px rgba(255, 255, 255, 0.8);
+}
+
 .stat-value-large {
   font-family: 'Impact', 'Arial Black', sans-serif;
   font-size: 1.65rem;
   font-weight: 900;
   color: #00ffff;
-  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 12px rgba(0, 255, 255, 0.9);
+  text-shadow: 2px 2px 0px #000, 0px 0px 12px rgba(0, 255, 255, 0.9);
 }
 
 .chi-bar-track {
@@ -385,13 +333,6 @@ body {
   font-weight: bold;
 }
 
-.status-tag {
-  font-size: 0.85rem;
-  color: var(--border-cyan);
-  font-weight: bold;
-  margin-top: 2px;
-}
-
 .buff-tray {
   position: relative;
   z-index: 35;
@@ -399,8 +340,6 @@ body {
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 4px;
-  max-width: 100%;
-  pointer-events: none;
 }
 
 .buff-tag {
@@ -410,19 +349,8 @@ body {
   font-size: 0.75rem;
   padding: 3px 7px;
   border-radius: 3px;
-  white-space: nowrap;
   font-weight: bold;
   box-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
-}
-
-.buff-tag.speed { 
-  border-color: var(--text-yellow); 
-  color: var(--text-yellow); 
-}
-
-.buff-tag.attack { 
-  border-color: var(--text-red); 
-  color: var(--text-red); 
 }
 
 .center-hud {
@@ -443,21 +371,23 @@ body {
   margin-top: 2px;
 }
 
-/* GOLDEN VS BANNER */
 .battle-banner {
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(0, 0, 0, 0.88);
   border: 2px solid var(--text-yellow);
   color: var(--text-yellow);
   text-align: center;
   padding: 6px 12px;
   font-weight: bold;
-  margin: 4px 0 0 0;
-  font-size: 1rem;
+  margin: 4px 0;
+  font-size: 1.1rem;
   width: 100%;
   letter-spacing: 0.5px;
 }
 
-/* RESPONSIVE BATTLE VIEWPORT (DYNAMIC FLEX HEIGHT) */
+/* ==========================================================================
+   RESPONSIVE BATTLE VIEWPORT (Vertical Video Zoom Fix)
+   ========================================================================== */
+
 .battle-viewport {
   display: flex;
   justify-content: space-between;
@@ -482,7 +412,7 @@ body {
   opacity: 0.15;
 }
 
-/* OBJECT-FIT COVER TO ELIMINATE BLACK SIDE PILLARBOXES */
+/* OBJECT-FIT COVER ELIMINATES SIDE PILLARBOXES ON VERTICAL CLIPS */
 .player-box video {
   width: 100%;
   height: 100%;
@@ -490,24 +420,6 @@ body {
   object-position: center 20%;
 }
 
-.p2-mirror-palette {
-  filter: hue-rotate(180deg) saturate(1.4);
-}
-
-.stun-effect {
-  position: absolute;
-  top: 40%;
-  width: 100%;
-  text-align: center;
-  background: rgba(255, 42, 95, 0.8);
-  color: #fff;
-  font-weight: 900;
-  font-size: 1.5rem;
-  padding: 8px 0;
-  letter-spacing: 2px;
-}
-
-/* CENTER ACTION VIDEO CONTAINER */
 .center-action-box {
   position: absolute;
   left: 50%;
@@ -527,96 +439,39 @@ body {
   object-position: center 25%;
 }
 
-/* IN-GAME MESSAGE SUB-BAR (PINNED DIRECTLY BELOW THE GOLDEN BANNER) */
-.action-overlay-label {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  transform: none;
-  background: rgba(8, 9, 13, 0.95);
-  border-bottom: 1px solid var(--border-cyan);
-  border-top: none;
-  border-left: none;
-  border-right: none;
-  color: var(--text-yellow);
-  padding: 4px 8px;
-  font-size: 0.85rem;
-  font-weight: bold;
-  z-index: 25;
-  text-align: center;
-  white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
-}
-
-/* FLOATING POPUPS DIRECTLY OVER CHARACTER BOXES */
+/* FLOATING POPUPS */
 .damage-popup {
   position: absolute;
-  top: 35%;
   left: 50%;
   transform: translate(-50%, 0);
   font-size: 2.5rem;
   font-weight: 900;
   z-index: 100;
   pointer-events: none;
-  animation: floatPopup 2.5s ease-out forwards;
-}
-
-.damage-popup.damage {
-  color: var(--text-red);
-  text-shadow: 0 0 10px rgba(255, 42, 95, 0.8), 2px 2px 0px #000;
-}
-
-.damage-popup.heal {
-  color: var(--border-cyan);
-  text-shadow: 0 0 10px rgba(0, 255, 204, 0.8), 2px 2px 0px #000;
-}
-
-.damage-popup.miss {
-  color: var(--text-red);
-  font-size: 2.8rem;
-  letter-spacing: 2px;
-  text-shadow: 0 0 14px rgba(255, 42, 95, 0.9), 3px 3px 0px #000;
-}
-
-.damage-popup.scratch {
-  color: var(--text-yellow);
-  font-size: 2.2rem;
-  text-shadow: 0 0 10px rgba(255, 204, 0, 0.8), 2px 2px 0px #000;
+  animation: floatPopup 2.2s ease-out forwards;
 }
 
 .damage-popup.popup-text {
   top: 20% !important;
   font-size: 1.6rem;
-  z-index: 105;
 }
 
 .damage-popup.popup-number {
   top: 45% !important;
   font-size: 2.2rem;
-  z-index: 106;
 }
 
 @keyframes floatPopup {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, 20px) scale(0.8);
-  }
-  15% {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1.15);
-  }
-  75% {
-    opacity: 1;
-    transform: translate(-50%, -20px) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -40px) scale(0.9);
-  }
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.8); }
+  15% { opacity: 1; transform: translate(-50%, -10px) scale(1.1); }
+  80% { opacity: 1; transform: translate(-50%, -25px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(0.9); }
 }
 
-/* ENLARGED CONTROLS PANEL FOR TOUCH INTERACTION */
+/* ==========================================================================
+   ENLARGED CONTROLS PANEL FOR TOUCH INTERACTION
+   ========================================================================== */
+
 .controls-panel {
   background: #000;
   border: 2px solid var(--border-cyan);
@@ -658,12 +513,6 @@ body {
   width: 0%;
 }
 
-.action-flag {
-  font-size: 0.95rem;
-  color: var(--text-yellow);
-  font-weight: bold;
-}
-
 .pad-container {
   display: flex;
   justify-content: space-between;
@@ -700,74 +549,13 @@ body {
   box-shadow: 0 0 12px var(--border-cyan);
 }
 
-/* SPLASH TRANSITION SCREEN */
-.splash-screen {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(8, 9, 13, 0.95);
-  z-index: 200;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-
-.splash-content h1 {
-  font-size: 2.2rem;
-  color: var(--text-yellow);
-  margin-bottom: 10px;
-}
-
-.splash-content h2 {
-  font-size: 1.8rem;
-  color: var(--border-cyan);
-}
-
-/* ENLARGED & BOLD ARCADE WORD ART HUD LABELS */
-.stat-label {
-  font-family: 'Impact', 'Trebuchet MS', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 900;
-  color: #ffea00;
-  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 8px rgba(255, 234, 0, 0.6);
-  letter-spacing: 1px;
-}
-
-.stat-value-styled {
-  font-family: 'Impact', 'Arial Black', sans-serif;
-  font-size: 1.55rem;
-  font-weight: bold;
-  color: #ffffff;
-  text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 0px 0px 10px rgba(255, 255, 255, 0.8);
-  transition: color 0.3s ease, text-shadow 0.3s ease;
-}
-
-/* 1-SECOND LP FLASH ANIMATIONS */
+/* LP FLASH ANIMATIONS */
 .lp-flash-damage {
   color: #ff1144 !important;
-  text-shadow: 2px 2px 0px #000, 0px 0px 14px #ff0044, 0px 0px 25px #ff0000 !important;
+  text-shadow: 2px 2px 0px #000, 0px 0px 18px #ff0044 !important;
 }
 
 .lp-flash-heal {
   color: #00ff66 !important;
-  text-shadow: 2px 2px 0px #000, 0px 0px 14px #00ff66, 0px 0px 25px #00ff00 !important;
-}
-
-/* MOBILE SCREEN SCALING ADJUSTMENTS */
-@media screen and (max-width: 768px) {
-  .buff-tag {
-    font-size: 0.7rem;
-    padding: 2px 5px;
-  }
-  
-  .hud-bar {
-    z-index: 30;
-  }
-
-  .center-action-box {
-    z-index: 10;
-  }
+  text-shadow: 2px 2px 0px #000, 0px 0px 18px #00ff66 !important;
 }
