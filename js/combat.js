@@ -215,7 +215,7 @@ function triggerFloatingText(slotKey, text, customClass = '') {
   }, 2500);
 }
 
-// BUFF & AIRBORNE STATE MANAGEMENT (FIXED FOR BUG 1: PRESERVES FULL CAST DURATION)
+// BUFF & AIRBORNE STATE MANAGEMENT
 function applyBuff(player, buffId, label, buffType, durationRounds) {
   if (!player.activeBuffs) player.activeBuffs = [];
   player.activeBuffs = player.activeBuffs.filter(b => b.id !== buffId);
@@ -459,7 +459,7 @@ async function executeTurnResolutionPhase() {
         if (move2.type === 'DEFENSE') {
           if (result.guardSuccess) {
             const guardVid = move2.video || 'guard.mp4';
-            const vidPromise = playCenterVideo(defKey1, guardVid, 'BLOCKED!', 1500, move2);
+            const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', 1500, move2);
 
             await new Promise(r => setTimeout(r, 600));
 
@@ -467,6 +467,10 @@ async function executeTurnResolutionPhase() {
               triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
             } else {
               triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
+              if (result.chiGained > 0) {
+                defender1.chi = Math.min(defender1.maxChi || 16, defender1.chi + result.chiGained);
+                triggerFloatingText(defKey1, 'CHI UP! (+2)', 'heal');
+              }
               await new Promise(r => setTimeout(r, 400));
               triggerFloatingNumber(defKey1, result.finalDmg, false);
             }
@@ -477,7 +481,7 @@ async function executeTurnResolutionPhase() {
             await vidPromise;
           } else {
             defender1WasInterrupted = true;
-            triggerFloatingText(defKey1, 'FAILED TO GUARD!', 'scratch');
+            triggerFloatingText(defKey1, 'GUARD FAIL!', 'scratch');
 
             await new Promise(r => setTimeout(r, 500));
 
@@ -558,7 +562,7 @@ async function executeTurnResolutionPhase() {
       if (move1.type === 'DEFENSE') {
         if (result.guardSuccess) {
           const guardVid = move1.video || 'guard.mp4';
-          const vidPromise = playCenterVideo(defKey2, guardVid, 'BLOCKED!', 1500, move1);
+          const vidPromise = playCenterVideo(defKey2, guardVid, 'GUARDED!', 1500, move1);
 
           await new Promise(r => setTimeout(r, 600));
 
@@ -566,6 +570,10 @@ async function executeTurnResolutionPhase() {
             triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
           } else {
             triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
+            if (result.chiGained > 0) {
+              defender2.chi = Math.min(defender2.maxChi || 16, defender2.chi + result.chiGained);
+              triggerFloatingText(defKey2, 'CHI UP! (+2)', 'heal');
+            }
             await new Promise(r => setTimeout(r, 400));
             triggerFloatingNumber(defKey2, result.finalDmg, false);
           }
@@ -575,7 +583,7 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else {
-          triggerFloatingText(defKey2, 'FAILED TO GUARD!', 'scratch');
+          triggerFloatingText(defKey2, 'GUARD FAIL!', 'scratch');
 
           await new Promise(r => setTimeout(r, 500));
 
@@ -704,7 +712,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
 
   if (!isOffensive) {
-    return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
+    return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
   const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
@@ -712,22 +720,35 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   let isGuarding = defMove.type === 'DEFENSE';
   let guardSuccess = false;
+  let isMatchingGuard = false;
+  let chiGained = 0;
   let damageRatio = 1.0;
 
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
     if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
+      isMatchingGuard = true;
       let effectiveCounterChance = 70 * defChargeRatio;
       if (!atkMove.unblockable && Math.random() * 100 < effectiveCounterChance) {
         guardSuccess = true;
         damageRatio = 0.0;
       }
-    } else if (defMoveKey === `A+${atkButton}` || defMove.name.includes('Guard')) {
-      guardSuccess = true;
-      let effectiveHighBlockChance = 20 * defChargeRatio;
-      let rolledHighBlock = Math.random() * 100 < effectiveHighBlockChance;
-      damageRatio = rolledHighBlock ? 0.20 : 0.70;
+    } else if (defMoveKey === `A+${atkButton}`) {
+      isMatchingGuard = true;
+      if (Math.random() < 0.70) {
+        guardSuccess = true;
+        damageRatio = 0.30; // Reduce damage by 70%
+        chiGained = 2;       // Award +2 Chi
+      } else {
+        guardSuccess = false;
+        damageRatio = 1.0;  // Matching fail -> Full damage
+      }
+    } else {
+      // Mismatched direction guard -> Full damage + faint buildup
+      isMatchingGuard = false;
+      guardSuccess = false;
+      damageRatio = 1.0;
     }
   }
 
@@ -748,7 +769,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   if (!rolledHit) {
-    return { isOffensive: true, hitLanded: false, isGlancing: false, guardSuccess: false, finalDmg: 0 };
+    return { isOffensive: true, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
   if (!isGuarding) {
@@ -778,5 +799,5 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
 
-  return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, finalDmg: finalDmg };
+  return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, isMatchingGuard: isMatchingGuard, chiGained: chiGained, finalDmg: finalDmg };
 }
