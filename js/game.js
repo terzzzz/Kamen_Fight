@@ -78,7 +78,6 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // ADD +1 CHI AT THE START OF EACH ROUND (EXCEPT ROUND 1)
   if (gameState.roundCounter > 1) {
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
@@ -89,7 +88,6 @@ function startRoundCountdown() {
     });
   }
 
-  // 400ms Grace Period: ignores residual inputs from prior round
   setTimeout(() => {
     if (gameState.input) gameState.input.acceptingInputs = true;
   }, 400);
@@ -168,7 +166,7 @@ function startRoundCountdown() {
     }
   });
 
-  // COUNTDOWN TIMER
+  // COUNTDOWN STRICTLY RUNS TIMER
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
 
@@ -178,14 +176,16 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      // Timeout Penalty: If player fails to confirm in time, force DO_NOTHING
+      // FORCE UNCONFIRMED PLAYERS TO DO_NOTHING & RESOLVE IMMEDIATELY
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
           gameState.p1.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p1');
         } else {
-          confirmPlayerAction('DO_NOTHING', 'p1');
+          gameState.input.isConfirmed = true;
+          gameState.input.selectedMoveKey = 'DO_NOTHING';
+          gameState.p1.activeChargePercent = 100;
         }
       }
 
@@ -195,7 +195,9 @@ function startRoundCountdown() {
           gameState.p2.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p2');
         } else {
-          confirmPlayerAction('DO_NOTHING', 'p2');
+          gameState.p2IsConfirmed = true;
+          gameState.p2SelectedMoveKey = 'DO_NOTHING';
+          gameState.p2.activeChargePercent = 100;
         }
       }
 
@@ -205,7 +207,19 @@ function startRoundCountdown() {
 }
 
 function checkBothPlayersLocked() {
-  return;
+  if (gameState.roundPhase !== 'INPUT') return;
+
+  const p1Ready = gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted);
+  const p2Ready = gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle;
+
+  if (p1Ready && p2Ready) {
+    clearInterval(gameState.timerInterval);
+    setTimeout(() => {
+      if (gameState.roundPhase === 'INPUT') {
+        executeTurnResolutionPhase();
+      }
+    }, 200);
+  }
 }
 
 function returnToCharSelect() {
@@ -271,7 +285,6 @@ function bindKeyboardInputs() {
 
     if (gameState.roundPhase !== 'INPUT' || !gameState.input.acceptingInputs || gameState.p1.isCPU || gameState.input.isConfirmed || gameState.p1.isFainted) return;
 
-    // AUTO-CHARGING DIRECTION LOGIC WITH REPEAT GUARD
     if (['A', 'D', 'W', 'S'].includes(key)) {
       if (gameState.input.heldDirection === key) return;
 
@@ -291,7 +304,6 @@ function bindKeyboardInputs() {
       if (keyEl) keyEl.classList.add('active');
     }
 
-    // ACTION BUTTON SELECTION
     if (['J', 'K', 'L', 'I'].includes(key)) {
       if (!gameState.input.heldDirection) {
         triggerFloatingText('p1', 'TAP DIRECTION FIRST!', 'scratch');
@@ -366,7 +378,6 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
   const player = gameState[playerKey];
   if (!player) return false;
 
-  // CHECK OPPONENT LOCK-IN STATUS BEFORE ALLOWING GUARD
   const isOpponentLocked = playerKey === 'p1' 
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
     : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
@@ -443,24 +454,33 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     }
   }
 
-  // 2-SECOND TIMER EXTENSION LOGIC FOR UNLOCKED OPPONENT
+  // REACTION TIME (+1s): ONLY GRANTED IF FIRST PLAYER LOCKS IN AFTER 7.0 SECONDS (<= 1s REMAINING)
   if (newlyConfirmed && gameState.roundPhase === 'INPUT') {
     const otherKey = playerKey === 'p1' ? 'p2' : 'p1';
     const otherPlayer = gameState[otherKey];
     const isOtherConfirmed = otherKey === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed;
 
     if (otherPlayer && !otherPlayer.isFainted && !isOtherConfirmed && !(otherKey === 'p2' && gameState.p2AlwaysIdle)) {
-      // Extend timer by +2s so the unconfirmed rider can select/switch actions or Guard
-      gameState.turnTimerSeconds += 2;
+      if (gameState.turnTimerSeconds <= 1) {
+        gameState.turnTimerSeconds += 1;
 
-      const timerEl = document.getElementById('turn-timer');
-      if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+        const timerEl = document.getElementById('turn-timer');
+        if (timerEl) {
+          timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
+          // Visual flash effect on the center timer display
+          timerEl.style.color = '#00ffcc';
+          timerEl.style.textShadow = '0 0 15px #00ffcc';
+          setTimeout(() => {
+            if (timerEl) {
+              timerEl.style.color = '';
+              timerEl.style.textShadow = '';
+            }
+          }, 600);
+        }
+      }
 
-      triggerFloatingText(otherKey, 'REACTION TIME +2s!', 'scratch');
-
-      // AI CPU Reaction re-evaluation if CPU is the remaining rider
       if (otherPlayer.isCPU) {
-        const reactionDelay = Math.floor(Math.random() * 800 + 600);
+        const reactionDelay = Math.floor(Math.random() * 500 + 300);
         setTimeout(() => {
           if (gameState.roundPhase !== 'INPUT') return;
           const stillConfirmed = otherKey === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed;
@@ -494,7 +514,6 @@ function bindCommandButtons() {
   });
 }
 
-// DISABLED: CPU ACTIONS NEVER HIGHLIGHT THE PLAYER'S CONTROL PAD
 function simulateCPUButtonPress(moveKey, playerKey = 'p2') {
   return;
 }
@@ -516,7 +535,6 @@ function resetTurnInputState() {
   if (flag2El) flag2El.hidden = true;
 }
 
-// DYNAMIC SCREEN AUTO-SCALER FOR MOBILE & TABLETS
 function autoScaleGameWindow() {
   const targetWidth = 960;
   const targetHeight = 640;
@@ -537,7 +555,6 @@ function autoScaleGameWindow() {
 window.addEventListener('resize', autoScaleGameWindow);
 window.addEventListener('orientationchange', () => setTimeout(autoScaleGameWindow, 200));
 
-// INITIALIZE CONTROLS & AUTO-SCALER ON LAUNCH
 window.addEventListener('DOMContentLoaded', () => {
   bindKeyboardInputs();
   bindCommandButtons();
