@@ -659,7 +659,7 @@ async function executeTurnResolutionPhase() {
     const p1DmgTaken = p1StartLp - gameState.p1.lp;
     const p2DmgTaken = p2StartLp - gameState.p2.lp;
 
-    if (gameState.p2.isCPU && window.globalAIKnowledge) {
+    if (gameState.p2.isCPU && window.globalAIKnowledge && typeof window.calculateMoveSuccess === 'function') {
       const wasSuccessful = window.calculateMoveSuccess(gameState.p2, gameState.p1, p2MoveKey, {
         damageDealt: p1DmgTaken,
         damageTaken: p2DmgTaken,
@@ -673,7 +673,7 @@ async function executeTurnResolutionPhase() {
       window.globalAIKnowledge.recordTurnOutcome(gameState.p2, gameState.p1, p1MoveKey, p2MoveKey, wasSuccessful);
     }
 
-    if (gameState.p1.isCPU && window.globalAIKnowledge) {
+    if (gameState.p1.isCPU && window.globalAIKnowledge && typeof window.calculateMoveSuccess === 'function') {
       const wasSuccessful = window.calculateMoveSuccess(gameState.p1, gameState.p2, p1MoveKey, {
         damageDealt: p2DmgTaken,
         damageTaken: p1DmgTaken,
@@ -714,6 +714,17 @@ async function executeTurnResolutionPhase() {
     } else {
       gameState.roundPhase = 'GAME_OVER';
       if (battleMsg) battleMsg.hidden = false;
+
+      // --- SAVE AI MEMORY & RECORD MATCH STATS ---
+      if (typeof saveAIKnowledge === 'function') {
+        saveAIKnowledge();
+      }
+
+      if (typeof recordMatchStats === 'function') {
+        const winner = gameState.p1.lp > 0 ? gameState.p1 : (gameState.p2.lp > 0 ? gameState.p2 : null);
+        recordMatchStats({ winner });
+      }
+      // -------------------------------------------
 
       ['p1', 'p2'].forEach(slot => {
         const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
