@@ -333,6 +333,7 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
+// FAINT BUILDUP (CLEAN HITS ONLY)
 function applyFaintBuildUp(player, playerKey) {
   if (!player.isFainted) {
     player.tookCleanHitThisRound = true;
@@ -342,7 +343,7 @@ function applyFaintBuildUp(player, playerKey) {
       player.isFainted = true;
       const stunOverlay = document.getElementById(`${playerKey}-stun-overlay`);
       if (stunOverlay) stunOverlay.hidden = false;
-      triggerFloatingText(playerKey, 'STUNNED!!', 'scratch');
+      triggerFloatingText(playerKey, 'FAINTED!!', 'scratch');
     }
   }
 }
@@ -512,17 +513,19 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else if (result.isGlancing) {
+          // SCRATCH HIT (20% DMG, NO FAINT BUILDUP)
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
 
           await new Promise(r => setTimeout(r, 1000));
 
-          triggerFloatingText(defKey1, 'Near-miss!!', 'scratch');
+          triggerFloatingText(defKey1, 'SCRATCH!', 'scratch');
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
           triggerFloatingNumber(defKey1, result.finalDmg, false);
 
           await vidPromise;
         } else {
+          // CLEAN HIT (FULL DMG + FAINT BUILDUP)
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
@@ -614,17 +617,19 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else if (result.isGlancing) {
+        // SCRATCH HIT (20% DMG, NO FAINT BUILDUP)
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
 
         await new Promise(r => setTimeout(r, 1000));
 
-        triggerFloatingText(defKey2, 'Near-miss!!', 'scratch');
+        triggerFloatingText(defKey2, 'SCRATCH!', 'scratch');
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
         triggerFloatingNumber(defKey2, result.finalDmg, false);
 
         await vidPromise;
       } else {
+        // CLEAN HIT (FULL DMG + FAINT BUILDUP)
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
@@ -655,7 +660,7 @@ async function executeTurnResolutionPhase() {
 
     if (battleMsg) battleMsg.hidden = true;
 
-    // --- RECORD ACCUMULATED KNOWLEDGE FOR CPU ---
+    // RECORD ACCUMULATED KNOWLEDGE FOR CPU
     const p1DmgTaken = p1StartLp - gameState.p1.lp;
     const p2DmgTaken = p2StartLp - gameState.p2.lp;
 
@@ -686,7 +691,6 @@ async function executeTurnResolutionPhase() {
       });
       window.globalAIKnowledge.recordTurnOutcome(gameState.p1, gameState.p2, p2MoveKey, p1MoveKey, wasSuccessful);
     }
-    // --------------------------------------------
 
     processRoundBuffs(gameState.p1);
     processRoundBuffs(gameState.p2);
@@ -715,7 +719,6 @@ async function executeTurnResolutionPhase() {
       gameState.roundPhase = 'GAME_OVER';
       if (battleMsg) battleMsg.hidden = false;
 
-      // --- SAVE AI MEMORY & RECORD MATCH STATS ---
       if (typeof saveAIKnowledge === 'function') {
         saveAIKnowledge();
       }
@@ -724,7 +727,6 @@ async function executeTurnResolutionPhase() {
         const winner = gameState.p1.lp > 0 ? gameState.p1 : (gameState.p2.lp > 0 ? gameState.p2 : null);
         recordMatchStats({ winner });
       }
-      // -------------------------------------------
 
       ['p1', 'p2'].forEach(slot => {
         const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -765,7 +767,8 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  const atkChargeRatio = Math.max(0.5, (attacker.activeChargePercent || 100) / 100);
+  const chargePercent = attacker.activeChargePercent || 100;
+  const atkChargeRatio = Math.max(0.5, chargePercent / 100);
   const defChargeRatio = Math.max(0.5, (defender.activeChargePercent || 100) / 100);
 
   let isGuarding = defMove.type === 'DEFENSE';
@@ -792,10 +795,10 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
         chiGained = 2;       // Award +2 Chi
       } else {
         guardSuccess = false;
-        damageRatio = 1.0;  // Matching fail -> Full damage
+        damageRatio = 1.0;   // Matching fail -> Full damage
       }
     } else {
-      // Mismatched direction guard -> Full damage + faint buildup
+      // Mismatched direction guard -> Full damage
       isMatchingGuard = false;
       guardSuccess = false;
       damageRatio = 1.0;
@@ -811,10 +814,15 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     rolledHit = true;
   } else {
     let baseHitChance = atkMove.hitChance || 80;
+    
+    // ACCURACY DISCOUNT FACTOR FOR D & S SKILLS (0.5 at 0% -> 1.0 at 100%)
+    let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S') || atkMove.category === 'D' || atkMove.category === 'S' || atkMove.tier === 'S';
+    let accuracyDiscount = isDOrS ? (0.5 + (0.5 * (chargePercent / 100))) : 1.0;
+
     let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
     let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
 
-    let effectiveHitChance = Math.max(10, ((baseHitChance + attackerHitBonus) * atkChargeRatio) - defenderEvasionBonus);
+    let effectiveHitChance = Math.max(10, (((baseHitChance * accuracyDiscount) + attackerHitBonus) * atkChargeRatio) - defenderEvasionBonus);
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
@@ -823,7 +831,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   if (!isGuarding) {
-    isGlancing = Math.random() * 100 < 15;
+    isGlancing = Math.random() * 100 < (atkMove.scratchRate || 15);
   }
 
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
@@ -847,7 +855,8 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let baseDamage = atkMove.baseDamage || 0;
   let calculatedDmg = baseDamage * typhoonMultiplier * focusMultiplier * jumpAtkMultiplier * damageRatio;
 
-  let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.10)) : Math.floor(calculatedDmg);
+  // SCRATCH DAMAGE IS EXACTLY 20% OF CALCULATED CHARGED DAMAGE
+  let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.20)) : Math.floor(calculatedDmg);
 
   return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, isMatchingGuard: isMatchingGuard, chiGained: chiGained, finalDmg: finalDmg };
 }
