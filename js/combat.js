@@ -758,7 +758,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH UNIFORM 0.5 + 0.5(CHARGE %) SCALING
+// ATTACK RESOLUTION ENGINE WITH 50% EXPECTED OUTCOME FLOOR AT 0% CHARGE
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
   const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
@@ -767,10 +767,10 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  // CHARGE RATIO (0.0 TO 1.0) AND DAMAGE/ACCURACY FACTOR (0.5 TO 1.0)
+  // SQUARE ROOT CHARGE FACTOR (0.7071 AT 0% -> 1.0 AT 100%) GUARANTEES EXACT 50% EV FLOOR
   const chargePercent = attacker.activeChargePercent !== undefined ? attacker.activeChargePercent : 100;
   const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
-  const chargeFactor = 0.5 + (0.5 * chargeRatio);
+  const chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
 
   let isGuarding = defMove.type === 'DEFENSE';
   let guardSuccess = false;
@@ -784,7 +784,8 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
       isMatchingGuard = true;
       let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent || 100) / 100));
-      let effectiveCounterChance = 70 * (0.5 + (0.5 * defenderChargeRatio));
+      let defenderChargeFactor = Math.sqrt(0.5 + (0.5 * defenderChargeRatio));
+      let effectiveCounterChance = 70 * defenderChargeFactor;
       if (!atkMove.unblockable && Math.random() * 100 < effectiveCounterChance) {
         guardSuccess = true;
         damageRatio = 0.0;
@@ -816,7 +817,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   } else {
     let baseHitChance = atkMove.hitChance || 80;
     
-    // ACCURACY SCALING (0.5 AT 0% CHARGE -> 1.0 AT 100% CHARGE)
+    // ACCURACY SCALING (0.7071 AT 0% CHARGE -> 1.0 AT 100% CHARGE)
     let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S') || atkMove.category === 'D' || atkMove.category === 'S' || atkMove.tier === 'S';
     let accuracyDiscount = isDOrS ? chargeFactor : 1.0;
 
