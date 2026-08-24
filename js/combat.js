@@ -354,7 +354,6 @@ function applyFaintBuildUp(player, playerKey) {
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
-  // TRACK HP/FAINT BEFORE RESOLUTION FOR ACCUMULATED AI
   const p1StartLp = gameState.p1.lp;
   const p2StartLp = gameState.p2.lp;
   const p1StartFaint = gameState.p1.faintMeter;
@@ -423,7 +422,6 @@ async function executeTurnResolutionPhase() {
     } else if (!p1IsDefensive && p2IsDefensive) {
       p1GoesFirst = true;
     } else {
-      // EQUAL MOVE TIER PRIORITY: 50/50 COIN FLIP ON TIME TIES
       if (p1Time === p2Time) {
         p1GoesFirst = Math.random() < 0.5;
       } else {
@@ -520,7 +518,6 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else if (result.isGlancing) {
-          // SCRATCH HIT (20% DMG, NO FAINT BUILDUP)
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
 
           await new Promise(r => setTimeout(r, 1000));
@@ -532,7 +529,6 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else {
-          // CLEAN HIT (FULL DMG + FAINT BUILDUP)
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
@@ -624,7 +620,6 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else if (result.isGlancing) {
-        // SCRATCH HIT (20% DMG, NO FAINT BUILDUP)
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
 
         await new Promise(r => setTimeout(r, 1000));
@@ -636,7 +631,6 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else {
-        // CLEAN HIT (FULL DMG + FAINT BUILDUP)
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
@@ -667,7 +661,6 @@ async function executeTurnResolutionPhase() {
 
     if (battleMsg) battleMsg.hidden = true;
 
-    // RECORD ACCUMULATED KNOWLEDGE FOR CPU
     const p1DmgTaken = p1StartLp - gameState.p1.lp;
     const p2DmgTaken = p2StartLp - gameState.p2.lp;
 
@@ -765,7 +758,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE
+// ATTACK RESOLUTION ENGINE WITH UNIFORM 0.5 + 0.5(CHARGE %) SCALING
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
   const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
@@ -774,9 +767,10 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  const chargePercent = attacker.activeChargePercent || 100;
-  const atkChargeRatio = Math.max(0.5, chargePercent / 100);
-  const defChargeRatio = Math.max(0.5, (defender.activeChargePercent || 100) / 100);
+  // CHARGE RATIO (0.0 TO 1.0) AND DAMAGE/ACCURACY FACTOR (0.5 TO 1.0)
+  const chargePercent = attacker.activeChargePercent !== undefined ? attacker.activeChargePercent : 100;
+  const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
+  const chargeFactor = 0.5 + (0.5 * chargeRatio);
 
   let isGuarding = defMove.type === 'DEFENSE';
   let guardSuccess = false;
@@ -789,7 +783,8 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
 
     if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
       isMatchingGuard = true;
-      let effectiveCounterChance = 70 * defChargeRatio;
+      let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent || 100) / 100));
+      let effectiveCounterChance = 70 * (0.5 + (0.5 * defenderChargeRatio));
       if (!atkMove.unblockable && Math.random() * 100 < effectiveCounterChance) {
         guardSuccess = true;
         damageRatio = 0.0;
@@ -802,10 +797,9 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
         chiGained = 2;       // Award +2 Chi
       } else {
         guardSuccess = false;
-        damageRatio = 1.0;   // Matching fail -> Full damage
+        damageRatio = 1.0;
       }
     } else {
-      // Mismatched direction guard -> Full damage
       isMatchingGuard = false;
       guardSuccess = false;
       damageRatio = 1.0;
@@ -822,14 +816,14 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   } else {
     let baseHitChance = atkMove.hitChance || 80;
     
-    // ACCURACY DISCOUNT FACTOR FOR D & S SKILLS (0.5 at 0% -> 1.0 at 100%)
+    // ACCURACY SCALING (0.5 AT 0% CHARGE -> 1.0 AT 100% CHARGE)
     let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S') || atkMove.category === 'D' || atkMove.category === 'S' || atkMove.tier === 'S';
-    let accuracyDiscount = isDOrS ? (0.5 + (0.5 * (chargePercent / 100))) : 1.0;
+    let accuracyDiscount = isDOrS ? chargeFactor : 1.0;
 
     let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
     let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
 
-    let effectiveHitChance = Math.max(10, (((baseHitChance * accuracyDiscount) + attackerHitBonus) * atkChargeRatio) - defenderEvasionBonus);
+    let effectiveHitChance = Math.max(10, ((baseHitChance * accuracyDiscount) + attackerHitBonus) - defenderEvasionBonus);
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
@@ -846,11 +840,11 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S');
-  let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon' || b.id === 'typhoon_speed')) ? 1.25 : 1.0;
+  let typhoonMultiplier = (isDOrS && attacker.activeBuffs && attacker.activeBuffs.some(b => b.id === 'typhoon' || b.id === 'typhoon_speed' || b.id === 'double_typhoon')) ? 1.25 : 1.0;
 
   let focusMultiplier = 1.0;
   if (attacker.activeBuffs) {
-    if (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus')) {
+    if (atkMoveKey.startsWith('S') && attacker.activeBuffs.some(b => b.id === 'focus' || b.id === 'v3_focus')) {
       focusMultiplier = 1.20;
     } else if (atkMoveKey.startsWith('D') && attacker.activeBuffs.some(b => b.id === 'power_focus')) {
       focusMultiplier = 1.30;
@@ -858,9 +852,9 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   let jumpAtkMultiplier = attacker.airborneTicks > 0 ? 1.15 : 1.0;
-  
+
   let baseDamage = atkMove.baseDamage || 0;
-  let calculatedDmg = baseDamage * typhoonMultiplier * focusMultiplier * jumpAtkMultiplier * damageRatio;
+  let calculatedDmg = baseDamage * chargeFactor * typhoonMultiplier * focusMultiplier * jumpAtkMultiplier * damageRatio;
 
   // SCRATCH DAMAGE IS EXACTLY 20% OF CALCULATED CHARGED DAMAGE
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.20)) : Math.floor(calculatedDmg);
