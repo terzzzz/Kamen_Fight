@@ -381,7 +381,7 @@ async function executeTurnResolutionPhase() {
   const p1StartFaint = gameState.p1.faintMeter;
   const p2StartFaint = gameState.p2.faintMeter;
 
-  let p1MoveKey = null;
+ let p1MoveKey = null;
   if (gameState.p1.isCPU) {
     p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
     if (gameState.p1.activeChargePercent === undefined) {
@@ -389,12 +389,19 @@ async function executeTurnResolutionPhase() {
     }
   } else {
     p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
-    gameState.p1.activeChargePercent = (gameState.input && gameState.input.chargePercent > 0) 
-      ? gameState.input.chargePercent 
-      : 100;
+    
+    // STRICTLY CAPTURE THE EXACT LOCKED CHARGE PERCENT FROM INPUT
+    if (gameState.input && typeof gameState.input.chargePercent === 'number') {
+      gameState.p1.activeChargePercent = gameState.input.chargePercent;
+    } else if (gameState.input && typeof gameState.input.lockedChargePercent === 'number') {
+      gameState.p1.activeChargePercent = gameState.input.lockedChargePercent;
+    } else {
+      gameState.p1.activeChargePercent = 100;
+    }
   }
   if (!p1MoveKey) p1MoveKey = 'DO_NOTHING';
 
+  
   let p2MoveKey = gameState.p2AlwaysIdle ? 'DO_NOTHING' : gameState.p2SelectedMoveKey;
   if (!p2MoveKey && gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
     p2MoveKey = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
@@ -417,7 +424,7 @@ async function executeTurnResolutionPhase() {
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
-  const battleMsg = document.getElementById('battle-message');
+const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
     const p1Charge = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
