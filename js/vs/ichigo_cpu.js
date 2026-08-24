@@ -1,23 +1,19 @@
 /**
  * Kamen Rider Ichigo AI Decision Engine
  * Path: js/vs/ichigo_cpu.js
- * 3-Turn Lookahead Engine with Reaction Delays, 8s Round Timer Constraints & Guarding Mechanics
+ * 3-Turn Lookahead Engine with Elapsed Time Charge Calculations & Guarding Mechanics
  */
 
 function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'normal') {
   if (!movesData || Object.keys(movesData).length === 0) return 'D+J';
 
-  // 1. CALCULATE TIME REMAINING & CPU THINKING DELAY
-  const ROUND_TIME_LIMIT = 8.0; // 8 Seconds Max per Round
-  let currentRoundTime = (typeof gameState !== 'undefined' && gameState.roundTimeRemaining !== undefined)
-    ? gameState.roundTimeRemaining
-    : ROUND_TIME_LIMIT;
+  // 1. CALCULATE MAX ACHIEVABLE CHARGE WITHIN THE 8s ROUND WINDOW
+  // A 100% charge requires 2.5 seconds (0.025s per 1% charge).
+  // Within an 8.0s round window, CPU thinking delay (~0.5s) leaves 7.5s, easily allowing 100% charge.
+  const TOTAL_ROUND_WINDOW = 8.0; 
+  let cpuThinkingDelay = 0.4 + (Math.random() * 0.4); // 0.4s to 0.8s reaction delay
+  let availableChargeTime = Math.max(0, TOTAL_ROUND_WINDOW - cpuThinkingDelay);
 
-  // Simulate human-like CPU reaction/thinking delay (0.4s to 1.0s after round starts)
-  let cpuThinkingDelay = 0.4 + (Math.random() * 0.6);
-  let availableChargeTime = Math.max(0, currentRoundTime - cpuThinkingDelay);
-
-  // 100% Charge takes 2.5 seconds (0.025s per 1% charge)
   let maxAchievableCharge = Math.min(100, Math.floor((availableChargeTime / 2.5) * 100));
 
   // 2. FILTER AFFORDABLE MOVES
@@ -63,29 +59,28 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
     selectedMoveKey = run3TurnSearchAndSelect(cpuPlayer, opponentPlayer, movesData, affordableKeys, 'normal', maxAchievableCharge);
   }
 
-  // ENFORCE CHARGE TARGET CAPPED BY 8s TIMER CONSTRAINT
+  // ENFORCE CHARGE TARGET CAPPED BY ACHIEVABLE CHARGE
   setCPUChargeTarget(cpuPlayer, selectedMoveKey, maxAchievableCharge);
 
   return selectedMoveKey;
 }
 
 /**
- * Assigns charge targets capped by maximum achievable charge before 8s timer expires
+ * Assigns charge targets matching combat.js resolution scaling
  */
 function setCPUChargeTarget(cpuPlayer, moveKey, maxAchievableCharge) {
   let desiredCharge = 100;
 
   if (moveKey === 'A+I') {
-    desiredCharge = 100;
+    desiredCharge = 100; // Windmill guard targets 100% charge for max 70% block
   } else if (moveKey.startsWith('A+')) {
-    desiredCharge = 15; // Fast matching guard lock-in
+    desiredCharge = 15;  // Directional matching guards lock in fast (15%) for speed priority
   } else if (moveKey.startsWith('S') || moveKey === 'W+I' || moveKey === 'W+K') {
-    desiredCharge = 100;
+    desiredCharge = 100; // Heavy Specials, Jumps, and Power Buffs target 100% Charge
   } else if (moveKey.startsWith('D')) {
     desiredCharge = 90 + Math.floor(Math.random() * 11);
   }
 
-  // FORCE CHARGE CAP BASED ON REMAINING TIMER TIME
   cpuPlayer.activeChargePercent = Math.min(desiredCharge, maxAchievableCharge);
 }
 
@@ -127,7 +122,6 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
 
   for (const m1Key of affordableKeys) {
     const m1 = movesData[m1Key];
-    // Evaluate turn 1 under time-capped charge constraints (maxAchievableCharge)
     const s1 = simulateIchigoStateTransition(START_CHI, OPP_LP, CPU_LP, START_FOCUS, START_AIRBORNE, START_FAINT, m1Key, m1, OPP_AVG_DMG, OPP_CHI, maxAchievableCharge);
 
     if (s1.isLethal) {
@@ -139,7 +133,6 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
       const m2 = movesData[m2Key];
       if ((m2.chiCost || 0) > s1.chi) continue;
 
-      // Turns 2 & 3 assume normal 100% full turn charge availability
       const s2 = simulateIchigoStateTransition(s1.chi, s1.oppLp, CPU_LP, s1.focus, s1.airborne, s1.faint, m2Key, m2, OPP_AVG_DMG, OPP_CHI, 100);
 
       if (s2.isLethal) {
@@ -167,7 +160,6 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
   let nextFocus = moveKey === 'W+K' ? 2 : Math.max(0, focus - 1);
   let nextAirborne = moveKey === 'W+I' ? 2 : Math.max(0, airborne - 1);
 
-  // CHARGE FACTOR BASED ON REAL TIME CAP
   let effectiveCharge = Math.min(100, currentChargeCap);
   let chargeRatio = effectiveCharge / 100;
   let chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
@@ -181,25 +173,20 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
 
   let ev = weightedDmg;
 
-  // --- W+K (TYPHOON FOCUS) ---
   if (moveKey === 'W+K') {
     ev += (296.18 * 0.20 * 1.5);
     if (chi < 11) ev -= 80;
   }
 
-  // --- W+I (RIDER HIGH JUMP) WITH TAKEOFF INSTABILITY PENALTY ---
   if (moveKey === 'W+I') {
     let takeoffInstability = 1.8 - (0.8 * chargeRatio);
-    ev += (oppAvgDmg * 0.20 * 2); // Evasion savings
-    
-    // Penalize rushing a jump under timer pressure (low charge = high takeoff vulnerability)
+    ev += (oppAvgDmg * 0.20 * 2);
     if (chargeRatio < 1.0) {
       ev -= (oppAvgDmg * (takeoffInstability - 1.0));
     }
     if (chi < 12) ev -= 90;
   }
 
-  // --- A+ GUARDS (EXACT COMBAT.JS CHARGE SCALING) ---
   if (moveKey.startsWith('A+')) {
     if (faint >= 100) {
       ev = 0;
@@ -221,7 +208,6 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
     }
   }
 
-  // --- FAINT BUILDUP & STUN BONUS ---
   let isUtility = moveKey.startsWith('W') || (move && move.type === 'DEFENSE');
   let faintGained = isUtility ? 0 : hitRate * (25 * 0.80 + 10 * 0.20);
   let nextFaint = faint + faintGained;
