@@ -50,6 +50,7 @@ async function startBattle(matchConfig) {
       activeBuffs: [],
       airborneTicks: 0,
       airborneAppliedRound: 0,
+      airborneChargePercent: 100,
       activeChargePercent: 100,
       isFainted: false,
       tookCleanHitThisRound: false
@@ -67,6 +68,7 @@ async function startBattle(matchConfig) {
       activeBuffs: [],
       airborneTicks: 0,
       airborneAppliedRound: 0,
+      airborneChargePercent: 100,
       activeChargePercent: 100,
       isFainted: false,
       tookCleanHitThisRound: false
@@ -263,6 +265,8 @@ function handleAirborneState(player, moveKey, move) {
   if (move && move.grantsAirborne) {
     player.airborneTicks = move.grantsAirborne;
     player.airborneAppliedRound = gameState.roundCounter;
+    // BIND CHARGE PERCENTAGE SPECIFICALLY AT THE TIME OF JUMP EXECUTION
+    player.airborneChargePercent = player.activeChargePercent !== undefined ? player.activeChargePercent : 100;
   } else if (player.airborneTicks > 0) {
     if (move && move.forcesLanding) {
       player.airborneTicks = 0;
@@ -335,7 +339,7 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
-// FAINT BUILDUP (SUPPORTING CUSTOM AMOUNT FOR CLEAN VS SCRATCH HITS)
+// FAINT BUILDUP (CLEAN HITS = 25, SCRATCH HITS = 10)
 function applyFaintBuildUp(player, playerKey, customAmount = null) {
   if (!player.isFainted) {
     player.tookCleanHitThisRound = true;
@@ -765,7 +769,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE (20% SCRATCH RATE + 10 FAINT BUILDUP)
+// ATTACK RESOLUTION ENGINE WITH TAKEOFF INSTABILITY MODEL
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
   const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
@@ -774,7 +778,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  // SQUARE ROOT CHARGE FACTOR (0.7071 AT 0% -> 1.0 AT 100%) GUARANTEES EXACT 50% EV FLOOR
+  // SQUARE ROOT CHARGE FACTOR (0.7071 AT 0% -> 1.0 AT 100%) FOR ATTACKER
   const chargePercent = attacker.activeChargePercent !== undefined ? attacker.activeChargePercent : 100;
   const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
   const chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
@@ -829,9 +833,22 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     let accuracyDiscount = isDOrS ? chargeFactor : 1.0;
 
     let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
-    let defenderEvasionBonus = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 20 : 0;
+    let rawHitRate = (baseHitChance * accuracyDiscount) + attackerHitBonus;
 
-    let effectiveHitChance = Math.max(10, ((baseHitChance * accuracyDiscount) + attackerHitBonus) - defenderEvasionBonus);
+    // CALCULATE DEFENDER AIRBORNE EVASION & TAKEOFF INSTABILITY MULTIPLIER
+    let baseEvasionPct = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 0.20 : 0.0;
+    let instabilityMult = 1.0;
+
+    if (defender.airborneTicks > 0 && defender.airborneAppliedRound === gameState.roundCounter) {
+      // TAKEOFF ROUND: Apply instability multiplier = 1.8 - 0.8*r
+      let jumpChargeRatio = Math.min(1.0, Math.max(0.0, (defender.airborneChargePercent !== undefined ? defender.airborneChargePercent : 100) / 100));
+      instabilityMult = 1.8 - (0.8 * jumpChargeRatio);
+    }
+
+    // FINAL HIT CHANCE = Raw Hit Rate * (1 - Base Evasion) * Instability Multiplier
+    let calculatedHitChance = rawHitRate * (1.0 - baseEvasionPct) * instabilityMult;
+    let effectiveHitChance = Math.max(10, Math.min(100, calculatedHitChance));
+
     rolledHit = Math.random() * 100 < effectiveHitChance;
   }
 
@@ -840,7 +857,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   if (!isGuarding) {
-    // UPDATED SCRATCH RATE FLOOR TO 20%
     isGlancing = Math.random() * 100 < (atkMove.scratchRate || 20);
   }
 
