@@ -5,6 +5,8 @@ const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
   ROUND_RECOVERY: 13
 };
 
+const OFFENSIVE_TYPES = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
+
 // BATTLE INITIALIZATION WITH GUARANTEED LIFECYCLE UNLOCK
 async function startBattle(matchConfig) {
   if (!window.gameState) window.gameState = {};
@@ -140,7 +142,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
-  // ROUTE ICHIGO TO HIS SPECIALIZED ENGINE
   if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
     return selectIchigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
@@ -158,7 +159,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     chosenKey = affordableKeys.length > 0 ? affordableKeys[Math.floor(Math.random() * affordableKeys.length)] : 'D+J';
   }
 
-  // DEFAULT FALLBACK CHARGE FOR NON-ICHIGO CPU
   if (chosenKey.startsWith('S') || chosenKey.startsWith('W')) {
     cpuPlayer.activeChargePercent = 100;
   } else if (chosenKey.startsWith('D')) {
@@ -416,7 +416,6 @@ async function executeTurnResolutionPhase() {
   } else if (p1IsD && p2IsS) {
     p1GoesFirst = false;
   } else {
-    // TIER TIE: Compare Lock-In Speed (Lower Charge % = Faster Lock-In -> GOES FIRST)
     let p1Charge = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
     let p2Charge = gameState.p2.activeChargePercent !== undefined ? gameState.p2.activeChargePercent : 100;
 
@@ -463,6 +462,11 @@ async function executeTurnResolutionPhase() {
     updateHUD();
 
     if (move1.type === 'DEFENSE') {
+      // STANDARD 0-COST GUARD VS NON-OFFENSIVE ACTION = +5 FAINT PTS (A+I IS EXEMPT)
+      let isOpponentOffensive = !!(move2 && OFFENSIVE_TYPES.includes(move2.type?.toUpperCase()));
+      if (!isOpponentOffensive && key1 !== 'A+I' && move1.name !== 'Windmill Guard' && (move1.chiCost || 0) === 0) {
+        applyFaintBuildUp(attacker1, atkKey1, 5);
+      }
       await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000, move1);
     } else {
       await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
@@ -654,6 +658,12 @@ async function executeTurnResolutionPhase() {
       attacker2.chi = Math.min(16, attacker2.chi + chiGain);
     }
     updateHUD();
+  } else if (move2.type === 'DEFENSE') {
+    // STANDARD 0-COST GUARD VS NON-OFFENSIVE ACTION = +5 FAINT PTS (A+I IS EXEMPT)
+    let isOpponentOffensive = !!(move1 && OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
+    if (!isOpponentOffensive && key2 !== 'A+I' && move2.name !== 'Windmill Guard' && (move2.chiCost || 0) === 0) {
+      applyFaintBuildUp(attacker2, atkKey2, 5);
+    }
   } else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
@@ -762,16 +772,14 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH UNIFIED CHARGE-SCALED GUARDING
+// ATTACK RESOLUTION ENGINE WITH ACCURATE GUARD FAINT PENALTIES
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
-  const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
-  const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
+  const isOffensive = !!(atkMove && OFFENSIVE_TYPES.includes(atkMove.type?.toUpperCase()));
 
   if (!isOffensive) {
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  // SQUARE ROOT CHARGE FACTOR (0.7071 AT 0% -> 1.0 AT 100%) FOR ATTACKER
   const chargePercent = attacker.activeChargePercent !== undefined ? attacker.activeChargePercent : 100;
   const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
   const chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
@@ -785,23 +793,27 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    // DEFENDER CHARGE FACTOR FOR UNIFIED GUARD EFFECTIVENESS
+    // STANDARD 0-COST GUARD VS OFFENSIVE ACTION = +25 FAINT PTS (A+I IS EXEMPT)
+    if (defMoveKey !== 'A+I' && defMove.name !== 'Windmill Guard' && (defMove.chiCost || 0) === 0) {
+      applyFaintBuildUp(defender, defenderKey, 25);
+    }
+
     let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent !== undefined ? defender.activeChargePercent : 100) / 100));
     let defenderChargeFactor = Math.sqrt(0.5 + (0.5 * defenderChargeRatio));
-    let effectiveGuardChance = 70 * defenderChargeFactor; // 49.5% at 0% charge -> 70.0% at 100% charge
+    let effectiveGuardChance = 70 * defenderChargeFactor;
 
     if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
       isMatchingGuard = true;
       if (!atkMove.unblockable && Math.random() * 100 < effectiveGuardChance) {
         guardSuccess = true;
-        damageRatio = 0.0; // 100% Damage Blocked
+        damageRatio = 0.0;
       }
     } else if (defMoveKey === `A+${atkButton}`) {
       isMatchingGuard = true;
       if (Math.random() * 100 < effectiveGuardChance) {
         guardSuccess = true;
-        damageRatio = 0.30; // Reduce damage by 70%
-        chiGained = 2;       // Award +2 Chi
+        damageRatio = 0.30;
+        chiGained = 2;
       } else {
         guardSuccess = false;
         damageRatio = 1.0;
