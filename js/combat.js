@@ -128,7 +128,15 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
     : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
 
-  let availableMoves = { ...movesData };
+  // STRICT CHI CHECK: Filter out moves that exceed available chi for CPU
+  let availableMoves = {};
+  Object.keys(movesData).forEach(key => {
+    const m = movesData[key];
+    if (m && typeof m === 'object' && (m.chiCost || 0) <= cpuPlayer.chi) {
+      availableMoves[key] = m;
+    }
+  });
+
   if (!isOpponentLocked) {
     Object.keys(availableMoves).forEach(key => {
       const m = availableMoves[key];
@@ -353,12 +361,10 @@ async function applyFaintBuildUp(player, playerKey, customAmount = null) {
       
       triggerFloatingText(playerKey, 'FAINTED!!', 'scratch');
 
-      // Play the faint video on the center screen
       if (typeof playCenterVideo === 'function') {
         await playCenterVideo(playerKey, 'faint.mp4', 'FAINTED!', 1500);
       }
 
-      // Update character media sidebar to display faint loop
       if (typeof updateCharacterMedia === 'function') {
         updateCharacterMedia(playerKey, 'IDLE');
       }
@@ -375,7 +381,6 @@ async function executeTurnResolutionPhase() {
   const p1StartFaint = gameState.p1.faintMeter;
   const p2StartFaint = gameState.p2.faintMeter;
 
-  // FIXED: Explicitly handle P1 CPU vs Human charge assignment to prevent 10% bug override
   let p1MoveKey = null;
   if (gameState.p1.isCPU) {
     p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
@@ -491,8 +496,9 @@ async function executeTurnResolutionPhase() {
       if (!isOpponentOffensive && key1 !== 'A+I' && move1.name !== 'Windmill Guard' && (move1.chiCost || 0) === 0) {
         applyFaintBuildUp(attacker1, atkKey1, 5);
       }
-      await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, 1000, move1);
+      await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, null, move1);
     } else {
+      // PLAY ATTACKER'S ACTION VIDEO FIRST WITHOUT SKIPPING
       await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
 
       let result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
@@ -501,9 +507,7 @@ async function executeTurnResolutionPhase() {
         if (move2.type === 'DEFENSE') {
           if (result.guardSuccess) {
             const guardVid = move2.video || 'guard.mp4';
-            const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', 1500, move2);
-
-            await new Promise(r => setTimeout(r, 600));
+            const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
 
             if (result.finalDmg === 0) {
               triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
@@ -513,7 +517,6 @@ async function executeTurnResolutionPhase() {
                 defender1.chi = Math.min(defender1.maxChi || 16, defender1.chi + result.chiGained);
                 triggerFloatingText(defKey1, 'CHI UP! (+2)', 'heal');
               }
-              await new Promise(r => setTimeout(r, 400));
               triggerFloatingNumber(defKey1, result.finalDmg, false);
             }
 
@@ -525,12 +528,8 @@ async function executeTurnResolutionPhase() {
             defender1WasInterrupted = true;
             triggerFloatingText(defKey1, 'GUARD FAIL!', 'scratch');
 
-            await new Promise(r => setTimeout(r, 500));
-
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
             const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
-
-            await new Promise(r => setTimeout(r, 1000));
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
             updateHUD();
@@ -541,31 +540,21 @@ async function executeTurnResolutionPhase() {
           }
         } else if (!result.hitLanded) {
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'DODGED!');
-
-          await new Promise(r => setTimeout(r, 1000));
-
           triggerFloatingText(defKey1, 'MISS!!', 'miss');
-
           await vidPromise;
         } else if (result.isGlancing) {
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
-
-          await new Promise(r => setTimeout(r, 1000));
-
           triggerFloatingText(defKey1, 'SCRATCH!', 'scratch');
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
           triggerFloatingNumber(defKey1, result.finalDmg, false);
           applyFaintBuildUp(defender1, defKey1, 10);
-
           await vidPromise;
         } else {
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
           const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
-
-          await new Promise(r => setTimeout(r, 1000));
 
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
@@ -598,6 +587,7 @@ async function executeTurnResolutionPhase() {
     attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
     updateHUD();
 
+    // PLAY ATTACKER'S ACTION VIDEO FIRST WITHOUT SKIPPING
     await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
     let result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
@@ -605,9 +595,7 @@ async function executeTurnResolutionPhase() {
       if (move1.type === 'DEFENSE') {
         if (result.guardSuccess) {
           const guardVid = move1.video || 'guard.mp4';
-          const vidPromise = playCenterVideo(defKey2, guardVid, 'GUARDED!', 1500, move1);
-
-          await new Promise(r => setTimeout(r, 600));
+          const vidPromise = playCenterVideo(defKey2, guardVid, 'GUARDED!', null, move1);
 
           if (result.finalDmg === 0) {
             triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
@@ -617,7 +605,6 @@ async function executeTurnResolutionPhase() {
               defender2.chi = Math.min(defender2.maxChi || 16, defender2.chi + result.chiGained);
               triggerFloatingText(defKey2, 'CHI UP! (+2)', 'heal');
             }
-            await new Promise(r => setTimeout(r, 400));
             triggerFloatingNumber(defKey2, result.finalDmg, false);
           }
 
@@ -628,12 +615,8 @@ async function executeTurnResolutionPhase() {
         } else {
           triggerFloatingText(defKey2, 'GUARD FAIL!', 'scratch');
 
-          await new Promise(r => setTimeout(r, 500));
-
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
           const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
-
-          await new Promise(r => setTimeout(r, 1000));
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
           updateHUD();
@@ -644,29 +627,19 @@ async function executeTurnResolutionPhase() {
         }
       } else if (!result.hitLanded) {
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'DODGED!');
-
-        await new Promise(r => setTimeout(r, 1000));
-
         triggerFloatingText(defKey2, 'MISS!!', 'miss');
-
         await vidPromise;
       } else if (result.isGlancing) {
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
-
-        await new Promise(r => setTimeout(r, 1000));
-
         triggerFloatingText(defKey2, 'SCRATCH!', 'scratch');
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
         triggerFloatingNumber(defKey2, result.finalDmg, false);
         applyFaintBuildUp(defender2, defKey2, 10);
-
         await vidPromise;
       } else {
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
-
-        await new Promise(r => setTimeout(r, 1000));
 
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
