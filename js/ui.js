@@ -57,7 +57,8 @@ function stopBattleBGM() {
 // Fallback Roster Storage
 let AVAILABLE_RIDERS = [
   { id: 'ichigo', name: 'Kamen Rider Ichigo', icon: 'assets/images/icons/ichigo.png', maxLp: 1050 },
-  { id: 'nigo', name: 'Kamen Rider Nigo', icon: 'assets/images/icons/nigo.png', maxLp: 1200 }
+  { id: 'nigo', name: 'Kamen Rider Nigo', icon: 'assets/images/icons/nigo.png', maxLp: 1200 },
+  { id: 'v3', name: 'Kamen Rider V3', icon: 'assets/images/icons/v3.png', maxLp: 1000 }
 ];
 
 let vsSelectionState = {
