@@ -113,7 +113,7 @@ async function startBattle(matchConfig) {
   }
 }
 
-// GET CPU MOVE CHOICE ROUTING TO CHARACTER-SPECIFIC ENGINE (JS/VS/)
+// GET CPU MOVE CHOICE ROUTING TO JS/VS/ MODULES
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
@@ -140,7 +140,7 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
-  // ROUTE TO ICHIGO SPECIFIC ENGINE IF LOADED
+  // ROUTE ICHIGO TO HIS SPECIALIZED ENGINE
   if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
     return selectIchigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
@@ -150,23 +150,24 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
 
-  if (chosenKey && availableMoves[chosenKey] && typeof availableMoves[chosenKey] === 'object') {
-    const moveCost = availableMoves[chosenKey].chiCost || 0;
-    if (moveCost <= cpuPlayer.chi) {
-      return chosenKey;
-    }
+  if (!chosenKey || !availableMoves[chosenKey]) {
+    const affordableKeys = Object.keys(availableMoves).filter(key => {
+      const move = availableMoves[key];
+      return move && typeof move === 'object' && (move.chiCost || 0) <= cpuPlayer.chi;
+    });
+    chosenKey = affordableKeys.length > 0 ? affordableKeys[Math.floor(Math.random() * affordableKeys.length)] : 'D+J';
   }
 
-  const affordableKeys = Object.keys(availableMoves).filter(key => {
-    const move = availableMoves[key];
-    return move && typeof move === 'object' && (move.chiCost || 0) <= cpuPlayer.chi;
-  });
-
-  if (affordableKeys.length > 0) {
-    return affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
+  // DEFAULT FALLBACK CHARGE FOR NON-ICHIGO CPU
+  if (chosenKey.startsWith('S') || chosenKey.startsWith('W')) {
+    cpuPlayer.activeChargePercent = 100;
+  } else if (chosenKey.startsWith('D')) {
+    cpuPlayer.activeChargePercent = 85;
+  } else {
+    cpuPlayer.activeChargePercent = 100;
   }
 
-  return 'D+J';
+  return chosenKey;
 }
 
 function triggerLPFlash(slotKey, isHeal = false) {
@@ -354,6 +355,7 @@ function applyFaintBuildUp(player, playerKey, customAmount = null) {
   }
 }
 
+// MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -373,9 +375,6 @@ async function executeTurnResolutionPhase() {
     p2MoveKey = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
   }
   if (!p2MoveKey) p2MoveKey = 'DO_NOTHING';
-
-  let p1Time = (gameState.input && gameState.input.lockInTime) ? gameState.input.lockInTime : 1;
-  let p2Time = gameState.p2LockInTime || 1;
 
   if (gameState.p1.isCPU && p1MoveKey !== 'DO_NOTHING' && typeof simulateCPUButtonPress === 'function') {
     simulateCPUButtonPress(p1MoveKey);
@@ -417,19 +416,19 @@ async function executeTurnResolutionPhase() {
   } else if (p1IsD && p2IsS) {
     p1GoesFirst = false;
   } else {
-    let p1IsDefensive = p1Move.type === 'DEFENSE';
-    let p2IsDefensive = p2Move.type === 'DEFENSE';
+    // TIER TIE: Compare Lock-In Speed (Lower Charge % = Faster Lock-In -> GOES FIRST)
+    let p1Charge = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
+    let p2Charge = gameState.p2.activeChargePercent !== undefined ? gameState.p2.activeChargePercent : 100;
 
-    if (p1IsDefensive && !p2IsDefensive) {
-      p1GoesFirst = false;
-    } else if (!p1IsDefensive && p2IsDefensive) {
+    let p1Elapsed = p1Charge * 0.025;
+    let p2Elapsed = p2Charge * 0.025;
+
+    if (p1Elapsed < p2Elapsed) {
       p1GoesFirst = true;
+    } else if (p1Elapsed > p2Elapsed) {
+      p1GoesFirst = false;
     } else {
-      if (p1Time === p2Time) {
-        p1GoesFirst = Math.random() < 0.5;
-      } else {
-        p1GoesFirst = p1Time > p2Time;
-      }
+      p1GoesFirst = Math.random() < 0.5;
     }
   }
 
@@ -763,7 +762,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH TAKEOFF INSTABILITY MODEL
+// ATTACK RESOLUTION ENGINE WITH UNIFIED CHARGE-SCALED GUARDING
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
   const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
@@ -786,18 +785,20 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
+    // DEFENDER CHARGE FACTOR FOR UNIFIED GUARD EFFECTIVENESS
+    let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent !== undefined ? defender.activeChargePercent : 100) / 100));
+    let defenderChargeFactor = Math.sqrt(0.5 + (0.5 * defenderChargeRatio));
+    let effectiveGuardChance = 70 * defenderChargeFactor; // 49.5% at 0% charge -> 70.0% at 100% charge
+
     if (defMoveKey === 'A+I' || defMove.name === 'Windmill Guard') {
       isMatchingGuard = true;
-      let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent || 100) / 100));
-      let defenderChargeFactor = Math.sqrt(0.5 + (0.5 * defenderChargeRatio));
-      let effectiveCounterChance = 70 * defenderChargeFactor;
-      if (!atkMove.unblockable && Math.random() * 100 < effectiveCounterChance) {
+      if (!atkMove.unblockable && Math.random() * 100 < effectiveGuardChance) {
         guardSuccess = true;
-        damageRatio = 0.0;
+        damageRatio = 0.0; // 100% Damage Blocked
       }
     } else if (defMoveKey === `A+${atkButton}`) {
       isMatchingGuard = true;
-      if (Math.random() < 0.70) {
+      if (Math.random() * 100 < effectiveGuardChance) {
         guardSuccess = true;
         damageRatio = 0.30; // Reduce damage by 70%
         chiGained = 2;       // Award +2 Chi
@@ -822,24 +823,20 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   } else {
     let baseHitChance = atkMove.hitChance || 80;
     
-    // ACCURACY SCALING (0.7071 AT 0% CHARGE -> 1.0 AT 100% CHARGE)
     let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S') || atkMove.category === 'D' || atkMove.category === 'S' || atkMove.tier === 'S';
     let accuracyDiscount = isDOrS ? chargeFactor : 1.0;
 
     let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
     let rawHitRate = (baseHitChance * accuracyDiscount) + attackerHitBonus;
 
-    // CALCULATE DEFENDER AIRBORNE EVASION & TAKEOFF INSTABILITY MULTIPLIER
     let baseEvasionPct = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 0.20 : 0.0;
     let instabilityMult = 1.0;
 
     if (defender.airborneTicks > 0 && defender.airborneAppliedRound === gameState.roundCounter) {
-      // TAKEOFF ROUND: Apply instability multiplier = 1.8 - 0.8*r
       let jumpChargeRatio = Math.min(1.0, Math.max(0.0, (defender.airborneChargePercent !== undefined ? defender.airborneChargePercent : 100) / 100));
       instabilityMult = 1.8 - (0.8 * jumpChargeRatio);
     }
 
-    // FINAL HIT CHANCE = Raw Hit Rate * (1 - Base Evasion) * Instability Multiplier
     let calculatedHitChance = rawHitRate * (1.0 - baseEvasionPct) * instabilityMult;
     let effectiveHitChance = Math.max(10, Math.min(100, calculatedHitChance));
 
@@ -875,7 +872,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let baseDamage = atkMove.baseDamage || 0;
   let calculatedDmg = baseDamage * chargeFactor * typhoonMultiplier * focusMultiplier * jumpAtkMultiplier * damageRatio;
 
-  // SCRATCH DAMAGE IS EXACTLY 20% OF CALCULATED CHARGED DAMAGE
   let finalDmg = (isGlancing && calculatedDmg > 0) ? Math.max(1, Math.floor(calculatedDmg * 0.20)) : Math.floor(calculatedDmg);
 
   return { isOffensive: true, hitLanded: true, isGlancing: isGlancing, guardSuccess: guardSuccess, isMatchingGuard: isMatchingGuard, chiGained: chiGained, finalDmg: finalDmg };
