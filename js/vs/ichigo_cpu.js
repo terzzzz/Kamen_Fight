@@ -1,6 +1,7 @@
 /**
  * Kamen Rider Ichigo AI Decision Engine
- * Specialized 3-Turn Lookahead Engine with Stance Stacking & Faint Prioritization
+ * Path: js/vs/ichigo_cpu.js
+ * Specialized 3-Turn Lookahead Engine with Stance Stacking, Guarding & Faint Prioritization
  */
 
 function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'normal') {
@@ -14,7 +15,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
   if (affordableKeys.length === 0) return 'D+J';
 
   // --- EASY DIFFICULTY ---
-  // High randomness (60% random choice), basic 1-turn evaluation, no advanced stance stacking
   if (difficulty === 'easy') {
     if (Math.random() < 0.60) {
       return affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
@@ -22,8 +22,7 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
     return getIchigoSimple1TurnChoice(cpuPlayer, opponentPlayer, movesData, affordableKeys);
   }
 
-  // --- HARD DIFFICULTY: PREDICTIVE GUARD OVERRIDE ---
-  // If opponent is locked in with an offensive move, attempt direct matching guard A+X or Windmill Guard A+I
+  // --- HARD DIFFICULTY: PREDICTIVE/REACTIVE GUARD OVERRIDE ---
   if (difficulty === 'hard') {
     const opponentMoveKey = gameState.p1SelectedMoveKey || (gameState.input ? gameState.input.selectedMoveKey : null);
     if (opponentMoveKey && !opponentMoveKey.startsWith('A+') && opponentMoveKey !== 'DO_NOTHING') {
@@ -37,12 +36,12 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
     }
   }
 
-  // --- NORMAL & HARD DIFFICULTY: 3-TURN EV SEARCH ---
+  // --- NORMAL & HARD DIFFICULTY: 3-TURN LOOKAHEAD SEARCH ---
   const sequenceEvaluations = runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKeys);
 
   if (sequenceEvaluations.length === 0) return 'D+J';
 
-  // Group paths by distinct starting move (m1) and take max EV per starting move
+  // Group paths by distinct starting move (m1) and find max EV
   const bestPerStartMove = {};
   sequenceEvaluations.forEach(item => {
     if (!bestPerStartMove[item.firstMove] || item.totalEV > bestPerStartMove[item.firstMove].totalEV) {
@@ -56,17 +55,12 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
 
   // --- DIFFICULTY SELECTION ROUTING ---
   if (difficulty === 'hard') {
-    // HARD: 90% optimal top move, 10% second best for mixup
     return Math.random() < 0.90 ? sortedDistinctMoves[0].firstMove : sortedDistinctMoves[1].firstMove;
   } else {
-    // NORMAL: 50/50 weighted roll between Top 2 starting moves
     return Math.random() < 0.50 ? sortedDistinctMoves[0].firstMove : sortedDistinctMoves[1].firstMove;
   }
 }
 
-/**
- * Depth-3 Tree Search evaluating 3-move sequences (m1 -> m2 -> m3)
- */
 function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKeys) {
   const START_CHI = cpuPlayer.chi || 0;
   const OPP_LP = opponentPlayer.lp || 1050;
@@ -120,9 +114,6 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
   return sequenceEvaluations;
 }
 
-/**
- * State Transition Engine for Ichigo
- */
 function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint, moveKey, move, oppAvgDmg, oppChi) {
   let nextChi = Math.min(16, chi - (move.chiCost || 0) + (moveKey.startsWith('D') ? 3 : 0));
   let nextFocus = moveKey === 'W+K' ? 2 : Math.max(0, focus - 1);
@@ -130,10 +121,7 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
 
   let baseDmg = move.baseDamage || 0;
   let hitRate = (move.hitChance || 80) / 100;
-  let chargeFactor = 1.0; // Assume 100% charge baseline for EV planning
-
-  // WEIGHTED DAMAGE (80% CLEAN HIT, 20% SCRATCH HIT)
-  let weightedDmg = baseDmg * chargeFactor * hitRate * 0.84;
+  let weightedDmg = baseDmg * hitRate * 0.84; // 80% clean hit + 20% scratch hit
 
   // STANCE MULTIPLIERS
   if (focus > 0 && moveKey.startsWith('S')) weightedDmg *= 1.20;
@@ -141,37 +129,45 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
 
   let ev = weightedDmg;
 
-  // --- W+K (TYPHOON FOCUS) EVALUATION ---
+  // --- W+K (TYPHOON FOCUS) ---
   if (moveKey === 'W+K') {
-    const expectedSpecialDmg = 296.18; // S+L baseline
-    ev += (expectedSpecialDmg * 0.20 * 1.5);
-    if (chi < 11) ev -= 80; // Solvency penalty if unable to execute follow-up special
+    ev += (296.18 * 0.20 * 1.5);
+    if (chi < 11) ev -= 80;
   }
 
-  // --- W+I (RIDER HIGH JUMP) EVALUATION ---
+  // --- W+I (RIDER HIGH JUMP) ---
   if (moveKey === 'W+I') {
-    ev += oppAvgDmg * 0.20 * 2; // Evasion savings over airborne duration
-    if (chi < 12) ev -= 90; // Solvency penalty
+    ev += oppAvgDmg * 0.20 * 2;
+    if (chi < 12) ev -= 90;
+  }
+
+  // --- A+ GUARDS ---
+  if (moveKey.startsWith('A+')) {
+    if (faint >= 100) {
+      ev = 0;
+    } else {
+      ev = moveKey === 'A+I' ? oppAvgDmg * 0.70 : oppAvgDmg * 0.49 + 40;
+      if (cpuLp <= 250) ev *= 1.50;
+    }
   }
 
   // --- FAINT BUILDUP & STUN BONUS ---
   let isUtility = moveKey.startsWith('W') || move.type === 'DEFENSE';
-  let faintGained = isUtility ? 0 : hitRate * (25 * 0.80 + 10 * 0.20); // ~22.0 Faint per landed strike
+  let faintGained = isUtility ? 0 : hitRate * (25 * 0.80 + 10 * 0.20);
   let nextFaint = faint + faintGained;
 
   if (nextFaint >= 100 && faint < 100) {
-    ev += 250; // MASSIVE STUN BONUS: Forces guaranteed stun window
+    ev += 250; // MASSIVE STUN TRIGGER BONUS
   } else if (faint >= 75 && !isUtility) {
-    ev += (faintGained * 2.5); // Priority bonus for offensive moves when close to threshold
+    ev += (faintGained * 2.5);
   }
 
-  // --- GENERAL UTILITY SAFEGUARDS ---
+  // --- UTILITY SAFEGUARDS ---
   if (isUtility) {
-    if (faint >= 75) ev -= 150; // Force offensive moves when opponent is in stun range
-    if (airborne > 0) ev -= 120; // Never cast utility moves while airborne
+    if (faint >= 75) ev -= 150;
+    if (airborne > 0) ev -= 120;
   }
 
-  // Airborne evasion defense value
   if (airborne > 0) {
     ev += oppAvgDmg * 0.20;
   }
@@ -188,9 +184,6 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
   };
 }
 
-/**
- * Simplified 1-turn fallback evaluation for Easy difficulty
- */
 function getIchigoSimple1TurnChoice(cpuPlayer, opponentPlayer, movesData, affordableKeys) {
   let bestKey = affordableKeys[0];
   let maxDmg = -1;
