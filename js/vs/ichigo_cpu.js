@@ -1,20 +1,49 @@
 /**
  * Kamen Rider Ichigo AI Decision Engine
  * Path: js/vs/ichigo_cpu.js
- * 3-Turn Lookahead Engine with Elapsed Time Charge Calculations & Guarding Mechanics
+ * 3-Turn Lookahead Engine with Dynamic Timing Helper, Extension Buffer & Guarding Mechanics
  */
+
+// CENTRALIZED TIMING CONFIG HELPER (Shared Contract across all 14 Rider CPU Engines)
+function getMatchTimingConfig() {
+  const matchCfg = (typeof gameState !== 'undefined' && gameState.matchConfig) ? gameState.matchConfig : {};
+  const sysCfg = (typeof GAME_CONFIG !== 'undefined') ? GAME_CONFIG : {};
+
+  const baseRoundWindow = (typeof gameState !== 'undefined' && gameState.roundTimeLimit !== undefined)
+    ? gameState.roundTimeLimit
+    : (matchCfg.roundTimeLimit || sysCfg.ROUND_TIME_LIMIT || 8.0);
+
+  const chargeTimeRequired = (typeof gameState !== 'undefined' && gameState.chargeTimeRequired !== undefined)
+    ? gameState.chargeTimeRequired
+    : (matchCfg.chargeTimeRequired || sysCfg.CHARGE_TIME_REQUIRED || 2.5);
+
+  const extensionBonus = (typeof gameState !== 'undefined' && gameState.lateExtensionBonus !== undefined)
+    ? gameState.lateExtensionBonus
+    : (matchCfg.lateExtensionBonus || sysCfg.LATE_EXTENSION_BONUS || 1.0);
+
+  const lateThreshold = (typeof gameState !== 'undefined' && gameState.lateDecisionThreshold !== undefined)
+    ? gameState.lateDecisionThreshold
+    : (matchCfg.lateDecisionThreshold || sysCfg.LATE_DECISION_THRESHOLD || (baseRoundWindow - 1.0));
+
+  return { baseRoundWindow, chargeTimeRequired, extensionBonus, lateThreshold };
+}
 
 function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 'normal') {
   if (!movesData || Object.keys(movesData).length === 0) return 'D+J';
 
-  // 1. CALCULATE MAX ACHIEVABLE CHARGE WITHIN THE 8s ROUND WINDOW
-  // A 100% charge requires 2.5 seconds (0.025s per 1% charge).
-  // Within an 8.0s round window, CPU thinking delay (~0.5s) leaves 7.5s, easily allowing 100% charge.
-  const TOTAL_ROUND_WINDOW = 8.0; 
+  // 1. DYNAMICALLY RESOLVE TIMING CONFIG FROM GAME STATE / SYSTEM CONFIG
+  const timing = getMatchTimingConfig();
   let cpuThinkingDelay = 0.4 + (Math.random() * 0.4); // 0.4s to 0.8s reaction delay
-  let availableChargeTime = Math.max(0, TOTAL_ROUND_WINDOW - cpuThinkingDelay);
 
-  let maxAchievableCharge = Math.min(100, Math.floor((availableChargeTime / 2.5) * 100));
+  // Detect late human lock-in or active time extension flag
+  let humanLockedLate = (typeof gameState !== 'undefined' && gameState.input && gameState.input.isConfirmed && 
+    (gameState.input.lockInTime > timing.lateThreshold || gameState.timeExtended));
+
+  let bonusExtensionTime = humanLockedLate ? timing.extensionBonus : 0.0;
+  let availableChargeTime = Math.max(0, (timing.baseRoundWindow + bonusExtensionTime) - cpuThinkingDelay);
+
+  // Dynamically calculate max achievable charge % without hardcoded seconds
+  let maxAchievableCharge = Math.min(100, Math.floor((availableChargeTime / timing.chargeTimeRequired) * 100));
 
   // 2. FILTER AFFORDABLE MOVES
   const affordableKeys = Object.keys(movesData).filter(key => {
@@ -59,7 +88,7 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
     selectedMoveKey = run3TurnSearchAndSelect(cpuPlayer, opponentPlayer, movesData, affordableKeys, 'normal', maxAchievableCharge);
   }
 
-  // ENFORCE CHARGE TARGET CAPPED BY ACHIEVABLE CHARGE
+  // ENFORCE CHARGE TARGET CAPPED BY DYNAMIC ACHIEVABLE CHARGE
   setCPUChargeTarget(cpuPlayer, selectedMoveKey, maxAchievableCharge);
 
   return selectedMoveKey;
