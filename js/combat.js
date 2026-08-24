@@ -335,11 +335,12 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
-// FAINT BUILDUP (CLEAN HITS ONLY)
-function applyFaintBuildUp(player, playerKey) {
+// FAINT BUILDUP (SUPPORTING CUSTOM AMOUNT FOR CLEAN VS SCRATCH HITS)
+function applyFaintBuildUp(player, playerKey, customAmount = null) {
   if (!player.isFainted) {
     player.tookCleanHitThisRound = true;
-    player.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, player.faintMeter + FAINT_CFG.HIT_BUILDUP);
+    const amount = customAmount !== null ? customAmount : FAINT_CFG.HIT_BUILDUP;
+    player.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, player.faintMeter + amount);
     
     if (player.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
       player.isFainted = true;
@@ -518,6 +519,7 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else if (result.isGlancing) {
+          // SCRATCH HIT (20% DMG, 10 FAINT BUILDUP)
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
 
           await new Promise(r => setTimeout(r, 1000));
@@ -526,9 +528,11 @@ async function executeTurnResolutionPhase() {
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
           triggerFloatingNumber(defKey1, result.finalDmg, false);
+          applyFaintBuildUp(defender1, defKey1, 10);
 
           await vidPromise;
         } else {
+          // CLEAN HIT (FULL DMG + 25 FAINT BUILDUP)
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
@@ -620,6 +624,7 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else if (result.isGlancing) {
+        // SCRATCH HIT (20% DMG, 10 FAINT BUILDUP)
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
 
         await new Promise(r => setTimeout(r, 1000));
@@ -628,9 +633,11 @@ async function executeTurnResolutionPhase() {
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
         triggerFloatingNumber(defKey2, result.finalDmg, false);
+        applyFaintBuildUp(defender2, defKey2, 10);
 
         await vidPromise;
       } else {
+        // CLEAN HIT (FULL DMG + 25 FAINT BUILDUP)
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
@@ -758,7 +765,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH 50% EXPECTED OUTCOME FLOOR AT 0% CHARGE
+// ATTACK RESOLUTION ENGINE (20% SCRATCH RATE + 10 FAINT BUILDUP)
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const offensiveTypes = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
   const isOffensive = !!(atkMove && offensiveTypes.includes(atkMove.type?.toUpperCase()));
@@ -833,7 +840,8 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   }
 
   if (!isGuarding) {
-    isGlancing = Math.random() * 100 < (atkMove.scratchRate || 15);
+    // UPDATED SCRATCH RATE FLOOR TO 20%
+    isGlancing = Math.random() * 100 < (atkMove.scratchRate || 20);
   }
 
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
