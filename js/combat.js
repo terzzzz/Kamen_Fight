@@ -113,7 +113,7 @@ async function startBattle(matchConfig) {
   }
 }
 
-// GET CPU MOVE CHOICE FILTERED BY AFFORDABLE CHI & OPPONENT LOCK STATUS
+// GET CPU MOVE CHOICE ROUTING TO CHARACTER-SPECIFIC ENGINE (JS/VS/)
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
@@ -140,6 +140,11 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
+  // ROUTE TO ICHIGO SPECIFIC ENGINE IF LOADED
+  if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
+    return selectIchigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
+  }
+
   let chosenKey = null;
   if (typeof selectCPUMove === 'function') {
     chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
@@ -164,7 +169,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   return 'D+J';
 }
 
-// DIRECT DOM TARGET LP COLOR FLASH
 function triggerLPFlash(slotKey, isHeal = false) {
   const lpContainer = document.getElementById(`${slotKey}-lp`);
   if (!lpContainer) return;
@@ -181,7 +185,6 @@ function triggerLPFlash(slotKey, isHeal = false) {
   }, 1000);
 }
 
-// FLOATING POPUP GENERATORS
 function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
   if (!container) return;
@@ -217,7 +220,6 @@ function triggerFloatingText(slotKey, text, customClass = '') {
   }, 2500);
 }
 
-// BUFF & AIRBORNE STATE MANAGEMENT
 function applyBuff(player, buffId, label, buffType, durationRounds) {
   if (!player.activeBuffs) player.activeBuffs = [];
   player.activeBuffs = player.activeBuffs.filter(b => b.id !== buffId);
@@ -265,7 +267,6 @@ function handleAirborneState(player, moveKey, move) {
   if (move && move.grantsAirborne) {
     player.airborneTicks = move.grantsAirborne;
     player.airborneAppliedRound = gameState.roundCounter;
-    // BIND CHARGE PERCENTAGE SPECIFICALLY AT THE TIME OF JUMP EXECUTION
     player.airborneChargePercent = player.activeChargePercent !== undefined ? player.activeChargePercent : 100;
   } else if (player.airborneTicks > 0) {
     if (move && move.forcesLanding) {
@@ -284,7 +285,6 @@ function setSideBoxesBlank(isBlank) {
   if (p2Box) p2Box.classList.toggle('blanked', isBlank);
 }
 
-// HUD DISPLAY UPDATER WITH DOUBLE-LABEL CLEANUP & SINGLE-LINE CHI FLEX CONTAINER
 function updateHUD() {
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
@@ -339,7 +339,6 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
-// FAINT BUILDUP (CLEAN HITS = 25, SCRATCH HITS = 10)
 function applyFaintBuildUp(player, playerKey, customAmount = null) {
   if (!player.isFainted) {
     player.tookCleanHitThisRound = true;
@@ -355,7 +354,6 @@ function applyFaintBuildUp(player, playerKey, customAmount = null) {
   }
 }
 
-// MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
   gameState.roundPhase = 'RESOLUTION';
 
@@ -523,7 +521,6 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else if (result.isGlancing) {
-          // SCRATCH HIT (20% DMG, 10 FAINT BUILDUP)
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
 
           await new Promise(r => setTimeout(r, 1000));
@@ -536,7 +533,6 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else {
-          // CLEAN HIT (FULL DMG + 25 FAINT BUILDUP)
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
@@ -628,7 +624,6 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else if (result.isGlancing) {
-        // SCRATCH HIT (20% DMG, 10 FAINT BUILDUP)
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
 
         await new Promise(r => setTimeout(r, 1000));
@@ -641,7 +636,6 @@ async function executeTurnResolutionPhase() {
 
         await vidPromise;
       } else {
-        // CLEAN HIT (FULL DMG + 25 FAINT BUILDUP)
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
         const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
