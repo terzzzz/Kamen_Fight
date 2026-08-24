@@ -340,7 +340,7 @@ function updateHUD() {
   if (turnDisp) turnDisp.textContent = `ROUND ${gameState.roundCounter}`;
 }
 
-function applyFaintBuildUp(player, playerKey, customAmount = null) {
+async function applyFaintBuildUp(player, playerKey, customAmount = null) {
   if (!player.isFainted) {
     player.tookCleanHitThisRound = true;
     const amount = customAmount !== null ? customAmount : FAINT_CFG.HIT_BUILDUP;
@@ -350,7 +350,18 @@ function applyFaintBuildUp(player, playerKey, customAmount = null) {
       player.isFainted = true;
       const stunOverlay = document.getElementById(`${playerKey}-stun-overlay`);
       if (stunOverlay) stunOverlay.hidden = false;
+      
       triggerFloatingText(playerKey, 'FAINTED!!', 'scratch');
+
+      // Play the faint video on the center screen
+      if (typeof playCenterVideo === 'function') {
+        await playCenterVideo(playerKey, 'faint.mp4', 'FAINTED!', 1500);
+      }
+
+      // Update character media sidebar to display faint loop
+      if (typeof updateCharacterMedia === 'function') {
+        updateCharacterMedia(playerKey, 'IDLE');
+      }
     }
   }
 }
