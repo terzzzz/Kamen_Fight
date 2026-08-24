@@ -503,6 +503,11 @@ const battleMsg = document.getElementById('battle-message');
       if (!isOpponentOffensive && key1 !== 'A+I' && move1.name !== 'Windmill Guard' && (move1.chiCost || 0) === 0) {
         applyFaintBuildUp(attacker1, atkKey1, 5);
       }
+      
+      // DEDUCT CHI FOR DEFENSE MOVES PROPERLY
+      attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
+      updateHUD();
+
       await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, null, move1);
     } else {
       // PLAY ATTACKER'S ACTION VIDEO FIRST WITHOUT SKIPPING
@@ -662,12 +667,16 @@ const battleMsg = document.getElementById('battle-message');
       attacker2.chi = Math.min(16, attacker2.chi + chiGain);
     }
     updateHUD();
-  } else if (move2.type === 'DEFENSE') {
+ } else if (move2.type === 'DEFENSE') {
     let isOpponentOffensive = !!(move1 && OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
     if (!isOpponentOffensive && key2 !== 'A+I' && move2.name !== 'Windmill Guard' && (move2.chiCost || 0) === 0) {
       applyFaintBuildUp(attacker2, atkKey2, 5);
     }
-  } else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
+    
+    // DEDUCT CHI FOR DEFENSE MOVES PROPERLY
+    attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
+    updateHUD();
+  }else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
