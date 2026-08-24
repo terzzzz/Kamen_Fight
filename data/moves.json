@@ -13,9 +13,9 @@
     "S+L": { "name": "Rider Kick", "type": "SPECIAL", "chiCost": 6, "baseDamage": 430, "hitChance": 70, "video": "rider_kick.mp4" },
     "S+I": { "name": "Kirimomi Kick", "type": "SPECIAL", "chiCost": 10, "baseDamage": 550, "hitChance": 76, "video": "kirimomi_kick.mp4" },
     "A+I": { "name": "Windmill Guard", "type": "DEFENSE", "chiCost": 3, "baseDamage": 0, "hitChance": 100, "video": "windmill_guard.mp4", "unmirrored": true },
-    "A+J": { "name": "High Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
-    "A+K": { "name": "Mid Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
-    "A+L": { "name": "Side Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
+    "A+J": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+K": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+L": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
   },
   "nigo": {
     "W+I": { "name": "Rider Power Jump", "type": "UTILITY", "chiCost": 3, "baseDamage": 0, "hitChance": 100, "video": "jump.mp4", "grantsAirborne": 2, "buff": { "id": "airborne_boost", "label": "AIR (+15% ATK / +15% HIT)", "type": "speed", "duration": 2 } },
@@ -31,8 +31,8 @@
     "S+L": { "name": "Rider Power Kick", "type": "SPECIAL", "chiCost": 7, "baseDamage": 470, "hitChance": 65, "video": "rider_kick.mp4" },
     "S+I": { "name": "Typhoon Power Break", "type": "SPECIAL", "chiCost": 10, "baseDamage": 630, "hitChance": 60, "video": "typhoon_power_break.mp4" },
     "A+I": { "name": "Windmill Guard", "type": "DEFENSE", "chiCost": 3, "baseDamage": 0, "hitChance": 100, "video": "windmill_guard.mp4", "unmirrored": true },
-    "A+J": { "name": "High Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
-    "A+K": { "name": "Mid Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
-    "A+L": { "name": "Side Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
+    "A+J": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+K": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" },
+    "A+L": { "name": "Guard", "type": "DEFENSE", "chiCost": 0, "baseDamage": 0, "hitChance": 100, "video": "guard.mp4" }
   }
 }
