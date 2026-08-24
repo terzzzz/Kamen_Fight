@@ -162,7 +162,7 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (chosenKey.startsWith('S') || chosenKey.startsWith('W')) {
     cpuPlayer.activeChargePercent = 100;
   } else if (chosenKey.startsWith('D')) {
-    cpuPlayer.activeChargePercent = 85;
+    cpuPlayer.activeChargePercent = 90 + Math.floor(Math.random() * 11);
   } else {
     cpuPlayer.activeChargePercent = 100;
   }
@@ -364,15 +364,29 @@ async function executeTurnResolutionPhase() {
   const p1StartFaint = gameState.p1.faintMeter;
   const p2StartFaint = gameState.p2.faintMeter;
 
-  let p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
-  if (!p1MoveKey && gameState.p1.isCPU) {
+  // FIXED: Explicitly handle P1 CPU vs Human charge assignment to prevent 10% bug override
+  let p1MoveKey = null;
+  if (gameState.p1.isCPU) {
     p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
+    if (gameState.p1.activeChargePercent === undefined) {
+      gameState.p1.activeChargePercent = 100;
+    }
+  } else {
+    p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
+    gameState.p1.activeChargePercent = (gameState.input && gameState.input.chargePercent > 0) 
+      ? gameState.input.chargePercent 
+      : 100;
   }
   if (!p1MoveKey) p1MoveKey = 'DO_NOTHING';
 
   let p2MoveKey = gameState.p2AlwaysIdle ? 'DO_NOTHING' : gameState.p2SelectedMoveKey;
   if (!p2MoveKey && gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
     p2MoveKey = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
+    if (gameState.p2.activeChargePercent === undefined) {
+      gameState.p2.activeChargePercent = 100;
+    }
+  } else if (!gameState.p2.isCPU) {
+    gameState.p2.activeChargePercent = gameState.p2ChargePercent || 100;
   }
   if (!p2MoveKey) p2MoveKey = 'DO_NOTHING';
 
@@ -390,8 +404,8 @@ async function executeTurnResolutionPhase() {
   const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
-    const p1Charge = gameState.p1.activeChargePercent || 100;
-    const p2Charge = gameState.p2.activeChargePercent || 100;
+    const p1Charge = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
+    const p2Charge = gameState.p2.activeChargePercent !== undefined ? gameState.p2.activeChargePercent : 100;
     battleMsg.innerHTML = `P1: ${p1Move.name} (${p1Charge}%) VS P2: ${p2Move.name} (${p2Charge}%)`;
   }
 
@@ -462,7 +476,6 @@ async function executeTurnResolutionPhase() {
     updateHUD();
 
     if (move1.type === 'DEFENSE') {
-      // STANDARD 0-COST GUARD VS NON-OFFENSIVE ACTION = +5 FAINT PTS (A+I IS EXEMPT)
       let isOpponentOffensive = !!(move2 && OFFENSIVE_TYPES.includes(move2.type?.toUpperCase()));
       if (!isOpponentOffensive && key1 !== 'A+I' && move1.name !== 'Windmill Guard' && (move1.chiCost || 0) === 0) {
         applyFaintBuildUp(attacker1, atkKey1, 5);
@@ -659,7 +672,6 @@ async function executeTurnResolutionPhase() {
     }
     updateHUD();
   } else if (move2.type === 'DEFENSE') {
-    // STANDARD 0-COST GUARD VS NON-OFFENSIVE ACTION = +5 FAINT PTS (A+I IS EXEMPT)
     let isOpponentOffensive = !!(move1 && OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
     if (!isOpponentOffensive && key2 !== 'A+I' && move2.name !== 'Windmill Guard' && (move2.chiCost || 0) === 0) {
       applyFaintBuildUp(attacker2, atkKey2, 5);
@@ -793,7 +805,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    // STANDARD 0-COST GUARD VS OFFENSIVE ACTION = +25 FAINT PTS (A+I IS EXEMPT)
     if (defMoveKey !== 'A+I' && defMove.name !== 'Windmill Guard' && (defMove.chiCost || 0) === 0) {
       applyFaintBuildUp(defender, defenderKey, 25);
     }
