@@ -127,11 +127,14 @@ function toggleControlType(playerKey) {
   updateSelectionUI();
 }
 
+// TOGGLE DIFFICULTY ACROSS 3 STAGES: EASY -> NORMAL -> HARD -> EASY
 function toggleDifficulty(playerKey) {
+  const nextDiff = { 'easy': 'normal', 'normal': 'hard', 'hard': 'easy' };
+
   if (playerKey === 'p1' && vsSelectionState.p1IsCPU && vsSelectionState.step === 1) {
-    vsSelectionState.p1Difficulty = vsSelectionState.p1Difficulty === 'normal' ? 'hard' : 'normal';
+    vsSelectionState.p1Difficulty = nextDiff[vsSelectionState.p1Difficulty] || 'normal';
   } else if (playerKey === 'p2' && vsSelectionState.step === 2) {
-    vsSelectionState.p2Difficulty = vsSelectionState.p2Difficulty === 'normal' ? 'hard' : 'normal';
+    vsSelectionState.p2Difficulty = nextDiff[vsSelectionState.p2Difficulty] || 'normal';
   }
   updateSelectionUI();
 }
@@ -180,10 +183,11 @@ function updateSelectionUI() {
   if (p1DiffDisplay) {
     if (!vsSelectionState.p1IsCPU) {
       p1DiffDisplay.textContent = 'N/A';
-      p1DiffDisplay.classList.remove('hard');
+      p1DiffDisplay.classList.remove('hard', 'easy');
     } else {
       p1DiffDisplay.textContent = vsSelectionState.p1Difficulty.toUpperCase();
       p1DiffDisplay.classList.toggle('hard', vsSelectionState.p1Difficulty === 'hard');
+      p1DiffDisplay.classList.toggle('easy', vsSelectionState.p1Difficulty === 'easy');
     }
   }
 
@@ -203,6 +207,7 @@ function updateSelectionUI() {
   if (p2DiffDisplay) {
     p2DiffDisplay.textContent = vsSelectionState.p2Difficulty.toUpperCase();
     p2DiffDisplay.classList.toggle('hard', vsSelectionState.p2Difficulty === 'hard');
+    p2DiffDisplay.classList.toggle('easy', vsSelectionState.p2Difficulty === 'easy');
   }
 
   const p1Card = document.getElementById('p1-card');
