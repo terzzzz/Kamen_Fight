@@ -78,6 +78,7 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
+  // Grant 1 Chi to both players at the start of Round 2+
   if (gameState.roundCounter > 1) {
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
@@ -92,14 +93,16 @@ function startRoundCountdown() {
     if (gameState.input) gameState.input.acceptingInputs = true;
   }, 400);
 
+  // Apply status overlays & process carry-over Faint Stun
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
 
+    // CARRY-OVER FAINT STUN: Keep fainted for this input round, then reset faint meter
     if (player.willBeFaintedNextRound) {
       player.isFainted = true;
-      player.willBeFaintedNextRound = false;
-      player.faintMeter = 0;
+      player.willBeFaintedNextRound = false; // Reset flag so player recovers in the following round
+      player.faintMeter = 0;                 // Reset faint meter to 0 for the stun round
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -124,6 +127,7 @@ function startRoundCountdown() {
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
+  // Auto-confirm DO_NOTHING for human players who start the round fainted
   if (gameState.p1 && gameState.p1.isFainted && !gameState.p1.isCPU) {
     confirmPlayerAction('DO_NOTHING', 'p1');
   }
@@ -149,7 +153,7 @@ function startRoundCountdown() {
   const timerEl = document.getElementById('turn-timer');
   if (timerEl) timerEl.textContent = `TIME: ${gameState.turnTimerSeconds}s`;
 
-  // Schedule CPU decision during countdown
+  // Schedule CPU decisions during input window
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (player && player.isCPU && !player.isFainted) {
@@ -161,6 +165,7 @@ function startRoundCountdown() {
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
         
+        // Preserve CPU-calculated charge target
         if (player.activeChargePercent === undefined) {
           player.activeChargePercent = 100;
         }
@@ -169,7 +174,7 @@ function startRoundCountdown() {
     }
   });
 
-  // COUNTDOWN STRICTLY RUNS TIMER
+  // Countdown timer interval
   gameState.timerInterval = setInterval(() => {
     if (gameState.roundPhase !== 'INPUT') return;
 
@@ -179,7 +184,7 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      // FORCE UNCONFIRMED PLAYERS TO DO_NOTHING & RESOLVE IMMEDIATELY
+      // FORCE UNCONFIRMED PLAYERS TO DECIDE ON TIMEOUT
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
@@ -194,7 +199,13 @@ function startRoundCountdown() {
 
       if (!gameState.p2IsConfirmed) {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
-          const mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
+          let mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
+
+          // PREVENT DOUBLE-GUARD: If P1 is guarding on timeout, force P2 to attack
+          if (gameState.input.selectedMoveKey && gameState.input.selectedMoveKey.startsWith('A+') && mk.startsWith('A+')) {
+            mk = 'D+J';
+          }
+
           if (gameState.p2.activeChargePercent === undefined) gameState.p2.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p2');
         } else {
