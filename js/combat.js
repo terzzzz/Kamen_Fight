@@ -23,6 +23,19 @@ const GAME_CONFIG = window.GAME_CONFIG || {
   HARD_CPU_HP_MULTIPLIER: 1.30
 };
 
+// HELPER: QUEUE POP-UPS WITH 0.7 SECOND INTERVALS
+function triggerStaggeredPopups(slotKey, popups) {
+  popups.forEach((item, index) => {
+    setTimeout(() => {
+      if (item.type === 'text') {
+        triggerFloatingText(slotKey, item.text, item.customClass || '');
+      } else if (item.type === 'number') {
+        triggerFloatingNumber(slotKey, item.amount, item.isHeal || false);
+      }
+    }, index * 700);
+  });
+}
+
 // BATTLE INITIALIZATION WITH GUARANTEED LIFECYCLE UNLOCK
 async function startBattle(matchConfig) {
   if (!window.gameState) window.gameState = {};
@@ -47,7 +60,6 @@ async function startBattle(matchConfig) {
       gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
     }
 
-    // UPDATED DEFAULT FALLBACK LP TO REFLECT +800 BOOST
     const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1850 };
     const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 2000 };
 
@@ -433,10 +445,10 @@ async function executeTurnResolutionPhase() {
   if (!p2MoveKey) p2MoveKey = 'DO_NOTHING';
 
   if (gameState.p1.isCPU && p1MoveKey !== 'DO_NOTHING' && typeof simulateCPUButtonPress === 'function') {
-    simulateCPUButtonPress(p1MoveKey);
+    simulateCPUButtonPress(p1MoveKey, 'p1');
   }
   if (gameState.p2.isCPU && !gameState.p2AlwaysIdle && p2MoveKey !== 'DO_NOTHING' && typeof simulateCPUButtonPress === 'function') {
-    simulateCPUButtonPress(p2MoveKey);
+    simulateCPUButtonPress(p2MoveKey, 'p2');
   }
 
   const defaultMove = { name: 'Do Nothing', type: 'IDLE', baseDamage: 0, chiCost: 0 };
@@ -545,12 +557,15 @@ async function executeTurnResolutionPhase() {
             if (result.finalDmg === 0) {
               triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
             } else {
-              triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
+              const queue = [
+                { type: 'text', text: 'GUARDED!', customClass: 'scratch' },
+                { type: 'number', amount: result.finalDmg, isHeal: false }
+              ];
               if (result.chiGained > 0) {
                 defender1.chi = Math.min(defender1.maxChi || rules.MAX_CHI, defender1.chi + result.chiGained);
-                triggerFloatingText(defKey1, 'CHI UP! (+2)', 'heal');
+                queue.push({ type: 'text', text: 'CHI UP! (+2)', customClass: 'heal' });
               }
-              triggerFloatingNumber(defKey1, result.finalDmg, false);
+              triggerStaggeredPopups(defKey1, queue);
             }
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
@@ -559,28 +574,36 @@ async function executeTurnResolutionPhase() {
             await vidPromise;
           } else {
             defender1WasInterrupted = true;
-            triggerFloatingText(defKey1, 'GUARD FAIL!', 'scratch');
 
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
             const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
             updateHUD();
-            triggerFloatingNumber(defKey1, result.finalDmg, false);
+
+            triggerStaggeredPopups(defKey1, [
+              { type: 'text', text: 'GUARD FAIL!', customClass: 'scratch' },
+              { type: 'number', amount: result.finalDmg, isHeal: false }
+            ]);
+
             applyFaintBuildUp(defender1, defKey1);
 
             await vidPromise;
           }
         } else if (!result.hitLanded) {
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'DODGED!');
-          triggerFloatingText(defKey1, 'MISS!!', 'miss');
+          setTimeout(() => triggerFloatingText(defKey1, 'MISS!!', 'miss'), 1000);
           await vidPromise;
         } else if (result.isGlancing) {
           const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
-          triggerFloatingText(defKey1, 'SCRATCH!', 'scratch');
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
-          triggerFloatingNumber(defKey1, result.finalDmg, false);
+
+          triggerStaggeredPopups(defKey1, [
+            { type: 'text', text: 'SCRATCH!', customClass: 'scratch' },
+            { type: 'number', amount: result.finalDmg, isHeal: false }
+          ]);
+
           applyFaintBuildUp(defender1, defKey1, 10);
           await vidPromise;
         } else {
@@ -591,7 +614,11 @@ async function executeTurnResolutionPhase() {
 
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
-          triggerFloatingNumber(defKey1, result.finalDmg, false);
+
+          triggerStaggeredPopups(defKey1, [
+            { type: 'number', amount: result.finalDmg, isHeal: false }
+          ]);
+
           applyFaintBuildUp(defender1, defKey1);
 
           await vidPromise;
@@ -632,12 +659,15 @@ async function executeTurnResolutionPhase() {
           if (result.finalDmg === 0) {
             triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
           } else {
-            triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
+            const queue = [
+              { type: 'text', text: 'GUARDED!', customClass: 'scratch' },
+              { type: 'number', amount: result.finalDmg, isHeal: false }
+            ];
             if (result.chiGained > 0) {
               defender2.chi = Math.min(defender2.maxChi || rules.MAX_CHI, defender2.chi + result.chiGained);
-              triggerFloatingText(defKey2, 'CHI UP! (+2)', 'heal');
+              queue.push({ type: 'text', text: 'CHI UP! (+2)', customClass: 'heal' });
             }
-            triggerFloatingNumber(defKey2, result.finalDmg, false);
+            triggerStaggeredPopups(defKey2, queue);
           }
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
@@ -645,28 +675,35 @@ async function executeTurnResolutionPhase() {
 
           await vidPromise;
         } else {
-          triggerFloatingText(defKey2, 'GUARD FAIL!', 'scratch');
-
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
           const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
           updateHUD();
-          triggerFloatingNumber(defKey2, result.finalDmg, false);
+
+          triggerStaggeredPopups(defKey2, [
+            { type: 'text', text: 'GUARD FAIL!', customClass: 'scratch' },
+            { type: 'number', amount: result.finalDmg, isHeal: false }
+          ]);
+
           applyFaintBuildUp(defender2, defKey2);
 
           await vidPromise;
         }
       } else if (!result.hitLanded) {
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'DODGED!');
-        triggerFloatingText(defKey2, 'MISS!!', 'miss');
+        setTimeout(() => triggerFloatingText(defKey2, 'MISS!!', 'miss'), 1000);
         await vidPromise;
       } else if (result.isGlancing) {
         const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
-        triggerFloatingText(defKey2, 'SCRATCH!', 'scratch');
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
-        triggerFloatingNumber(defKey2, result.finalDmg, false);
+
+        triggerStaggeredPopups(defKey2, [
+          { type: 'text', text: 'SCRATCH!', customClass: 'scratch' },
+          { type: 'number', amount: result.finalDmg, isHeal: false }
+        ]);
+
         applyFaintBuildUp(defender2, defKey2, 10);
         await vidPromise;
       } else {
@@ -675,7 +712,11 @@ async function executeTurnResolutionPhase() {
 
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
-        triggerFloatingNumber(defKey2, result.finalDmg, false);
+
+        triggerStaggeredPopups(defKey2, [
+          { type: 'number', amount: result.finalDmg, isHeal: false }
+        ]);
+
         applyFaintBuildUp(defender2, defKey2);
 
         await vidPromise;
@@ -714,6 +755,7 @@ async function executeTurnResolutionPhase() {
       const wasSuccessful = window.calculateMoveSuccess(gameState.p2, gameState.p1, p2MoveKey, {
         damageDealt: p1DmgTaken,
         damageTaken: p2DmgTaken,
+        oppChargePercent: gameState.p1.activeChargePercent || 100,
         cpuWasHit: p2DmgTaken > 0,
         cpuWasInterrupted: defender1WasInterrupted && attacker2 === gameState.p1,
         oppWasGuarded: p1Move.type === 'DEFENSE',
@@ -728,6 +770,7 @@ async function executeTurnResolutionPhase() {
       const wasSuccessful = window.calculateMoveSuccess(gameState.p1, gameState.p2, p1MoveKey, {
         damageDealt: p2DmgTaken,
         damageTaken: p1DmgTaken,
+        oppChargePercent: gameState.p2.activeChargePercent || 100,
         cpuWasHit: p1DmgTaken > 0,
         cpuWasInterrupted: defender1WasInterrupted && attacker2 === gameState.p2,
         oppWasGuarded: p2Move.type === 'DEFENSE',
@@ -804,7 +847,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH DYNAMIC FAINT PENALTIES (+15 CHI GUARDS, +25 0-COST GUARDS)
+// ATTACK RESOLUTION ENGINE WITH DYNAMIC EVASION & FAINT PENALTIES
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const rules = window.COMBAT_RULES || COMBAT_RULES;
   const isOffensive = !!(atkMove && rules.OFFENSIVE_TYPES.includes(atkMove.type?.toUpperCase()));
@@ -813,7 +856,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  // 1. CALCULATE ATTACKER CHARGE MULTIPLIER FIRST
   const chargePercent = attacker.activeChargePercent !== undefined ? attacker.activeChargePercent : 100;
   const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
   const chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
@@ -824,7 +866,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let chiGained = 0;
   let damageRatio = 1.0;
 
-  // 2. GUARD RESOLUTION
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
@@ -862,7 +903,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
-  // 3. HIT & EVASION RESOLUTION
   let rolledHit = false;
   let isGlancing = false;
 
@@ -879,7 +919,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
     let rawHitRate = (baseHitChance * accuracyDiscount) + attackerHitBonus;
 
-    // DYNAMIC EVASION READ (Defaults to 0.0 if omitted in JSON)
     let baseEvasionPct = (defender && defender.evasionRate !== undefined) ? defender.evasionRate : 0.0;
     if (defender.id === 'ichigo' && defender.airborneTicks > 0) {
       baseEvasionPct += 0.20;
@@ -905,7 +944,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     isGlancing = Math.random() * 100 < (atkMove.scratchRate || 20);
   }
 
-  // 4. DAMAGE CALCULATIONS & BUFF MULTIPLIERS
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
     damageRatio *= 0.85; 
   }
