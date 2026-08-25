@@ -110,7 +110,7 @@ function startRoundCountdown() {
     if (gameState.input) gameState.input.acceptingInputs = true;
   }, 400);
 
-  // Process status overlays & carry-over faint stun
+ // Process status overlays & carry-over faint stun
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
@@ -119,6 +119,8 @@ function startRoundCountdown() {
       player.isFainted = true;
       player.willBeFaintedNextRound = false;
       player.faintMeter = 0;
+    } else {
+      player.isFainted = false; // RECOVER FROM STUN: Clear fainted status for normal play
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
