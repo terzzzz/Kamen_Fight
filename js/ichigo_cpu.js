@@ -1,7 +1,7 @@
 /**
  * Kamen Rider Ichigo AI Decision Engine
  * Path: js/ichigo_cpu.js
- * 3-Turn Lookahead Engine with Dynamic Health Ratios
+ * 3-Turn Lookahead Engine
  */
 
 function getMatchTimingConfig() {
@@ -66,6 +66,7 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
     const opponentMoveKey = gameState.p1SelectedMoveKey || (gameState.input ? gameState.input.selectedMoveKey : null);
     let guardChosen = false;
 
+    // 1. REACTIVE GUARD VS HUMAN / CONFIRMED LOCK-IN
     if (opponentMoveKey && !opponentMoveKey.startsWith('A+') && opponentMoveKey !== 'DO_NOTHING') {
       const oppButton = opponentMoveKey.split('+')[1];
       const isOpponentSpecial = opponentMoveKey.startsWith('S');
@@ -74,7 +75,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
       const cpuWindmillFaintRisk = (cpuPlayer.faintMeter || 0) >= (rules.FAINT_THRESHOLD - rules.FAINT_PENALTY_CHI_GUARD);
       const cpuStandardGuardSelfFaintRisk = (cpuPlayer.faintMeter || 0) >= (rules.FAINT_THRESHOLD - rules.FAINT_PENALTY_STANDARD_GUARD);
 
-      // 1. HIGH THREAT (Special): Reactive Windmill Guard (A+I, +15 faint pts) or Matching Guard
       if (isOpponentSpecial) {
         const windmillMove = movesData['A+I'];
         const windmillCost = windmillMove ? (windmillMove.chiCost || 0) : 0;
@@ -87,7 +87,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
           guardChosen = true;
         }
       } 
-      // 2. LOW THREAT (Physical): Dynamic 25% LP Threshold Check
       else if (isOpponentPhysical && oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk) {
         const maxLp = cpuPlayer.maxLp || 1850;
         const isLowLp = (cpuPlayer.lp / maxLp) <= 0.25;
@@ -99,6 +98,16 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
           selectedMoveKey = `A+${oppButton}`;
           guardChosen = true;
         }
+      }
+    }
+
+    // 2. PREEMPTIVE GUARDING IN CPU VS. CPU (WHEN OPPONENT HAS >= 8 CHI)
+    if (!guardChosen && opponentPlayer.isCPU && opponentPlayer.chi >= 8) {
+      const cpuWindmillFaintRisk = (cpuPlayer.faintMeter || 0) >= (rules.FAINT_THRESHOLD - rules.FAINT_PENALTY_CHI_GUARD);
+      const windmillMove = movesData['A+I'];
+      if (windmillMove && cpuPlayer.chi >= (windmillMove.chiCost || 0) && !cpuWindmillFaintRisk && Math.random() < 0.35) {
+        selectedMoveKey = 'A+I';
+        guardChosen = true;
       }
     }
 
@@ -125,6 +134,7 @@ function setCPUChargeTarget(cpuPlayer, moveKey, maxAchievableCharge) {
   } else if (moveKey.startsWith('S') || moveKey === 'W+I' || moveKey === 'W+K') {
     desiredCharge = 100;
   } else if (moveKey.startsWith('D')) {
+    // UNCHANGED: Physical moves charge to 90-100%
     desiredCharge = 90 + Math.floor(Math.random() * 11);
   }
 
@@ -155,7 +165,6 @@ function run3TurnSearchAndSelect(cpuPlayer, opponentPlayer, movesData, affordabl
 function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKeys, maxAchievableCharge) {
   const START_CHI = cpuPlayer.chi || 0;
   
-  // DYNAMIC READ: Pulls actual runtime LP & Max LP
   const CPU_LP = cpuPlayer.lp || 1850;
   const CPU_MAX_LP = cpuPlayer.maxLp || 1850;
   const OPP_LP = opponentPlayer.lp || 2000;
@@ -215,7 +224,15 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, cpuMaxLp, focus, airbo
     MAX_CHI: 16
   };
 
-  let nextChi = Math.min(rules.MAX_CHI || 16, chi - ((move && move.chiCost) || 0) + (moveKey.startsWith('D') ? 3 : 0));
+  // CORRECTED CHI MATH: D+J and D+K grant +2 Chi; all other D moves grant +3 Chi
+  let chiGain = 0;
+  if (moveKey === 'D+J' || moveKey === 'D+K') {
+    chiGain = 2;
+  } else if (moveKey.startsWith('D')) {
+    chiGain = 3;
+  }
+
+  let nextChi = Math.min(rules.MAX_CHI || 16, chi - ((move && move.chiCost) || 0) + chiGain);
   let nextFocus = moveKey === 'W+K' ? 2 : Math.max(0, focus - 1);
   let nextAirborne = moveKey === 'W+I' ? 2 : Math.max(0, airborne - 1);
 
@@ -227,10 +244,24 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, cpuMaxLp, focus, airbo
   let hitRate = ((move && move.hitChance) || 80) / 100;
   let weightedDmg = baseDmg * chargeFactor * hitRate * 0.84;
 
-  if (focus > 0 && moveKey.startsWith('S')) weightedDmg *= 1.20;
+  let ev = weightedDmg;
+
+  // 1. IMMEDIATE FOCUS BUFF CAPITALIZATION
+  if (focus > 0) {
+    if (moveKey.startsWith('S')) {
+      weightedDmg *= 1.25;
+      ev += 120; // Priority bonus to unleash Special attack while Focus is active
+    } else if (moveKey.startsWith('D') && chi >= 6) {
+      ev -= 120; // Penalty for using 0-cost D moves when Focus is active and Chi >= 6
+    }
+  }
+
   if (airborne > 0) weightedDmg *= 1.15;
 
-  let ev = weightedDmg;
+  // 2. CHI HOARDING PENALTY
+  if (chi >= 10 && moveKey.startsWith('D')) {
+    ev -= 70; // Penalty if holding >= 10 Chi and attempting a punch instead of a Special move
+  }
 
   if (moveKey === 'W+K') {
     ev += (296.18 * 0.20 * 1.5);
@@ -279,7 +310,6 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, cpuMaxLp, focus, airbo
         ev = damageSaved + chiGainEV - (selfFaintGained * 1.5);
       }
 
-      // DYNAMIC LOW LP CHECK: Applies desperation EV boost when below 25% LP
       if ((cpuLp / (cpuMaxLp || 1850)) <= 0.25) {
         ev *= 1.50;
       }
