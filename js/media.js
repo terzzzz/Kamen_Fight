@@ -120,14 +120,26 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
 
       centerVid.removeEventListener('ended', cleanUpAndResolve);
       centerVid.removeEventListener('error', cleanUpAndResolve);
+      centerVid.removeEventListener('loadedmetadata', onMetadata);
 
       centerBox.hidden = true;
       if (actionLabel) actionLabel.hidden = true;
       resolve();
     };
 
+    const onMetadata = () => {
+      if (resolved) return;
+      if (centerVid.duration && !isNaN(centerVid.duration) && centerVid.duration > 0) {
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        const durationMs = (centerVid.duration * 1000) + 300;
+        const targetTimeout = maxDurationMs ? Math.max(durationMs, maxDurationMs) : durationMs;
+        fallbackTimer = setTimeout(cleanUpAndResolve, targetTimeout);
+      }
+    };
+
     centerVid.addEventListener('ended', cleanUpAndResolve);
     centerVid.addEventListener('error', cleanUpAndResolve);
+    centerVid.addEventListener('loadedmetadata', onMetadata);
 
     const riderId = player.id || 'ichigo';
     const rawUrl = `assets/videos/${riderId}/${videoFile}`;
@@ -143,7 +155,8 @@ function playCenterVideo(playerKey, videoFile, actionName = '', maxDurationMs = 
       });
     }
 
-    fallbackTimer = setTimeout(cleanUpAndResolve, maxDurationMs || 8000);
+    const initialTimeout = (maxDurationMs && maxDurationMs > 8000) ? maxDurationMs : 8000;
+    fallbackTimer = setTimeout(cleanUpAndResolve, initialTimeout);
   });
 }
 
@@ -193,7 +206,6 @@ function updateCharacterMedia(playerKey, stateType) {
   videoEl.setAttribute('playsinline', '');
   videoEl.setAttribute('webkit-playsinline', '');
 
-  // Toggle mirror match palette specifically per slot
   videoEl.classList.toggle('p2-mirror-palette', playerKey === 'p2' && isMirrorMatch);
 
   const isLoopingState = ['idle.mp4', 'mid-air.mp4', 'faint.mp4'].includes(fileName);
