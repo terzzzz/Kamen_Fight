@@ -124,11 +124,19 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     movesData = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
   }
 
+  const difficulty = playerKey === 'p1' 
+    ? (gameState.matchConfig?.p1Difficulty || 'normal') 
+    : (gameState.matchConfig?.p2Difficulty || 'normal');
+
+  // PASS UNFILTERED MOVES TO CHARACTER-SPECIFIC ENGINE
+  if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
+    return selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty);
+  }
+
   const isOpponentLocked = playerKey === 'p1'
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
     : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
 
-  // STRICT CHI CHECK: Filter out moves that exceed available chi for CPU
   let availableMoves = {};
   Object.keys(movesData).forEach(key => {
     const m = movesData[key];
@@ -144,14 +152,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
         delete availableMoves[key];
       }
     });
-  }
-
-  const difficulty = playerKey === 'p1' 
-    ? (gameState.matchConfig?.p1Difficulty || 'normal') 
-    : (gameState.matchConfig?.p2Difficulty || 'normal');
-
-  if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
-    return selectIchigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
 
   let chosenKey = null;
@@ -381,7 +381,7 @@ async function executeTurnResolutionPhase() {
   const p1StartFaint = gameState.p1.faintMeter;
   const p2StartFaint = gameState.p2.faintMeter;
 
- let p1MoveKey = null;
+  let p1MoveKey = null;
   if (gameState.p1.isCPU) {
     p1MoveKey = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
     if (gameState.p1.activeChargePercent === undefined) {
@@ -390,7 +390,6 @@ async function executeTurnResolutionPhase() {
   } else {
     p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
     
-    // STRICTLY CAPTURE THE EXACT LOCKED CHARGE PERCENT FROM INPUT
     if (gameState.input && typeof gameState.input.chargePercent === 'number') {
       gameState.p1.activeChargePercent = gameState.input.chargePercent;
     } else if (gameState.input && typeof gameState.input.lockedChargePercent === 'number') {
@@ -401,7 +400,6 @@ async function executeTurnResolutionPhase() {
   }
   if (!p1MoveKey) p1MoveKey = 'DO_NOTHING';
 
-  
   let p2MoveKey = gameState.p2AlwaysIdle ? 'DO_NOTHING' : gameState.p2SelectedMoveKey;
   if (!p2MoveKey && gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
     p2MoveKey = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
@@ -424,7 +422,7 @@ async function executeTurnResolutionPhase() {
   let p1Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p1', p1MoveKey) : null) || defaultMove;
   let p2Move = (typeof getMoveForPlayer === 'function' ? getMoveForPlayer('p2', p2MoveKey) : null) || defaultMove;
 
-const battleMsg = document.getElementById('battle-message');
+  const battleMsg = document.getElementById('battle-message');
   if (battleMsg) {
     battleMsg.hidden = false;
     const p1Charge = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
@@ -495,6 +493,7 @@ const battleMsg = document.getElementById('battle-message');
       triggerFloatingText(atkKey1, `FAINT -${recovered}`, 'heal');
     }
 
+    // SINGLE EXACT CHI DEDUCTION FOR ALL MOVES
     attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
     updateHUD();
 
@@ -504,19 +503,21 @@ const battleMsg = document.getElementById('battle-message');
         applyFaintBuildUp(attacker1, atkKey1, 5);
       }
       
-      // DEDUCT CHI FOR DEFENSE MOVES PROPERLY
-      attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
-      updateHUD();
-
-      await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, null, move1);
+      // ONLY PLAY VIDEO IF OPPONENT IS NOT ATTACKING THIS STEP
+      if (!OFFENSIVE_TYPES.includes(move2.type?.toUpperCase())) {
+        await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, null, move1);
+      }
     } else {
-      // PLAY ATTACKER'S ACTION VIDEO FIRST WITHOUT SKIPPING
       await playCenterVideo(atkKey1, move1.video || 'idle.mp4', move1.name, null, move1);
 
       let result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
 
       if (result.isOffensive) {
         if (move2.type === 'DEFENSE') {
+          // Deduct defender's guard Chi cost during reactive guard activation
+          defender1.chi = Math.max(0, defender1.chi - (move2.chiCost || 0));
+          updateHUD();
+
           if (result.guardSuccess) {
             const guardVid = move2.video || 'guard.mp4';
             const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
@@ -599,7 +600,6 @@ const battleMsg = document.getElementById('battle-message');
     attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
     updateHUD();
 
-    // PLAY ATTACKER'S ACTION VIDEO FIRST WITHOUT SKIPPING
     await playCenterVideo(atkKey2, move2.video || 'idle.mp4', move2.name, null, move2);
     let result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
@@ -667,16 +667,12 @@ const battleMsg = document.getElementById('battle-message');
       attacker2.chi = Math.min(16, attacker2.chi + chiGain);
     }
     updateHUD();
- } else if (move2.type === 'DEFENSE') {
+  } else if (move2.type === 'DEFENSE') {
     let isOpponentOffensive = !!(move1 && OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
     if (!isOpponentOffensive && key2 !== 'A+I' && move2.name !== 'Windmill Guard' && (move2.chiCost || 0) === 0) {
       applyFaintBuildUp(attacker2, atkKey2, 5);
     }
-    
-    // DEDUCT CHI FOR DEFENSE MOVES PROPERLY
-    attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
-    updateHUD();
-  }else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
+  } else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
