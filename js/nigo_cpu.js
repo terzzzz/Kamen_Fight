@@ -55,9 +55,6 @@ function selectNigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty
 /**
  * Evaluates tactical expected value (EV) for Nigo's unique moveset
  */
-/**
- * Evaluates tactical expected value (EV) for Nigo's unique moveset
- */
 function evaluateNigoMoveScore(cpu, opp, mKey1, move1, isOppLocked, oppMoveKey) {
   let score = move1.baseDamage || 0;
 
@@ -66,12 +63,11 @@ function evaluateNigoMoveScore(cpu, opp, mKey1, move1, isOppLocked, oppMoveKey) 
   const isAirborne = cpu.airborneTicks > 0;
 
   // A. POWER FOCUS (W+K) & PHYSICAL ATTACK SYNERGY (+30% D-ATK)
-  // Higher weight on D-moves since Nigo's physical loop out-damages unbuffed low-tier S moves
   if (mKey1 === 'W+K' && !hasPowerFocus && cpu.chi >= 1) {
-    score += 130; // Increased setup priority for Power Focus
+    score += 130;
   }
   if (hasPowerFocus && mKey1.startsWith('D')) {
-    score += (move1.baseDamage || 0) * 0.45; // Increased bonus to lean into heavy physical loops
+    score += (move1.baseDamage || 0) * 0.45;
   }
 
   // B. RIDER POWER JUMP (W+I) & AIRBORNE FINISHER SYNERGY (+15% HIT / +15% ATK)
@@ -79,7 +75,7 @@ function evaluateNigoMoveScore(cpu, opp, mKey1, move1, isOppLocked, oppMoveKey) 
     score += 85;
   }
   if (isAirborne && mKey1.startsWith('S')) {
-    score += 90; // Moderated bonus to reflect lower S-move base damage
+    score += 90;
   }
 
   // C. TYPHOON RED SHUTTER (W+J) TANKING (-15% DMG)
@@ -107,7 +103,7 @@ function evaluateNigoMoveScore(cpu, opp, mKey1, move1, isOppLocked, oppMoveKey) 
 
   // F. CHI BUILDING PRIORITY
   if (mKey1.startsWith('D')) {
-    score += 25; // Physical moves build +2 or +3 Chi
+    score += 25;
   }
 
   return score;
