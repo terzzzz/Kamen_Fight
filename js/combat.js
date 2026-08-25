@@ -440,7 +440,6 @@ async function executeTurnResolutionPhase() {
   } else {
     p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
 
-    // PRESERVE LOCKED CHARGE PERCENTAGE FROM HUMAN INPUT
     if (gameState.p1.activeChargePercent === undefined) {
       if (gameState.input && typeof gameState.input.currentPercent === 'number' && gameState.input.currentPercent > 0) {
         gameState.p1.activeChargePercent = gameState.input.currentPercent;
@@ -569,7 +568,7 @@ async function executeTurnResolutionPhase() {
       let result = resolveAttack(attacker1, defender1, move1, key1, move2, key2, defKey1);
 
       if (result.isOffensive) {
-        if (move2.type === 'DEFENSE') {
+        if (move2.type === 'DEFENSE' && !defender1.isFainted) {
           defender1.chi = Math.max(0, defender1.chi - (move2.chiCost || 0));
           defender1GuardDeducted = true;
           updateHUD();
@@ -577,11 +576,6 @@ async function executeTurnResolutionPhase() {
           if (result.guardSuccess) {
             const guardVid = move2.video || 'guard.mp4';
             await playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
-
-            if (defender1.isFainted) {
-              defender1WasInterrupted = true;
-              await applyFaintBuildUp(defender1, defKey1, 0);
-            }
 
             if (result.finalDmg === 0) {
               triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
@@ -672,14 +666,10 @@ async function executeTurnResolutionPhase() {
     let result = resolveAttack(attacker2, defender2, move2, key2, move1, key1, defKey2);
 
     if (result.isOffensive) {
-      if (move1.type === 'DEFENSE') {
+      if (move1.type === 'DEFENSE' && !defender2.isFainted) {
         if (result.guardSuccess) {
           const guardVid = move1.video || 'guard.mp4';
           await playCenterVideo(defKey2, guardVid, 'GUARDED!', null, move1);
-
-          if (defender2.isFainted) {
-            await applyFaintBuildUp(defender2, defKey2, 0);
-          }
 
           if (result.finalDmg === 0) {
             triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
@@ -878,7 +868,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
   const chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
 
-  let isGuarding = defMove.type === 'DEFENSE';
+  let isGuarding = defMove.type === 'DEFENSE' && !defender.isFainted;
   let guardSuccess = false;
   let isMatchingGuard = false;
   let chiGained = 0;
@@ -932,7 +922,11 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let rolledHit = false;
   let isGlancing = false;
 
-  if (isGuarding) {
+  // STRICT GUARANTEE: Fainted defenders CANNOT dodge, evade, or glance
+  if (defender.isFainted) {
+    rolledHit = true;
+    isGlancing = false;
+  } else if (isGuarding) {
     rolledHit = true;
   } else if (defMove.type === 'IDLE' || defMoveKey === 'DO_NOTHING' || defMove.name === 'Do Nothing') {
     rolledHit = true;
@@ -966,7 +960,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: true, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
-  if (!isGuarding) {
+  if (!isGuarding && !defender.isFainted) {
     isGlancing = Math.random() * 100 < (atkMove.scratchRate || 20);
   }
 
