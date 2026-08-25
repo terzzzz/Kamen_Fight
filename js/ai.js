@@ -13,7 +13,7 @@ window.globalAIKnowledge = {
    */
   recordTurnOutcome: function(cpuPlayer, opponentPlayer, oppMoveKey, cpuMoveKey, outcomeData) {
     const oppId = (opponentPlayer && opponentPlayer.id) ? opponentPlayer.id : 'human';
-    
+
     // 1. INITIALIZE PLAYER PROFILE IF NEW
     if (!this.playerProfiles[oppId]) {
       this.playerProfiles[oppId] = {
@@ -27,6 +27,9 @@ window.globalAIKnowledge = {
 
     const profile = this.playerProfiles[oppId];
     profile.totalRounds++;
+
+    if (!profile.chargeSamples) profile.chargeSamples = { D: [], S: [] };
+    if (!profile.avgCharge) profile.avgCharge = { D: 88, S: 100 };
 
     // 2. TRACK ACTION TYPES (ATTACK VS GUARD)
     if (oppMoveKey && oppMoveKey.startsWith('A+')) {
