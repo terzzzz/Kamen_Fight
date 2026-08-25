@@ -128,7 +128,7 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
-  // PASS UNFILTERED MOVES TO CHARACTER-SPECIFIC ENGINE
+  // PASS UNFILTERED MOVES TO CHARACTER ENGINE SO REACTIVE GUARDS WORK
   if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
     return selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty);
   }
@@ -481,6 +481,7 @@ async function executeTurnResolutionPhase() {
   let defKey2 = p1GoesFirst ? 'p1' : 'p2';
 
   let defender1WasInterrupted = false;
+  let defender1GuardDeducted = false;
 
   // STEP 1 EXECUTION
   if (move1.type !== 'IDLE' && key1 !== 'DO_NOTHING') {
@@ -493,18 +494,16 @@ async function executeTurnResolutionPhase() {
       triggerFloatingText(atkKey1, `FAINT -${recovered}`, 'heal');
     }
 
-    // SINGLE EXACT CHI DEDUCTION FOR ALL MOVES
     attacker1.chi = Math.max(0, attacker1.chi - (move1.chiCost || 0));
     updateHUD();
 
     if (move1.type === 'DEFENSE') {
       let isOpponentOffensive = !!(move2 && OFFENSIVE_TYPES.includes(move2.type?.toUpperCase()));
-      if (!isOpponentOffensive && key1 !== 'A+I' && move1.name !== 'Windmill Guard' && (move1.chiCost || 0) === 0) {
+      if (!isOpponentOffensive && (move1.chiCost || 0) === 0) {
         applyFaintBuildUp(attacker1, atkKey1, 5);
       }
       
-      // ONLY PLAY VIDEO IF OPPONENT IS NOT ATTACKING THIS STEP
-      if (!OFFENSIVE_TYPES.includes(move2.type?.toUpperCase())) {
+      if (!isOpponentOffensive) {
         await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, null, move1);
       }
     } else {
@@ -514,8 +513,8 @@ async function executeTurnResolutionPhase() {
 
       if (result.isOffensive) {
         if (move2.type === 'DEFENSE') {
-          // Deduct defender's guard Chi cost during reactive guard activation
           defender1.chi = Math.max(0, defender1.chi - (move2.chiCost || 0));
+          defender1GuardDeducted = true;
           updateHUD();
 
           if (result.guardSuccess) {
@@ -669,8 +668,12 @@ async function executeTurnResolutionPhase() {
     updateHUD();
   } else if (move2.type === 'DEFENSE') {
     let isOpponentOffensive = !!(move1 && OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
-    if (!isOpponentOffensive && key2 !== 'A+I' && move2.name !== 'Windmill Guard' && (move2.chiCost || 0) === 0) {
+    if (!isOpponentOffensive && (move2.chiCost || 0) === 0) {
       applyFaintBuildUp(attacker2, atkKey2, 5);
+    }
+    if (!defender1GuardDeducted) {
+      attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
+      updateHUD();
     }
   } else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
@@ -780,7 +783,7 @@ async function executeTurnResolutionPhase() {
   }, 1000);
 }
 
-// ATTACK RESOLUTION ENGINE WITH ACCURATE GUARD FAINT PENALTIES
+// ATTACK RESOLUTION ENGINE WITH DYNAMIC FAINT PENALTIES (+15 CHI GUARDS, +25 0-COST GUARDS)
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
   const isOffensive = !!(atkMove && OFFENSIVE_TYPES.includes(atkMove.type?.toUpperCase()));
 
@@ -801,9 +804,10 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    if (defMoveKey !== 'A+I' && defMove.name !== 'Windmill Guard' && (defMove.chiCost || 0) === 0) {
-      applyFaintBuildUp(defender, defenderKey, 25);
-    }
+    // +15 FAINT PTS FOR CHI-COSTING GUARDS, +25 FAINT PTS FOR 0-COST GUARDS
+    const guardChiCost = defMove.chiCost || 0;
+    const faintPenalty = guardChiCost > 0 ? 15 : 25;
+    applyFaintBuildUp(defender, defenderKey, faintPenalty);
 
     let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent !== undefined ? defender.activeChargePercent : 100) / 100));
     let defenderChargeFactor = Math.sqrt(0.5 + (0.5 * defenderChargeRatio));
