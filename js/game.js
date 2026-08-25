@@ -161,7 +161,6 @@ function startRoundCountdown() {
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
         
-        // PRESERVE CPU-CALCULATED CHARGE TARGET (Only set default if missing)
         if (player.activeChargePercent === undefined) {
           player.activeChargePercent = 100;
         }
@@ -432,7 +431,12 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.input.lockInTime = gameState.turnTimerSeconds;
     newlyConfirmed = true;
     
-    const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : Math.max(10, gameState.input.currentPercent || 10);
+    // READ HUMAN P1 CHARGE SPECIFICALLY WITHOUT P2 INTERFERENCE
+    const currentCharge = (typeof gameState.input.currentPercent === 'number' && gameState.input.currentPercent > 0)
+      ? gameState.input.currentPercent 
+      : 100;
+
+    const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : currentCharge;
     gameState.p1.activeChargePercent = lockedPercent;
     clearInterval(gameState.input.chargeInterval);
 
@@ -519,7 +523,6 @@ function bindCommandButtons() {
   });
 }
 
-// FULL CPU BUTTON PRESS HUD ANIMATION
 function simulateCPUButtonPress(moveKey, playerKey = 'p2') {
   if (!moveKey || moveKey === 'DO_NOTHING') return;
   const targetBox = document.getElementById(`${playerKey}-box`);
@@ -576,7 +579,6 @@ window.addEventListener('DOMContentLoaded', () => {
   bindCommandButtons();
   autoScaleGameWindow();
 
-  // LOAD PERSISTENT AI KNOWLEDGE ON BOOT
   if (typeof loadAIKnowledge === 'function') {
     loadAIKnowledge();
   }
