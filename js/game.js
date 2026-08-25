@@ -119,7 +119,7 @@ function startRoundCountdown() {
       player.willBeFaintedNextRound = false;
       player.faintMeter = 0;
     } else {
-      player.isFainted = false; // Clear faint status on recovery
+      player.isFainted = false;
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -568,6 +568,10 @@ function resetTurnInputState() {
   gameState.p2IsConfirmed = false;
   gameState.p2SelectedMoveKey = null;
   gameState.p2LockInTime = 0;
+
+  // CLEAN RESET OF CHARGE PERCENTAGES AT START OF EVERY INPUT WINDOW
+  if (gameState.p1) delete gameState.p1.activeChargePercent;
+  if (gameState.p2) delete gameState.p2.activeChargePercent;
 
   const flag1El = document.getElementById('p1-action-flag');
   if (flag1El) flag1El.hidden = true;
