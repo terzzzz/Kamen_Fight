@@ -87,6 +87,7 @@ async function startBattle(matchConfig) {
       airborneChargePercent: 100,
       activeChargePercent: 100,
       isFainted: false,
+      willBeFaintedNextRound: false,
       tookCleanHitThisRound: false
     };
 
@@ -105,6 +106,7 @@ async function startBattle(matchConfig) {
       airborneChargePercent: 100,
       activeChargePercent: 100,
       isFainted: false,
+      willBeFaintedNextRound: false,
       tookCleanHitThisRound: false
     };
 
@@ -388,6 +390,8 @@ async function applyFaintBuildUp(player, playerKey, customAmount = null) {
     
     if (player.faintMeter >= rules.FAINT_THRESHOLD) {
       player.isFainted = true;
+      player.willBeFaintedNextRound = true; // FLAG FAINT STUN TO CARRY OVER INTO NEXT ROUND
+
       const stunOverlay = document.getElementById(`${playerKey}-stun-overlay`);
       if (stunOverlay) stunOverlay.hidden = false;
       
@@ -554,6 +558,11 @@ async function executeTurnResolutionPhase() {
             const guardVid = move2.video || 'guard.mp4';
             const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
 
+            // FAINT-BY-GUARD INTERRUPTS PENDING STEP 2 ACTION
+            if (defender1.isFainted) {
+              defender1WasInterrupted = true;
+            }
+
             if (result.finalDmg === 0) {
               triggerFloatingText(defKey1, 'BLOCKED!', 'heal');
             } else {
@@ -561,7 +570,7 @@ async function executeTurnResolutionPhase() {
                 { type: 'text', text: 'GUARDED!', customClass: 'scratch' },
                 { type: 'number', amount: result.finalDmg, isHeal: false }
               ];
-              if (result.chiGained > 0) {
+              if (result.chiGained > 0 && !defender1.isFainted) {
                 defender1.chi = Math.min(defender1.maxChi || rules.MAX_CHI, defender1.chi + result.chiGained);
                 queue.push({ type: 'text', text: 'CHI UP! (+2)', customClass: 'heal' });
               }
@@ -633,7 +642,7 @@ async function executeTurnResolutionPhase() {
     updateHUD();
   }
 
-  // STEP 2 EXECUTION
+  // STEP 2 EXECUTION (CANCELED IF DEFENDER IS FAINTED)
   if (defender2.lp > 0 && !defender2.isFainted && !defender1WasInterrupted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
@@ -663,7 +672,7 @@ async function executeTurnResolutionPhase() {
               { type: 'text', text: 'GUARDED!', customClass: 'scratch' },
               { type: 'number', amount: result.finalDmg, isHeal: false }
             ];
-            if (result.chiGained > 0) {
+            if (result.chiGained > 0 && !defender2.isFainted) {
               defender2.chi = Math.min(defender2.maxChi || rules.MAX_CHI, defender2.chi + result.chiGained);
               queue.push({ type: 'text', text: 'CHI UP! (+2)', customClass: 'heal' });
             }
@@ -741,7 +750,7 @@ async function executeTurnResolutionPhase() {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
-  // ROUND CONCLUSION
+  // ROUND CONCLUSION & FAINT CARRY-OVER PROCESSING
   setTimeout(() => {
     hideCenterScreen();
     setSideBoxesBlank(false);
@@ -784,12 +793,13 @@ async function executeTurnResolutionPhase() {
     processRoundBuffs(gameState.p1);
     processRoundBuffs(gameState.p2);
 
+    // PRESERVE FAINT STATUS FOR CARRY-OVER
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
       if (player) {
-        if (player.isFainted) {
-          player.isFainted = false;
-          player.faintMeter = 0;
+        if (player.willBeFaintedNextRound) {
+          player.isFainted = true;
+          player.faintMeter = 100;
         } else if (!player.tookCleanHitThisRound && player.faintMeter > 0) {
           player.faintMeter = Math.max(0, player.faintMeter - rules.ROUND_RECOVERY);
         }
