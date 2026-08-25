@@ -11,6 +11,7 @@ const COMBAT_RULES = window.COMBAT_RULES || {
   FAINT_PENALTY_CHI_GUARD: 15,
   FAINT_PENALTY_STANDARD_GUARD: 25,
   FAINT_PENALTY_IDLE_GUARD: 5,
+  STARTING_CHI: 8,
   MAX_CHI: 16,
   OFFENSIVE_TYPES: ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL']
 };
@@ -50,6 +51,7 @@ async function startBattle(matchConfig) {
     const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
     const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
 
+    const rules = window.COMBAT_RULES || COMBAT_RULES;
     const hpMultiplier = (window.GAME_CONFIG && window.GAME_CONFIG.HARD_CPU_HP_MULTIPLIER) || 1.30;
 
     let p1MaxLp = p1Rider.maxLp || 1050;
@@ -64,8 +66,8 @@ async function startBattle(matchConfig) {
       isCPU: !!matchConfig.p1IsCPU,
       maxLp: p1MaxLp,
       lp: p1MaxLp,
-      chi: 10,
-      maxChi: COMBAT_RULES.MAX_CHI || 16,
+      chi: rules.STARTING_CHI || 8,
+      maxChi: rules.MAX_CHI || 16,
       faintMeter: 0,
       activeBuffs: [],
       airborneTicks: 0,
@@ -82,8 +84,8 @@ async function startBattle(matchConfig) {
       isCPU: !!matchConfig.p2IsCPU,
       maxLp: p2MaxLp,
       lp: p2MaxLp,
-      chi: 10,
-      maxChi: COMBAT_RULES.MAX_CHI || 16,
+      chi: rules.STARTING_CHI || 8,
+      maxChi: rules.MAX_CHI || 16,
       faintMeter: 0,
       activeBuffs: [],
       airborneTicks: 0,
@@ -146,7 +148,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
-  // PASS UNFILTERED MOVES TO CHARACTER ENGINE SO REACTIVE GUARDS WORK
   if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
     return selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty);
   }
@@ -825,7 +826,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    // READ FAINT PENALTY FROM SHARED RULES (+15 CHI GUARDS, +25 0-COST GUARDS)
     const guardChiCost = defMove.chiCost || 0;
     const faintPenalty = guardChiCost > 0 
       ? rules.FAINT_PENALTY_CHI_GUARD 
