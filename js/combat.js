@@ -395,7 +395,7 @@ async function applyFaintBuildUp(player, playerKey, customAmount = null) {
       triggerFloatingText(playerKey, 'FAINTED!!', 'scratch');
 
       if (typeof playCenterVideo === 'function') {
-        await playCenterVideo(playerKey, 'faint.mp4', 'FAINTED!', 1500);
+        await playCenterVideo(playerKey, 'faint.mp4', 'FAINTED!');
       }
 
       if (typeof updateCharacterMedia === 'function') {
