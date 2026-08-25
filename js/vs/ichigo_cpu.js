@@ -4,7 +4,6 @@
  * 3-Turn Lookahead Engine with Anti-Turtling Safeguards, Guard Faint Penalties & Dynamic Timing
  */
 
-// CENTRALIZED TIMING CONFIG HELPER
 function getMatchTimingConfig() {
   const matchCfg = (typeof gameState !== 'undefined' && gameState.matchConfig) ? gameState.matchConfig : {};
   const sysCfg = (typeof GAME_CONFIG !== 'undefined') ? GAME_CONFIG : {};
@@ -41,6 +40,7 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
   let availableChargeTime = Math.max(0, (timing.baseRoundWindow + bonusExtensionTime) - cpuThinkingDelay);
   let maxAchievableCharge = Math.min(100, Math.floor((availableChargeTime / timing.chargeTimeRequired) * 100));
 
+  // STRICT CHI CHECK FOR AFFORDABLE MOVES
   const affordableKeys = Object.keys(movesData).filter(key => {
     const m = movesData[key];
     return m && typeof m === 'object' && (m.chiCost || 0) <= cpuPlayer.chi;
@@ -50,7 +50,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
 
   let selectedMoveKey = 'D+J';
 
-  // --- EASY DIFFICULTY ---
   if (difficulty === 'easy') {
     if (Math.random() < 0.60) {
       selectedMoveKey = affordableKeys[Math.floor(Math.random() * affordableKeys.length)];
@@ -58,7 +57,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
       selectedMoveKey = getIchigoSimple1TurnChoice(cpuPlayer, opponentPlayer, movesData, affordableKeys);
     }
   } 
-  // --- HARD DIFFICULTY: ANTI-TURTLING REACTIVE GUARD OVERRIDE ---
   else if (difficulty === 'hard') {
     const opponentMoveKey = gameState.p1SelectedMoveKey || (gameState.input ? gameState.input.selectedMoveKey : null);
     let guardChosen = false;
@@ -68,20 +66,22 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
       const isOpponentSpecial = opponentMoveKey.startsWith('S');
       const isOpponentPhysical = opponentMoveKey.startsWith('D');
 
-      // Check if standard guard (+25 faint pts) would trigger self faint stun
       const cpuStandardGuardSelfFaintRisk = (cpuPlayer.faintMeter || 0) >= 75;
 
-      // 1. HIGH THREAT (Opponent uses S Special): 85% Windmill Guard (A+I, 0 faint) or 80% Matching Guard
+      // 1. HIGH THREAT: Reactive Windmill Guard (A+I) or Matching Guard
       if (isOpponentSpecial) {
-        if (cpuPlayer.chi >= 0 && movesData['A+I'] && Math.random() < 0.85) {
-          selectedMoveKey = 'A+I'; // A+I is exempt from faint penalty!
+        const windmillMove = movesData['A+I'];
+        const windmillCost = windmillMove ? (windmillMove.chiCost || 0) : 0;
+
+        if (windmillMove && cpuPlayer.chi >= windmillCost && Math.random() < 0.85) {
+          selectedMoveKey = 'A+I';
           guardChosen = true;
         } else if (oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk && Math.random() < 0.80) {
           selectedMoveKey = `A+${oppButton}`;
           guardChosen = true;
         }
       } 
-      // 2. LOW THREAT (Opponent uses D Physical): Prevent Infinite Defensive Turtling
+      // 2. LOW THREAT: Anti-Turtling Physical Guarding
       else if (isOpponentPhysical && oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk) {
         const isLowLp = cpuPlayer.lp <= 250;
         const isLowChi = cpuPlayer.chi < 4;
@@ -99,7 +99,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
       selectedMoveKey = run3TurnSearchAndSelect(cpuPlayer, opponentPlayer, movesData, affordableKeys, 'hard', maxAchievableCharge);
     }
   } 
-  // --- NORMAL DIFFICULTY ---
   else {
     selectedMoveKey = run3TurnSearchAndSelect(cpuPlayer, opponentPlayer, movesData, affordableKeys, 'normal', maxAchievableCharge);
   }
@@ -228,36 +227,33 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
     if (chi < 12) ev -= 90;
   }
 
-  // --- A+ GUARDS (A+I EXEMPT, STANDARD GUARDS INCUR 25 FAINT PTS) ---
   let nextCpuFaint = faint;
 
   if (moveKey.startsWith('A+')) {
     let isWindmill = (moveKey === 'A+I');
     let guardChiCost = (move && move.chiCost !== undefined) ? move.chiCost : 0;
     
-    // A+I (Windmill Guard) is exempt; standard 0-cost guards incur +25 faint points against expected attacks
     let selfFaintGained = (!isWindmill && guardChiCost === 0) ? 25 : 0;
     nextCpuFaint = faint + selfFaintGained;
 
     if (faint >= 100) {
-      ev = 0; // Already fainted
+      ev = 0;
     } else if (nextCpuFaint >= 100) {
-      ev = -300; // DISCOURAGE SELF FAINT STUN: Standard 0-cost guard causes self faint!
+      ev = -300;
     } else {
       const guardChargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
       const effectiveGuardChance = 0.70 * guardChargeFactor;
 
       if (isWindmill) {
-        ev = oppAvgDmg * 1.0 * effectiveGuardChance; // No faint penalty deduction for A+I
+        ev = oppAvgDmg * 1.0 * effectiveGuardChance;
       } else {
         const damageSaved = oppAvgDmg * 0.70 * effectiveGuardChance;
 
-        // Trim Chi EV reward if near 16 max cap
         let chiHeadroom = Math.max(0, 16 - chi);
         let actualChiGained = Math.min(2, chiHeadroom);
         const chiGainEV = actualChiGained * 20 * effectiveGuardChance;
 
-        ev = damageSaved + chiGainEV - (25 * 1.5); // Deduct self-faint penalty for standard guard
+        ev = damageSaved + chiGainEV - (25 * 1.5);
       }
 
       if (cpuLp <= 250) {
@@ -266,7 +262,6 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
     }
   }
 
-  // --- FAINT BUILDUP ON OPPONENT & STUN BONUS ---
   let isUtility = moveKey.startsWith('W') || (move && move.type === 'DEFENSE');
   let faintGainedOnOpponent = isUtility ? 0 : hitRate * (25 * 0.80 + 10 * 0.20);
   let nextOppFaint = faint + faintGainedOnOpponent;
