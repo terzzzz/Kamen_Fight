@@ -40,7 +40,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
   let availableChargeTime = Math.max(0, (timing.baseRoundWindow + bonusExtensionTime) - cpuThinkingDelay);
   let maxAchievableCharge = Math.min(100, Math.floor((availableChargeTime / timing.chargeTimeRequired) * 100));
 
-  // STRICT CHI CHECK FOR AFFORDABLE MOVES
   const affordableKeys = Object.keys(movesData).filter(key => {
     const m = movesData[key];
     return m && typeof m === 'object' && (m.chiCost || 0) <= cpuPlayer.chi;
@@ -66,22 +65,24 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
       const isOpponentSpecial = opponentMoveKey.startsWith('S');
       const isOpponentPhysical = opponentMoveKey.startsWith('D');
 
+      // Check self-faint stun risks for guards (+15 faint for Chi guards, +25 for 0-cost guards)
+      const cpuWindmillFaintRisk = (cpuPlayer.faintMeter || 0) >= 85;
       const cpuStandardGuardSelfFaintRisk = (cpuPlayer.faintMeter || 0) >= 75;
 
-      // 1. HIGH THREAT: Reactive Windmill Guard (A+I) or Matching Guard
+      // 1. HIGH THREAT (Special): Reactive Windmill Guard (A+I, +15 faint pts) or Matching Guard
       if (isOpponentSpecial) {
         const windmillMove = movesData['A+I'];
         const windmillCost = windmillMove ? (windmillMove.chiCost || 0) : 0;
 
-        if (windmillMove && cpuPlayer.chi >= windmillCost && Math.random() < 0.85) {
+        if (windmillMove && cpuPlayer.chi >= windmillCost && !cpuWindmillFaintRisk && Math.random() < 0.65) {
           selectedMoveKey = 'A+I';
           guardChosen = true;
-        } else if (oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk && Math.random() < 0.80) {
+        } else if (oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk && Math.random() < 0.50) {
           selectedMoveKey = `A+${oppButton}`;
           guardChosen = true;
         }
       } 
-      // 2. LOW THREAT: Anti-Turtling Physical Guarding
+      // 2. LOW THREAT (Physical): Anti-Turtling Physical Guarding
       else if (isOpponentPhysical && oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk) {
         const isLowLp = cpuPlayer.lp <= 250;
         const isLowChi = cpuPlayer.chi < 4;
@@ -233,7 +234,7 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
     let isWindmill = (moveKey === 'A+I');
     let guardChiCost = (move && move.chiCost !== undefined) ? move.chiCost : 0;
     
-    let selfFaintGained = (!isWindmill && guardChiCost === 0) ? 25 : 0;
+    let selfFaintGained = guardChiCost > 0 ? 15 : 25;
     nextCpuFaint = faint + selfFaintGained;
 
     if (faint >= 100) {
@@ -245,7 +246,8 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
       const effectiveGuardChance = 0.70 * guardChargeFactor;
 
       if (isWindmill) {
-        ev = oppAvgDmg * 1.0 * effectiveGuardChance;
+        const damageSaved = oppAvgDmg * 1.0 * effectiveGuardChance;
+        ev = damageSaved - (15 * 1.5);
       } else {
         const damageSaved = oppAvgDmg * 0.70 * effectiveGuardChance;
 
