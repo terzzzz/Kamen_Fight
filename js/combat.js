@@ -553,10 +553,11 @@ async function executeTurnResolutionPhase() {
 
           if (result.guardSuccess) {
             const guardVid = move2.video || 'guard.mp4';
-            const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
+            await playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
 
             if (defender1.isFainted) {
               defender1WasInterrupted = true;
+              await applyFaintBuildUp(defender1, defKey1, 0);
             }
 
             if (result.finalDmg === 0) {
@@ -575,13 +576,11 @@ async function executeTurnResolutionPhase() {
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
             updateHUD();
-
-            await vidPromise;
           } else {
             defender1WasInterrupted = true;
 
             const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-            const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+            await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
 
             defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
             updateHUD();
@@ -592,15 +591,12 @@ async function executeTurnResolutionPhase() {
             ]);
 
             await applyFaintBuildUp(defender1, defKey1);
-
-            await vidPromise;
           }
         } else if (!result.hitLanded) {
-          const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'DODGED!');
-          setTimeout(() => triggerFloatingText(defKey1, 'MISS!!', 'miss'), 1000);
-          await vidPromise;
+          await playCenterVideo(defKey1, 'dodge.mp4', 'DODGED!');
+          triggerFloatingText(defKey1, 'MISS!!', 'miss');
         } else if (result.isGlancing) {
-          const vidPromise = playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
+          await playCenterVideo(defKey1, 'dodge.mp4', 'EVADED!');
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
 
@@ -610,12 +606,11 @@ async function executeTurnResolutionPhase() {
           ]);
 
           await applyFaintBuildUp(defender1, defKey1, 10);
-          await vidPromise;
         } else {
           defender1WasInterrupted = true;
 
           const hitVid = key1.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          const vidPromise = playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
+          await playCenterVideo(defKey1, hitVid, 'TAKING DAMAGE');
 
           defender1.lp = Math.max(0, defender1.lp - result.finalDmg);
           updateHUD();
@@ -625,8 +620,6 @@ async function executeTurnResolutionPhase() {
           ]);
 
           await applyFaintBuildUp(defender1, defKey1);
-
-          await vidPromise;
         }
       }
     }
@@ -659,7 +652,11 @@ async function executeTurnResolutionPhase() {
       if (move1.type === 'DEFENSE') {
         if (result.guardSuccess) {
           const guardVid = move1.video || 'guard.mp4';
-          const vidPromise = playCenterVideo(defKey2, guardVid, 'GUARDED!', null, move1);
+          await playCenterVideo(defKey2, guardVid, 'GUARDED!', null, move1);
+
+          if (defender2.isFainted) {
+            await applyFaintBuildUp(defender2, defKey2, 0);
+          }
 
           if (result.finalDmg === 0) {
             triggerFloatingText(defKey2, 'BLOCKED!', 'heal');
@@ -677,11 +674,9 @@ async function executeTurnResolutionPhase() {
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
           updateHUD();
-
-          await vidPromise;
         } else {
           const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-          const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+          await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
           defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
           updateHUD();
@@ -692,15 +687,12 @@ async function executeTurnResolutionPhase() {
           ]);
 
           await applyFaintBuildUp(defender2, defKey2);
-
-          await vidPromise;
         }
       } else if (!result.hitLanded) {
-        const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'DODGED!');
-        setTimeout(() => triggerFloatingText(defKey2, 'MISS!!', 'miss'), 1000);
-        await vidPromise;
+        await playCenterVideo(defKey2, 'dodge.mp4', 'DODGED!');
+        triggerFloatingText(defKey2, 'MISS!!', 'miss');
       } else if (result.isGlancing) {
-        const vidPromise = playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
+        await playCenterVideo(defKey2, 'dodge.mp4', 'EVADED!');
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
 
@@ -710,10 +702,9 @@ async function executeTurnResolutionPhase() {
         ]);
 
         await applyFaintBuildUp(defender2, defKey2, 10);
-        await vidPromise;
       } else {
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
-        const vidPromise = playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
+        await playCenterVideo(defKey2, hitVid, 'TAKING DAMAGE');
 
         defender2.lp = Math.max(0, defender2.lp - result.finalDmg);
         updateHUD();
@@ -723,8 +714,6 @@ async function executeTurnResolutionPhase() {
         ]);
 
         await applyFaintBuildUp(defender2, defKey2);
-
-        await vidPromise;
       }
     }
 
@@ -880,7 +869,16 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
       ? rules.FAINT_PENALTY_CHI_GUARD 
       : rules.FAINT_PENALTY_STANDARD_GUARD;
 
-    applyFaintBuildUp(defender, defenderKey, faintPenalty);
+    // Apply faint meter penalty directly
+    defender.tookCleanHitThisRound = true;
+    defender.faintMeter = Math.min(rules.FAINT_THRESHOLD, defender.faintMeter + faintPenalty);
+    if (defender.faintMeter >= rules.FAINT_THRESHOLD) {
+      defender.isFainted = true;
+      defender.willBeFaintedNextRound = true;
+      const stunOverlay = document.getElementById(`${defenderKey}-stun-overlay`);
+      if (stunOverlay) stunOverlay.hidden = false;
+      triggerFloatingText(defenderKey, 'FAINTED!!', 'scratch');
+    }
 
     let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent !== undefined ? defender.activeChargePercent : 100) / 100));
     let defenderChargeFactor = Math.sqrt(0.5 + (0.5 * defenderChargeRatio));
