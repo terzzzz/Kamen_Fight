@@ -442,14 +442,26 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.input.lockInTime = gameState.turnTimerSeconds;
     newlyConfirmed = true;
     
-    // READ HUMAN P1 CHARGE SPECIFICALLY WITHOUT P2 INTERFERENCE
-    const currentCharge = (typeof gameState.input.currentPercent === 'number' && gameState.input.currentPercent > 0)
-      ? gameState.input.currentPercent 
-      : 100;
+    // ACCURATELY READ CHARGE PERCENT: Use P1 CPU activeChargePercent if CPU, or human input if Human
+    let lockedPercent = 100;
+    if (gameState.p1.isCPU) {
+      lockedPercent = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
+    } else {
+      const currentCharge = (typeof gameState.input.currentPercent === 'number' && gameState.input.currentPercent > 0)
+        ? gameState.input.currentPercent 
+        : 100;
+      lockedPercent = moveKey === 'DO_NOTHING' ? 100 : currentCharge;
+      gameState.p1.activeChargePercent = lockedPercent;
+    }
 
-    const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : currentCharge;
-    gameState.p1.activeChargePercent = lockedPercent;
     clearInterval(gameState.input.chargeInterval);
+
+    // UPDATE P1 CHARGE BAR DISPLAY WITH ACCURATE PERCENTAGE
+    const fillEl = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill') || document.querySelector('.charge-fill');
+    if (fillEl) {
+      fillEl.style.width = `${lockedPercent}%`;
+      fillEl.textContent = `${lockedPercent}%`;
+    }
 
     const flagEl = document.getElementById('p1-action-flag');
     if (flagEl) {
@@ -462,14 +474,12 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.p2LockInTime = gameState.turnTimerSeconds;
     newlyConfirmed = true;
 
-    if (!gameState.p2.activeChargePercent) {
-      gameState.p2.activeChargePercent = 100;
-    }
+    const lockedPercent = gameState.p2.activeChargePercent !== undefined ? gameState.p2.activeChargePercent : 100;
 
     const flagEl = document.getElementById('p2-action-flag');
     if (flagEl) {
       flagEl.hidden = false;
-      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p2.activeChargePercent}%!`;
+      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${lockedPercent}%!`;
     }
   }
 
