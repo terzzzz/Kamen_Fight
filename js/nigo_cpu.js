@@ -64,33 +64,33 @@ function evaluateNigoMoveScore(cpu, opp, mKey1, move1, isOppLocked, oppMoveKey) 
 
   // A. POWER FOCUS (W+K) & PHYSICAL ATTACK SYNERGY (+30% D-ATK)
   if (mKey1 === 'W+K' && !hasPowerFocus && cpu.chi >= 1) {
-    score += 110; // High value for 1-Chi setup
+    score += 110;
   }
   if (hasPowerFocus && mKey1.startsWith('D')) {
-    score += (move1.baseDamage || 0) * 0.35; // Heavy bonus for physical moves during Power Focus
+    score += (move1.baseDamage || 0) * 0.35;
   }
 
   // B. RIDER POWER JUMP (W+I) & AIRBORNE FINISHER SYNERGY (+15% HIT / +15% ATK)
   if (mKey1 === 'W+I' && !isAirborne && cpu.chi >= 5) {
-    score += 95; // Setup airborne stance when Chi is ready for big Specials
+    score += 95;
   }
   if (isAirborne && mKey1.startsWith('S')) {
-    score += 120; // Capitalize on +15% accuracy bonus to land heavy Specials (S+I / S+L)
+    score += 120;
   }
 
-  // C. TYPHOON RED SHUTTER (W+J) TANKING
+  // C. TYPHOON RED SHUTTER (W+J) TANKING (-15% DMG)
   if (mKey1 === 'W+J' && !hasRedShutter && opp.chi >= 6) {
-    score += 105; // Pop Red Shutter when expecting heavy incoming Special damage
+    score += 105;
   }
 
   // D. BATTLE CRY (W+L) FAINT RECOVERY LOGIC
   if (mKey1 === 'W+L') {
     if (cpu.faintMeter >= 75) {
-      score += 200; // Emergency recovery to prevent 100-faint stun round
+      score += 200;
     } else if (cpu.faintMeter >= 50 && cpu.chi >= 5) {
-      score += 70;  // Moderate recovery when Chi surplus exists
+      score += 70;
     } else {
-      score -= 100; // Penalty for wasting Chi when faint meter is low
+      score -= 100;
     }
   }
 
@@ -103,7 +103,7 @@ function evaluateNigoMoveScore(cpu, opp, mKey1, move1, isOppLocked, oppMoveKey) 
 
   // F. CHI BUILDING PRIORITY
   if (mKey1.startsWith('D')) {
-    score += 20; // Physical moves build +2 or +3 Chi
+    score += 20;
   }
 
   return score;
@@ -116,7 +116,7 @@ function setNigoChargeTarget(cpuPlayer, moveKey, opponentPlayer) {
   let target = 100;
 
   if (moveKey.startsWith('A+')) {
-    target = 15; // Fast guard lock-in
+    target = 15;
   } else if (moveKey.startsWith('D')) {
     let playerDCharge = 88;
     if (window.globalAIKnowledge && window.globalAIKnowledge.playerProfiles) {
@@ -125,7 +125,6 @@ function setNigoChargeTarget(cpuPlayer, moveKey, opponentPlayer) {
         playerDCharge = profile.avgCharge.D;
       }
     }
-    // Target slightly faster charge than opponent's physical habit
     target = Math.max(65, playerDCharge - (3 + Math.floor(Math.random() * 3)));
   } else {
     target = 100;
