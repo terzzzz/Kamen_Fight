@@ -149,7 +149,6 @@ async function startBattle(matchConfig) {
   }
 }
 
-// GET CPU MOVE CHOICE ROUTING TO CHARACTER MODULES
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
@@ -162,42 +161,43 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     ? (gameState.matchConfig?.p1Difficulty || 'normal') 
     : (gameState.matchConfig?.p2Difficulty || 'normal');
 
-  if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
-    return selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty);
-  }
-
   const isOpponentLocked = playerKey === 'p1'
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
     : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
 
+  // FILTER AVAILABLE MOVES
   let availableMoves = {};
   Object.keys(movesData).forEach(key => {
     const m = movesData[key];
     if (m && typeof m === 'object' && (m.chiCost || 0) <= cpuPlayer.chi) {
+      // STRICT RULE: If opponent is NOT locked in, remove ALL Guard moves (A+)
+      if (!isOpponentLocked && (key.startsWith('A+') || m.type === 'DEFENSE')) {
+        return; // Skip guard moves
+      }
       availableMoves[key] = m;
     }
   });
 
-  if (!isOpponentLocked) {
-    Object.keys(availableMoves).forEach(key => {
-      const m = availableMoves[key];
-      if (key.startsWith('A+') || (m && m.type === 'DEFENSE')) {
-        delete availableMoves[key];
-      }
-    });
+  // Fallback if no non-guard moves are affordable
+  if (Object.keys(availableMoves).length === 0) {
+    return 'D+J';
   }
 
   let chosenKey = null;
-  if (typeof selectCPUMove === 'function') {
+  if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
+    chosenKey = selectIchigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
+  } else if (typeof selectCPUMove === 'function') {
     chosenKey = selectCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
 
   if (!chosenKey || !availableMoves[chosenKey]) {
-    const affordableKeys = Object.keys(availableMoves).filter(key => {
-      const move = availableMoves[key];
-      return move && typeof move === 'object' && (move.chiCost || 0) <= cpuPlayer.chi;
-    });
-    chosenKey = affordableKeys.length > 0 ? affordableKeys[Math.floor(Math.random() * affordableKeys.length)] : 'D+J';
+    const keys = Object.keys(availableMoves);
+    chosenKey = keys.length > 0 ? keys[Math.floor(Math.random() * keys.length)] : 'D+J';
+  }
+
+  // Double-check: If still somehow a guard move while opponent isn't locked, force D+J
+  if (!isOpponentLocked && (chosenKey.startsWith('A+') || availableMoves[chosenKey]?.type === 'DEFENSE')) {
+    chosenKey = 'D+J';
   }
 
   if (chosenKey.startsWith('S') || chosenKey.startsWith('W')) {
@@ -210,7 +210,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
 
   return chosenKey;
 }
-
 function triggerLPFlash(slotKey, isHeal = false) {
   const lpContainer = document.getElementById(`${slotKey}-lp`);
   if (!lpContainer) return;
