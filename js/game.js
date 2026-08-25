@@ -1,9 +1,9 @@
 // SAFE GLOBAL DECLARATIONS
 var CHARGE_TIMES = CHARGE_TIMES || {
-  'A': 1280,  // Defense (800 * 8/5)
-  'D': 2080,  // Offense (1300 * 8/5)
-  'W': 3200,  // Air/Buffs (2000 * 8/5)
-  'S': 4160   // Energy/Specials (2600 * 8/5)
+  'A': 1280,  // Defense
+  'D': 2080,  // Offense
+  'W': 3200,  // Air/Buffs
+  'S': 4160   // Energy/Specials
 };
 
 var DO_NOTHING_MOVE = DO_NOTHING_MOVE || {
@@ -78,7 +78,6 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // Grant 1 Chi at round start
   if (gameState.roundCounter > 1) {
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
@@ -110,7 +109,7 @@ function startRoundCountdown() {
     if (gameState.input) gameState.input.acceptingInputs = true;
   }, 400);
 
- // Process status overlays & carry-over faint stun
+  // Process status overlays & carry-over faint stun
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
@@ -120,7 +119,7 @@ function startRoundCountdown() {
       player.willBeFaintedNextRound = false;
       player.faintMeter = 0;
     } else {
-      player.isFainted = false; // RECOVER FROM STUN: Clear fainted status for normal play
+      player.isFainted = false; // Clear faint status on recovery
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -200,7 +199,6 @@ function startRoundCountdown() {
     if (gameState.turnTimerSeconds <= 0) {
       clearInterval(gameState.timerInterval);
 
-      // FORCE UNCONFIRMED PLAYERS TO DECIDE ON TIMEOUT
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
@@ -217,7 +215,6 @@ function startRoundCountdown() {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
           let mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
 
-          // PREVENT DOUBLE-GUARD ON TIMEOUT
           if (gameState.input.selectedMoveKey && gameState.input.selectedMoveKey.startsWith('A+') && mk.startsWith('A+')) {
             mk = 'D+J';
           }
@@ -410,7 +407,7 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
 
   const isOpponentLocked = playerKey === 'p1' 
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
-    : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
+    : (gameState.input?.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
 
   const move = getMoveForPlayer(playerKey, moveKey);
   const isGuardMove = moveKey.startsWith('A+') || (move && move.type === 'DEFENSE');
@@ -488,7 +485,6 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     }
   }
 
-  // Reaction timer extension
   if (newlyConfirmed && gameState.roundPhase === 'INPUT') {
     const otherKey = playerKey === 'p1' ? 'p2' : 'p1';
     const otherPlayer = gameState[otherKey];
