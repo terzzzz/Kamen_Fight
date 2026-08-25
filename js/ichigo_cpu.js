@@ -1,7 +1,7 @@
 /**
  * Kamen Rider Ichigo AI Decision Engine
  * Path: js/ichigo_cpu.js
- * 3-Turn Lookahead Engine with Shared Rules Reference
+ * 3-Turn Lookahead Engine with Dynamic Health Ratios
  */
 
 function getMatchTimingConfig() {
@@ -71,7 +71,6 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
       const isOpponentSpecial = opponentMoveKey.startsWith('S');
       const isOpponentPhysical = opponentMoveKey.startsWith('D');
 
-      // Check self-faint stun risks reading directly from window.COMBAT_RULES
       const cpuWindmillFaintRisk = (cpuPlayer.faintMeter || 0) >= (rules.FAINT_THRESHOLD - rules.FAINT_PENALTY_CHI_GUARD);
       const cpuStandardGuardSelfFaintRisk = (cpuPlayer.faintMeter || 0) >= (rules.FAINT_THRESHOLD - rules.FAINT_PENALTY_STANDARD_GUARD);
 
@@ -88,9 +87,10 @@ function selectIchigoCPUMove(cpuPlayer, opponentPlayer, movesData, difficulty = 
           guardChosen = true;
         }
       } 
-      // 2. LOW THREAT (Physical): Anti-Turtling Physical Guarding
+      // 2. LOW THREAT (Physical): Dynamic 25% LP Threshold Check
       else if (isOpponentPhysical && oppButton && movesData[`A+${oppButton}`] && !cpuStandardGuardSelfFaintRisk) {
-        const isLowLp = cpuPlayer.lp <= 250;
+        const maxLp = cpuPlayer.maxLp || 1850;
+        const isLowLp = (cpuPlayer.lp / maxLp) <= 0.25;
         const isLowChi = cpuPlayer.chi < 4;
 
         let dGuardChance = isLowLp ? 0.80 : (isLowChi ? 0.40 : 0.00);
@@ -154,8 +154,13 @@ function run3TurnSearchAndSelect(cpuPlayer, opponentPlayer, movesData, affordabl
 
 function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKeys, maxAchievableCharge) {
   const START_CHI = cpuPlayer.chi || 0;
-  const OPP_LP = opponentPlayer.lp || 1050;
-  const CPU_LP = cpuPlayer.lp || 1050;
+  
+  // DYNAMIC READ: Pulls actual runtime LP & Max LP
+  const CPU_LP = cpuPlayer.lp || 1850;
+  const CPU_MAX_LP = cpuPlayer.maxLp || 1850;
+  const OPP_LP = opponentPlayer.lp || 2000;
+  const OPP_MAX_LP = opponentPlayer.maxLp || 2000;
+  
   const OPP_AVG_DMG = 175;
 
   const activeBuffs = cpuPlayer.activeBuffs || [];
@@ -169,7 +174,7 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
 
   for (const m1Key of affordableKeys) {
     const m1 = movesData[m1Key];
-    const s1 = simulateIchigoStateTransition(START_CHI, OPP_LP, CPU_LP, START_FOCUS, START_AIRBORNE, START_FAINT, m1Key, m1, OPP_AVG_DMG, OPP_CHI, maxAchievableCharge);
+    const s1 = simulateIchigoStateTransition(START_CHI, OPP_LP, CPU_LP, CPU_MAX_LP, START_FOCUS, START_AIRBORNE, START_FAINT, m1Key, m1, OPP_AVG_DMG, OPP_CHI, maxAchievableCharge);
 
     if (s1.isLethal) {
       sequenceEvaluations.push({ firstMove: m1Key, totalEV: s1.ev + 500, path: [m1Key] });
@@ -180,7 +185,7 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
       const m2 = movesData[m2Key];
       if ((m2.chiCost || 0) > s1.chi) continue;
 
-      const s2 = simulateIchigoStateTransition(s1.chi, s1.oppLp, CPU_LP, s1.focus, s1.airborne, s1.faint, m2Key, m2, OPP_AVG_DMG, OPP_CHI, 100);
+      const s2 = simulateIchigoStateTransition(s1.chi, s1.oppLp, CPU_LP, CPU_MAX_LP, s1.focus, s1.airborne, s1.faint, m2Key, m2, OPP_AVG_DMG, OPP_CHI, 100);
 
       if (s2.isLethal) {
         sequenceEvaluations.push({ firstMove: m1Key, totalEV: s1.ev + s2.ev + 300, path: [m1Key, m2Key] });
@@ -191,7 +196,7 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
         const m3 = movesData[m3Key];
         if ((m3.chiCost || 0) > s2.chi) continue;
 
-        const s3 = simulateIchigoStateTransition(s2.chi, s2.oppLp, CPU_LP, s2.focus, s2.airborne, s2.faint, m3Key, m3, OPP_AVG_DMG, OPP_CHI, 100);
+        const s3 = simulateIchigoStateTransition(s2.chi, s2.oppLp, CPU_LP, CPU_MAX_LP, s2.focus, s2.airborne, s2.faint, m3Key, m3, OPP_AVG_DMG, OPP_CHI, 100);
         const pathTotalEV = s1.ev + s2.ev + s3.ev;
 
         sequenceEvaluations.push({ firstMove: m1Key, totalEV: pathTotalEV, path: [m1Key, m2Key, m3Key] });
@@ -202,7 +207,7 @@ function runIchigo3TurnSearch(cpuPlayer, opponentPlayer, movesData, affordableKe
   return sequenceEvaluations;
 }
 
-function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint, moveKey, move, oppAvgDmg, oppChi, currentChargeCap = 100) {
+function simulateIchigoStateTransition(chi, oppLp, cpuLp, cpuMaxLp, focus, airborne, faint, moveKey, move, oppAvgDmg, oppChi, currentChargeCap = 100) {
   const rules = window.COMBAT_RULES || {
     FAINT_THRESHOLD: 100,
     FAINT_PENALTY_CHI_GUARD: 15,
@@ -247,7 +252,6 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
     let isWindmill = (moveKey === 'A+I');
     let guardChiCost = (move && move.chiCost !== undefined) ? move.chiCost : 0;
     
-    // READ PENALTY DYNAMICALLY FROM window.COMBAT_RULES
     let selfFaintGained = guardChiCost > 0 
       ? rules.FAINT_PENALTY_CHI_GUARD 
       : rules.FAINT_PENALTY_STANDARD_GUARD;
@@ -275,7 +279,8 @@ function simulateIchigoStateTransition(chi, oppLp, cpuLp, focus, airborne, faint
         ev = damageSaved + chiGainEV - (selfFaintGained * 1.5);
       }
 
-      if (cpuLp <= 250) {
+      // DYNAMIC LOW LP CHECK: Applies desperation EV boost when below 25% LP
+      if ((cpuLp / (cpuMaxLp || 1850)) <= 0.25) {
         ev *= 1.50;
       }
     }
