@@ -163,14 +163,13 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
 
   const isOpponentLocked = playerKey === 'p1'
     ? (gameState.p2IsConfirmed || (gameState.p2 && gameState.p2.isFainted) || gameState.p2AlwaysIdle)
-    : (gameState.input.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
+    : (gameState.input?.isConfirmed || (gameState.p1 && gameState.p1.isFainted));
 
   // FILTER AVAILABLE MOVES
   let availableMoves = {};
   Object.keys(movesData).forEach(key => {
     const m = movesData[key];
     if (m && typeof m === 'object' && (m.chiCost || 0) <= cpuPlayer.chi) {
-      // STRICT RULE: If opponent is NOT locked in, remove ALL Guard moves (A+)
       if (!isOpponentLocked && (key.startsWith('A+') || m.type === 'DEFENSE')) {
         return; // Skip guard moves
       }
@@ -178,7 +177,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     }
   });
 
-  // Fallback if no non-guard moves are affordable
   if (Object.keys(availableMoves).length === 0) {
     return 'D+J';
   }
@@ -195,7 +193,6 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
     chosenKey = keys.length > 0 ? keys[Math.floor(Math.random() * keys.length)] : 'D+J';
   }
 
-  // Double-check: If still somehow a guard move while opponent isn't locked, force D+J
   if (!isOpponentLocked && (chosenKey.startsWith('A+') || availableMoves[chosenKey]?.type === 'DEFENSE')) {
     chosenKey = 'D+J';
   }
@@ -210,13 +207,14 @@ function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
 
   return chosenKey;
 }
+
 function triggerLPFlash(slotKey, isHeal = false) {
   const lpContainer = document.getElementById(`${slotKey}-lp`);
   if (!lpContainer) return;
 
   const targetEl = lpContainer.querySelector('.stat-value-styled') || lpContainer;
   const flashClass = isHeal ? 'lp-flash-heal' : 'lp-flash-damage';
-  
+
   targetEl.classList.remove('lp-flash-heal', 'lp-flash-damage');
   void targetEl.offsetWidth;
   targetEl.classList.add(flashClass);
@@ -386,14 +384,14 @@ async function applyFaintBuildUp(player, playerKey, customAmount = null) {
     player.tookCleanHitThisRound = true;
     const amount = customAmount !== null ? customAmount : rules.HIT_BUILDUP;
     player.faintMeter = Math.min(rules.FAINT_THRESHOLD, player.faintMeter + amount);
-    
+
     if (player.faintMeter >= rules.FAINT_THRESHOLD) {
       player.isFainted = true;
-      player.willBeFaintedNextRound = true; // FLAG FAINT STUN TO CARRY OVER INTO NEXT ROUND
+      player.willBeFaintedNextRound = true;
 
       const stunOverlay = document.getElementById(`${playerKey}-stun-overlay`);
       if (stunOverlay) stunOverlay.hidden = false;
-      
+
       triggerFloatingText(playerKey, 'FAINTED!!', 'scratch');
 
       if (typeof playCenterVideo === 'function') {
@@ -425,7 +423,7 @@ async function executeTurnResolutionPhase() {
     }
   } else {
     p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
-    
+
     if (gameState.input && typeof gameState.input.chargePercent === 'number') {
       gameState.p1.activeChargePercent = gameState.input.chargePercent;
     } else if (gameState.input && typeof gameState.input.lockedChargePercent === 'number') {
@@ -536,9 +534,9 @@ async function executeTurnResolutionPhase() {
     if (move1.type === 'DEFENSE') {
       let isOpponentOffensive = !!(move2 && rules.OFFENSIVE_TYPES.includes(move2.type?.toUpperCase()));
       if (!isOpponentOffensive && (move1.chiCost || 0) === 0) {
-        applyFaintBuildUp(attacker1, atkKey1, rules.FAINT_PENALTY_IDLE_GUARD);
+        await applyFaintBuildUp(attacker1, atkKey1, rules.FAINT_PENALTY_IDLE_GUARD);
       }
-      
+
       if (!isOpponentOffensive) {
         await playCenterVideo(atkKey1, move1.video || 'guard.mp4', move1.name, null, move1);
       }
@@ -557,7 +555,6 @@ async function executeTurnResolutionPhase() {
             const guardVid = move2.video || 'guard.mp4';
             const vidPromise = playCenterVideo(defKey1, guardVid, 'GUARDED!', null, move2);
 
-            // FAINT-BY-GUARD INTERRUPTS PENDING STEP 2 ACTION
             if (defender1.isFainted) {
               defender1WasInterrupted = true;
             }
@@ -594,7 +591,7 @@ async function executeTurnResolutionPhase() {
               { type: 'number', amount: result.finalDmg, isHeal: false }
             ]);
 
-            applyFaintBuildUp(defender1, defKey1);
+            await applyFaintBuildUp(defender1, defKey1);
 
             await vidPromise;
           }
@@ -612,7 +609,7 @@ async function executeTurnResolutionPhase() {
             { type: 'number', amount: result.finalDmg, isHeal: false }
           ]);
 
-          applyFaintBuildUp(defender1, defKey1, 10);
+          await applyFaintBuildUp(defender1, defKey1, 10);
           await vidPromise;
         } else {
           defender1WasInterrupted = true;
@@ -627,7 +624,7 @@ async function executeTurnResolutionPhase() {
             { type: 'number', amount: result.finalDmg, isHeal: false }
           ]);
 
-          applyFaintBuildUp(defender1, defKey1);
+          await applyFaintBuildUp(defender1, defKey1);
 
           await vidPromise;
         }
@@ -641,8 +638,8 @@ async function executeTurnResolutionPhase() {
     updateHUD();
   }
 
-  // STEP 2 EXECUTION (CANCELED IF DEFENDER IS FAINTED)
-  if (defender2.lp > 0 && !defender2.isFainted && !defender1WasInterrupted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
+  // STEP 2 EXECUTION (CANCELED IF ATTACKER IS FAINTED OR INTERRUPTED)
+  if (defender2.lp > 0 && !attacker2.isFainted && !defender1WasInterrupted && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     if (move2.buff) applyBuff(attacker2, move2.buff.id, move2.buff.label, move2.buff.type, move2.buff.duration);
     handleAirborneState(attacker2, key2, move2);
 
@@ -694,7 +691,7 @@ async function executeTurnResolutionPhase() {
             { type: 'number', amount: result.finalDmg, isHeal: false }
           ]);
 
-          applyFaintBuildUp(defender2, defKey2);
+          await applyFaintBuildUp(defender2, defKey2);
 
           await vidPromise;
         }
@@ -712,7 +709,7 @@ async function executeTurnResolutionPhase() {
           { type: 'number', amount: result.finalDmg, isHeal: false }
         ]);
 
-        applyFaintBuildUp(defender2, defKey2, 10);
+        await applyFaintBuildUp(defender2, defKey2, 10);
         await vidPromise;
       } else {
         const hitVid = key2.startsWith('S') ? 'hit.mp4' : 'hit_physical.mp4';
@@ -725,7 +722,7 @@ async function executeTurnResolutionPhase() {
           { type: 'number', amount: result.finalDmg, isHeal: false }
         ]);
 
-        applyFaintBuildUp(defender2, defKey2);
+        await applyFaintBuildUp(defender2, defKey2);
 
         await vidPromise;
       }
@@ -739,13 +736,13 @@ async function executeTurnResolutionPhase() {
   } else if (move2.type === 'DEFENSE') {
     let isOpponentOffensive = !!(move1 && rules.OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
     if (!isOpponentOffensive && (move2.chiCost || 0) === 0) {
-      applyFaintBuildUp(attacker2, atkKey2, rules.FAINT_PENALTY_IDLE_GUARD);
+      await applyFaintBuildUp(attacker2, atkKey2, rules.FAINT_PENALTY_IDLE_GUARD);
     }
     if (!defender1GuardDeducted) {
       attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
       updateHUD();
     }
-  } else if ((defender2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
+  } else if ((attacker2.isFainted || defender1WasInterrupted) && move2.type !== 'IDLE' && key2 !== 'DO_NOTHING' && move2.type !== 'DEFENSE') {
     triggerFloatingText(atkKey2, 'INTERRUPTED!', 'scratch');
   }
 
@@ -921,7 +918,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     rolledHit = true;
   } else {
     let baseHitChance = atkMove.hitChance || 80;
-    
+
     let isDOrS = atkMoveKey.startsWith('D') || atkMoveKey.startsWith('S') || atkMove.category === 'D' || atkMove.category === 'S' || atkMove.tier === 'S';
     let accuracyDiscount = isDOrS ? chargeFactor : 1.0;
 
