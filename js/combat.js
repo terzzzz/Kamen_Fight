@@ -23,7 +23,7 @@ const GAME_CONFIG = window.GAME_CONFIG || {
   HARD_CPU_HP_MULTIPLIER: 1.30
 };
 
-// HELPER: QUEUE POP-UPS WITH 0.7 SECOND INTERVALS
+// HELPER: QUEUE POP-UPS WITH STRICT 0.7 SECOND (700ms) INTERVALS
 function triggerStaggeredPopups(slotKey, popups) {
   popups.forEach((item, index) => {
     setTimeout(() => {
@@ -32,7 +32,7 @@ function triggerStaggeredPopups(slotKey, popups) {
       } else if (item.type === 'number') {
         triggerFloatingNumber(slotKey, item.amount, item.isHeal || false);
       }
-    }, index * 700);
+    }, index * 700); // STRICT 0.7 SECOND DELAY PER POPUP
   });
 }
 
@@ -233,30 +233,48 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
 
   triggerLPFlash(slotKey, isHeal);
 
+  const activePopups = container.querySelectorAll('.damage-popup');
+  const stackIndex = activePopups.length;
+
   const popup = document.createElement('div');
   popup.className = `damage-popup popup-number ${isHeal ? 'heal' : 'damage'}`;
   popup.textContent = isHeal ? `+${roundedAmount}` : `-${roundedAmount}`;
+
+  // VERTICAL & HORIZONTAL STACKING OFFSETS TO PREVENT ANY OVERLAP
+  if (stackIndex > 0) {
+    popup.style.marginTop = `${stackIndex * -30}px`;
+    popup.style.marginLeft = `${(stackIndex % 2 === 1 ? 15 : -15)}px`;
+  }
 
   container.appendChild(popup);
 
   setTimeout(() => {
     popup.remove();
-  }, 2500);
+  }, 1800);
 }
 
 function triggerFloatingText(slotKey, text, customClass = '') {
   const container = document.getElementById(`${slotKey}-box`) || document.querySelector(`.${slotKey}-hud`);
   if (!container) return;
 
+  const activePopups = container.querySelectorAll('.damage-popup');
+  const stackIndex = activePopups.length;
+
   const popup = document.createElement('div');
   popup.className = `damage-popup popup-text ${customClass}`;
   popup.textContent = text;
+
+  // VERTICAL & HORIZONTAL STACKING OFFSETS TO PREVENT ANY OVERLAP
+  if (stackIndex > 0) {
+    popup.style.marginTop = `${stackIndex * -30}px`;
+    popup.style.marginLeft = `${(stackIndex % 2 === 1 ? -15 : 15)}px`;
+  }
 
   container.appendChild(popup);
 
   setTimeout(() => {
     popup.remove();
-  }, 2500);
+  }, 1800);
 }
 
 function applyBuff(player, buffId, label, buffType, durationRounds) {
@@ -869,7 +887,6 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
       ? rules.FAINT_PENALTY_CHI_GUARD 
       : rules.FAINT_PENALTY_STANDARD_GUARD;
 
-    // Apply faint meter penalty directly
     defender.tookCleanHitThisRound = true;
     defender.faintMeter = Math.min(rules.FAINT_THRESHOLD, defender.faintMeter + faintPenalty);
     if (defender.faintMeter >= rules.FAINT_THRESHOLD) {
