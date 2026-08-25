@@ -78,7 +78,7 @@ function startRoundCountdown() {
   gameState.roundPhase = 'INPUT';
   resetTurnInputState();
 
-  // Grant 1 Chi to both players at the start of Round 2+
+  // Grant 1 Chi at round start
   if (gameState.roundCounter > 1) {
     ['p1', 'p2'].forEach(slot => {
       const player = gameState[slot];
@@ -89,20 +89,36 @@ function startRoundCountdown() {
     });
   }
 
+  // SPECTATOR / CPU VS CPU UI VISIBILITY CLEANUP
+  const humanControlPanel = document.getElementById('human-control-panel') || document.querySelector('.bottom-controls') || document.getElementById('p1-controls');
+  const chargeStatusEl = document.getElementById('charge-status-display') || document.getElementById('charge-status');
+  const p1ChargeFill = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill');
+
+  if (gameState.p1 && gameState.p1.isCPU && gameState.p2 && gameState.p2.isCPU) {
+    if (humanControlPanel) humanControlPanel.style.display = 'none';
+    if (chargeStatusEl) chargeStatusEl.style.display = 'none';
+    if (p1ChargeFill) {
+      p1ChargeFill.style.width = '0%';
+      p1ChargeFill.textContent = '';
+    }
+  } else {
+    if (humanControlPanel) humanControlPanel.style.display = 'flex';
+    if (chargeStatusEl) chargeStatusEl.style.display = 'block';
+  }
+
   setTimeout(() => {
     if (gameState.input) gameState.input.acceptingInputs = true;
   }, 400);
 
-  // Apply status overlays & process carry-over Faint Stun
+  // Process status overlays & carry-over faint stun
   ['p1', 'p2'].forEach(slot => {
     const player = gameState[slot];
     if (!player) return;
 
-    // CARRY-OVER FAINT STUN: Keep fainted for this input round, then reset faint meter
     if (player.willBeFaintedNextRound) {
       player.isFainted = true;
-      player.willBeFaintedNextRound = false; // Reset flag so player recovers in the following round
-      player.faintMeter = 0;                 // Reset faint meter to 0 for the stun round
+      player.willBeFaintedNextRound = false;
+      player.faintMeter = 0;
     }
 
     const stunOverlay = document.getElementById(`${slot}-stun-overlay`);
@@ -127,7 +143,6 @@ function startRoundCountdown() {
   updateCharacterMedia('p1', 'IDLE');
   updateCharacterMedia('p2', 'IDLE');
 
-  // Auto-confirm DO_NOTHING for human players who start the round fainted
   if (gameState.p1 && gameState.p1.isFainted && !gameState.p1.isCPU) {
     confirmPlayerAction('DO_NOTHING', 'p1');
   }
@@ -165,7 +180,6 @@ function startRoundCountdown() {
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
         
-        // Preserve CPU-calculated charge target
         if (player.activeChargePercent === undefined) {
           player.activeChargePercent = 100;
         }
@@ -201,7 +215,7 @@ function startRoundCountdown() {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
           let mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
 
-          // PREVENT DOUBLE-GUARD: If P1 is guarding on timeout, force P2 to attack
+          // PREVENT DOUBLE-GUARD ON TIMEOUT
           if (gameState.input.selectedMoveKey && gameState.input.selectedMoveKey.startsWith('A+') && mk.startsWith('A+')) {
             mk = 'D+J';
           }
@@ -442,31 +456,22 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.input.lockInTime = gameState.turnTimerSeconds;
     newlyConfirmed = true;
     
-    // ACCURATELY READ CHARGE PERCENT: Use P1 CPU activeChargePercent if CPU, or human input if Human
-    let lockedPercent = 100;
     if (gameState.p1.isCPU) {
-      lockedPercent = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
+      gameState.p1.activeChargePercent = gameState.p1.activeChargePercent !== undefined ? gameState.p1.activeChargePercent : 100;
     } else {
       const currentCharge = (typeof gameState.input.currentPercent === 'number' && gameState.input.currentPercent > 0)
         ? gameState.input.currentPercent 
         : 100;
-      lockedPercent = moveKey === 'DO_NOTHING' ? 100 : currentCharge;
+
+      const lockedPercent = moveKey === 'DO_NOTHING' ? 100 : currentCharge;
       gameState.p1.activeChargePercent = lockedPercent;
-    }
+      clearInterval(gameState.input.chargeInterval);
 
-    clearInterval(gameState.input.chargeInterval);
-
-    // UPDATE P1 CHARGE BAR DISPLAY WITH ACCURATE PERCENTAGE
-    const fillEl = document.getElementById('p1-charge-fill') || document.getElementById('charge-fill') || document.querySelector('.charge-fill');
-    if (fillEl) {
-      fillEl.style.width = `${lockedPercent}%`;
-      fillEl.textContent = `${lockedPercent}%`;
-    }
-
-    const flagEl = document.getElementById('p1-action-flag');
-    if (flagEl) {
-      flagEl.hidden = false;
-      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${lockedPercent}%!`;
+      const flagEl = document.getElementById('p1-action-flag');
+      if (flagEl) {
+        flagEl.hidden = false;
+        flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${lockedPercent}%!`;
+      }
     }
   } else if (playerKey === 'p2' && !gameState.p2IsConfirmed) {
     gameState.p2IsConfirmed = true;
@@ -474,16 +479,14 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     gameState.p2LockInTime = gameState.turnTimerSeconds;
     newlyConfirmed = true;
 
-    const lockedPercent = gameState.p2.activeChargePercent !== undefined ? gameState.p2.activeChargePercent : 100;
-
     const flagEl = document.getElementById('p2-action-flag');
     if (flagEl) {
       flagEl.hidden = false;
-      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${lockedPercent}%!`;
+      flagEl.textContent = moveKey === 'DO_NOTHING' ? 'DO NOTHING' : `LOCKED ${gameState.p2.activeChargePercent || 100}%!`;
     }
   }
 
-  // REACTION TIME (+1s): GRANTED IF FIRST PLAYER LOCKS IN AFTER 7.0 SECONDS
+  // Reaction timer extension
   if (newlyConfirmed && gameState.roundPhase === 'INPUT') {
     const otherKey = playerKey === 'p1' ? 'p2' : 'p1';
     const otherPlayer = gameState[otherKey];
