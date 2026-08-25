@@ -813,6 +813,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
   }
 
+  // 1. CALCULATE ATTACKER CHARGE MULTIPLIER FIRST
   const chargePercent = attacker.activeChargePercent !== undefined ? attacker.activeChargePercent : 100;
   const chargeRatio = Math.min(1.0, Math.max(0.0, chargePercent / 100));
   const chargeFactor = Math.sqrt(0.5 + (0.5 * chargeRatio));
@@ -823,6 +824,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   let chiGained = 0;
   let damageRatio = 1.0;
 
+  // 2. GUARD RESOLUTION
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
@@ -860,6 +862,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     }
   }
 
+  // 3. HIT & EVASION RESOLUTION
   let rolledHit = false;
   let isGlancing = false;
 
@@ -876,9 +879,13 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     let attackerHitBonus = (attacker.id === 'nigo' && attacker.airborneTicks > 0) ? 15 : 0;
     let rawHitRate = (baseHitChance * accuracyDiscount) + attackerHitBonus;
 
-    let baseEvasionPct = (defender.id === 'ichigo' && defender.airborneTicks > 0) ? 0.20 : 0.0;
-    let instabilityMult = 1.0;
+    // DYNAMIC EVASION READ (Defaults to 0.0 if omitted in JSON)
+    let baseEvasionPct = (defender && defender.evasionRate !== undefined) ? defender.evasionRate : 0.0;
+    if (defender.id === 'ichigo' && defender.airborneTicks > 0) {
+      baseEvasionPct += 0.20;
+    }
 
+    let instabilityMult = 1.0;
     if (defender.airborneTicks > 0 && defender.airborneAppliedRound === gameState.roundCounter) {
       let jumpChargeRatio = Math.min(1.0, Math.max(0.0, (defender.airborneChargePercent !== undefined ? defender.airborneChargePercent : 100) / 100));
       instabilityMult = 1.8 - (0.8 * jumpChargeRatio);
@@ -898,6 +905,7 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
     isGlancing = Math.random() * 100 < (atkMove.scratchRate || 20);
   }
 
+  // 4. DAMAGE CALCULATIONS & BUFF MULTIPLIERS
   if (defender.activeBuffs && defender.activeBuffs.some(b => b.id === 'red_shutter')) {
     damageRatio *= 0.85; 
   }
