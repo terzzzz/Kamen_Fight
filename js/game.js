@@ -160,7 +160,11 @@ function startRoundCountdown() {
         if (gameState.roundPhase !== 'INPUT' || (slot === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed)) return;
         const oppSlot = slot === 'p1' ? 'p2' : 'p1';
         const moveKey = getCPUMoveChoice(player, gameState[oppSlot], slot);
-        player.activeChargePercent = Math.floor(Math.random() * 26 + 75);
+        
+        // PRESERVE CPU-CALCULATED CHARGE TARGET (Only set default if missing)
+        if (player.activeChargePercent === undefined) {
+          player.activeChargePercent = 100;
+        }
         confirmPlayerAction(moveKey, slot);
       }, thinkTime);
     }
@@ -180,7 +184,7 @@ function startRoundCountdown() {
       if (!gameState.input.isConfirmed) {
         if (gameState.p1.isCPU) {
           const mk = getCPUMoveChoice(gameState.p1, gameState.p2, 'p1');
-          gameState.p1.activeChargePercent = 85;
+          if (gameState.p1.activeChargePercent === undefined) gameState.p1.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p1');
         } else {
           gameState.input.isConfirmed = true;
@@ -192,7 +196,7 @@ function startRoundCountdown() {
       if (!gameState.p2IsConfirmed) {
         if (gameState.p2.isCPU && !gameState.p2AlwaysIdle) {
           const mk = getCPUMoveChoice(gameState.p2, gameState.p1, 'p2');
-          gameState.p2.activeChargePercent = 85;
+          if (gameState.p2.activeChargePercent === undefined) gameState.p2.activeChargePercent = 85;
           confirmPlayerAction(mk, 'p2');
         } else {
           gameState.p2IsConfirmed = true;
@@ -454,7 +458,7 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
     }
   }
 
-  // REACTION TIME (+1s): ONLY GRANTED IF FIRST PLAYER LOCKS IN AFTER 7.0 SECONDS (<= 1s REMAINING)
+  // REACTION TIME (+1s): GRANTED IF FIRST PLAYER LOCKS IN AFTER 7.0 SECONDS
   if (newlyConfirmed && gameState.roundPhase === 'INPUT') {
     const otherKey = playerKey === 'p1' ? 'p2' : 'p1';
     const otherPlayer = gameState[otherKey];
@@ -485,7 +489,9 @@ function confirmPlayerAction(moveKey, playerKey = 'p1') {
           const stillConfirmed = otherKey === 'p1' ? gameState.input.isConfirmed : gameState.p2IsConfirmed;
           if (!stillConfirmed) {
             const chosenKey = getCPUMoveChoice(otherPlayer, player, otherKey);
-            otherPlayer.activeChargePercent = Math.floor(Math.random() * 26 + 75);
+            if (otherPlayer.activeChargePercent === undefined) {
+              otherPlayer.activeChargePercent = 100;
+            }
             confirmPlayerAction(chosenKey, otherKey);
           }
         }, reactionDelay);
@@ -513,8 +519,19 @@ function bindCommandButtons() {
   });
 }
 
+// FULL CPU BUTTON PRESS HUD ANIMATION
 function simulateCPUButtonPress(moveKey, playerKey = 'p2') {
-  return;
+  if (!moveKey || moveKey === 'DO_NOTHING') return;
+  const targetBox = document.getElementById(`${playerKey}-box`);
+  if (!targetBox) return;
+
+  const btn = targetBox.querySelector(`.key-btn[data-key="${moveKey}"]`) || targetBox.querySelector(`.cmd-btn[data-key="${moveKey}"]`);
+  if (btn) {
+    btn.classList.add('cpu-pressed');
+    setTimeout(() => {
+      btn.classList.remove('cpu-pressed');
+    }, 400);
+  }
 }
 
 function resetTurnInputState() {
