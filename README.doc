@@ -37,5 +37,6 @@ Riders: Include all showga riders + shadow moon (portrait only)
 21/8/26: Bug fixing, testing, improve interface font size. Re-construct the code for future addition of new chars. Added Nigo in game, and added difficulty.
 23/8/26: interface , video scsling, implement smarter CPU. 
 24/8/26: Further work on CPU difficluty , to make it smarter.
+25/8/26: Final touch up on bugs and confirm CPU is working. Version released.
 
 
