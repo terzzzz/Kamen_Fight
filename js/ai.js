@@ -35,7 +35,7 @@ window.globalAIKnowledge = {
       profile.attackCount++;
     }
 
-    // 3. TRACK CHARGE PERCENTAGE HABITS FOR SPEEDPriority TUNING
+    // 3. TRACK CHARGE PERCENTAGE HABITS FOR SPEED PRIORITY TUNING
     const oppCharge = (outcomeData && typeof outcomeData.oppChargePercent === 'number') 
       ? outcomeData.oppChargePercent 
       : 100;
@@ -103,14 +103,21 @@ window.calculateMoveSuccess = function(cpuPlayer, opponentPlayer, cpuMoveKey, ou
 };
 
 /**
- * Fallback Move Selector for generic characters (Nigo, V3, etc.)
+ * Main CPU Dispatcher
+ * Routes to character-specific AI modules (ichigo_cpu.js / nigo_cpu.js)
  */
 function selectCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty = 'normal') {
-  // ROUTE TO CHARACTER ENGINE IF AVAILABLE IN JS/
+  // ROUTE TO ICHIGO SPECIFIC ENGINE
   if (cpuPlayer.id === 'ichigo' && typeof selectIchigoCPUMove === 'function') {
     return selectIchigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
   }
 
+  // ROUTE TO NIGO SPECIFIC ENGINE
+  if (cpuPlayer.id === 'nigo' && typeof selectNigoCPUMove === 'function') {
+    return selectNigoCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty);
+  }
+
+  // GENERAL FALLBACK FOR OTHER UNIMPLEMENTED RIDERS
   const keys = Object.keys(availableMoves);
   if (keys.length === 0) return 'D+J';
 
@@ -142,12 +149,12 @@ function selectCPUMove(cpuPlayer, opponentPlayer, availableMoves, difficulty = '
 }
 
 // SIMULATE CPU BUTTON LOCK-IN ANIMATION
-function simulateCPUButtonPress(moveKey) {
+function simulateCPUButtonPress(moveKey, playerKey = 'p2') {
   if (!moveKey || moveKey === 'DO_NOTHING') return;
-  const p2Box = document.getElementById('p2-box');
-  if (!p2Box) return;
+  const targetBox = document.getElementById(`${playerKey}-box`);
+  if (!targetBox) return;
 
-  const btn = p2Box.querySelector(`.key-btn[data-key="${moveKey}"]`) || p2Box.querySelector(`.cmd-btn[data-key="${moveKey}"]`);
+  const btn = targetBox.querySelector(`.key-btn[data-key="${moveKey}"]`) || targetBox.querySelector(`.cmd-btn[data-key="${moveKey}"]`);
   if (btn) {
     btn.classList.add('cpu-pressed');
     setTimeout(() => {
