@@ -1,11 +1,27 @@
-// FAINT SYSTEM FALLBACK CONFIG
-const FAINT_CFG = typeof FAINT_CONFIG !== 'undefined' ? FAINT_CONFIG : {
+/**
+ * Combat Engine & Turn Resolution Manager
+ * Path: js/combat.js
+ */
+
+// SAFE FALLBACK CONSTANTS IN CASE common.js IS NOT LOADED YET
+const COMBAT_RULES = window.COMBAT_RULES || {
   FAINT_THRESHOLD: 100,
   HIT_BUILDUP: 25,
-  ROUND_RECOVERY: 13
+  ROUND_RECOVERY: 13,
+  FAINT_PENALTY_CHI_GUARD: 15,
+  FAINT_PENALTY_STANDARD_GUARD: 25,
+  FAINT_PENALTY_IDLE_GUARD: 5,
+  MAX_CHI: 16,
+  OFFENSIVE_TYPES: ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL']
 };
 
-const OFFENSIVE_TYPES = ['MELEE', 'PROJECTILE', 'SPECIAL', 'FINISHER', 'PHYSICAL'];
+const GAME_CONFIG = window.GAME_CONFIG || {
+  ROUND_TIME_LIMIT: 8.0,
+  CHARGE_TIME_REQUIRED: 2.5,
+  LATE_EXTENSION_BONUS: 1.0,
+  LATE_DECISION_THRESHOLD: 7.0,
+  HARD_CPU_HP_MULTIPLIER: 1.30
+};
 
 // BATTLE INITIALIZATION WITH GUARANTEED LIFECYCLE UNLOCK
 async function startBattle(matchConfig) {
@@ -34,11 +50,13 @@ async function startBattle(matchConfig) {
     const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
     const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
 
+    const hpMultiplier = (window.GAME_CONFIG && window.GAME_CONFIG.HARD_CPU_HP_MULTIPLIER) || 1.30;
+
     let p1MaxLp = p1Rider.maxLp || 1050;
-    if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') p1MaxLp = Math.floor(p1MaxLp * 1.30);
+    if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') p1MaxLp = Math.floor(p1MaxLp * hpMultiplier);
 
     let p2MaxLp = p2Rider.maxLp || 1200;
-    if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') p2MaxLp = Math.floor(p2MaxLp * 1.30);
+    if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') p2MaxLp = Math.floor(p2MaxLp * hpMultiplier);
 
     gameState.p1 = {
       id: p1Rider.id || 'ichigo',
@@ -47,7 +65,7 @@ async function startBattle(matchConfig) {
       maxLp: p1MaxLp,
       lp: p1MaxLp,
       chi: 10,
-      maxChi: 16,
+      maxChi: COMBAT_RULES.MAX_CHI || 16,
       faintMeter: 0,
       activeBuffs: [],
       airborneTicks: 0,
@@ -65,7 +83,7 @@ async function startBattle(matchConfig) {
       maxLp: p2MaxLp,
       lp: p2MaxLp,
       chi: 10,
-      maxChi: 16,
+      maxChi: COMBAT_RULES.MAX_CHI || 16,
       faintMeter: 0,
       activeBuffs: [],
       airborneTicks: 0,
@@ -115,7 +133,7 @@ async function startBattle(matchConfig) {
   }
 }
 
-// GET CPU MOVE CHOICE ROUTING TO JS/VS/ MODULES
+// GET CPU MOVE CHOICE ROUTING TO CHARACTER MODULES
 function getCPUMoveChoice(cpuPlayer, opponentPlayer, playerKey = 'p2') {
   if (cpuPlayer.isFainted || (playerKey === 'p2' && gameState.p2AlwaysIdle)) return 'DO_NOTHING';
 
@@ -325,7 +343,7 @@ function updateHUD() {
         });
       }
       chiEl.className = 'stat-line stat-line-chi';
-      const maxChi = player.maxChi || 16;
+      const maxChi = player.maxChi || (window.COMBAT_RULES?.MAX_CHI || 16);
       const chiPct = Math.min(100, Math.max(0, (player.chi / maxChi) * 100));
       chiEl.innerHTML = `
         <span class="stat-label">CHI:</span> 
@@ -350,11 +368,12 @@ function updateHUD() {
 
 async function applyFaintBuildUp(player, playerKey, customAmount = null) {
   if (!player.isFainted) {
+    const rules = window.COMBAT_RULES || COMBAT_RULES;
     player.tookCleanHitThisRound = true;
-    const amount = customAmount !== null ? customAmount : FAINT_CFG.HIT_BUILDUP;
-    player.faintMeter = Math.min(FAINT_CFG.FAINT_THRESHOLD, player.faintMeter + amount);
+    const amount = customAmount !== null ? customAmount : rules.HIT_BUILDUP;
+    player.faintMeter = Math.min(rules.FAINT_THRESHOLD, player.faintMeter + amount);
     
-    if (player.faintMeter >= FAINT_CFG.FAINT_THRESHOLD) {
+    if (player.faintMeter >= rules.FAINT_THRESHOLD) {
       player.isFainted = true;
       const stunOverlay = document.getElementById(`${playerKey}-stun-overlay`);
       if (stunOverlay) stunOverlay.hidden = false;
@@ -374,6 +393,7 @@ async function applyFaintBuildUp(player, playerKey, customAmount = null) {
 
 // MAIN SEQUENTIAL RESOLUTION PHASE
 async function executeTurnResolutionPhase() {
+  const rules = window.COMBAT_RULES || COMBAT_RULES;
   gameState.roundPhase = 'RESOLUTION';
 
   const p1StartLp = gameState.p1.lp;
@@ -498,9 +518,9 @@ async function executeTurnResolutionPhase() {
     updateHUD();
 
     if (move1.type === 'DEFENSE') {
-      let isOpponentOffensive = !!(move2 && OFFENSIVE_TYPES.includes(move2.type?.toUpperCase()));
+      let isOpponentOffensive = !!(move2 && rules.OFFENSIVE_TYPES.includes(move2.type?.toUpperCase()));
       if (!isOpponentOffensive && (move1.chiCost || 0) === 0) {
-        applyFaintBuildUp(attacker1, atkKey1, 5);
+        applyFaintBuildUp(attacker1, atkKey1, rules.FAINT_PENALTY_IDLE_GUARD);
       }
       
       if (!isOpponentOffensive) {
@@ -526,7 +546,7 @@ async function executeTurnResolutionPhase() {
             } else {
               triggerFloatingText(defKey1, 'GUARDED!', 'scratch');
               if (result.chiGained > 0) {
-                defender1.chi = Math.min(defender1.maxChi || 16, defender1.chi + result.chiGained);
+                defender1.chi = Math.min(defender1.maxChi || rules.MAX_CHI, defender1.chi + result.chiGained);
                 triggerFloatingText(defKey1, 'CHI UP! (+2)', 'heal');
               }
               triggerFloatingNumber(defKey1, result.finalDmg, false);
@@ -580,7 +600,7 @@ async function executeTurnResolutionPhase() {
 
     if (key1.startsWith('D')) {
       const chiGain = (key1 === 'D+J' || key1 === 'D+K') ? 2 : 3;
-      attacker1.chi = Math.min(16, attacker1.chi + chiGain);
+      attacker1.chi = Math.min(rules.MAX_CHI, attacker1.chi + chiGain);
     }
     updateHUD();
   }
@@ -613,7 +633,7 @@ async function executeTurnResolutionPhase() {
           } else {
             triggerFloatingText(defKey2, 'GUARDED!', 'scratch');
             if (result.chiGained > 0) {
-              defender2.chi = Math.min(defender2.maxChi || 16, defender2.chi + result.chiGained);
+              defender2.chi = Math.min(defender2.maxChi || rules.MAX_CHI, defender2.chi + result.chiGained);
               triggerFloatingText(defKey2, 'CHI UP! (+2)', 'heal');
             }
             triggerFloatingNumber(defKey2, result.finalDmg, false);
@@ -663,13 +683,13 @@ async function executeTurnResolutionPhase() {
 
     if (key2.startsWith('D')) {
       const chiGain = (key2 === 'D+J' || key2 === 'D+K') ? 2 : 3;
-      attacker2.chi = Math.min(16, attacker2.chi + chiGain);
+      attacker2.chi = Math.min(rules.MAX_CHI, attacker2.chi + chiGain);
     }
     updateHUD();
   } else if (move2.type === 'DEFENSE') {
-    let isOpponentOffensive = !!(move1 && OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
+    let isOpponentOffensive = !!(move1 && rules.OFFENSIVE_TYPES.includes(move1.type?.toUpperCase()));
     if (!isOpponentOffensive && (move2.chiCost || 0) === 0) {
-      applyFaintBuildUp(attacker2, atkKey2, 5);
+      applyFaintBuildUp(attacker2, atkKey2, rules.FAINT_PENALTY_IDLE_GUARD);
     }
     if (!defender1GuardDeducted) {
       attacker2.chi = Math.max(0, attacker2.chi - (move2.chiCost || 0));
@@ -727,7 +747,7 @@ async function executeTurnResolutionPhase() {
           player.isFainted = false;
           player.faintMeter = 0;
         } else if (!player.tookCleanHitThisRound && player.faintMeter > 0) {
-          player.faintMeter = Math.max(0, player.faintMeter - FAINT_CFG.ROUND_RECOVERY);
+          player.faintMeter = Math.max(0, player.faintMeter - rules.ROUND_RECOVERY);
         }
         player.tookCleanHitThisRound = false;
       }
@@ -785,7 +805,8 @@ async function executeTurnResolutionPhase() {
 
 // ATTACK RESOLUTION ENGINE WITH DYNAMIC FAINT PENALTIES (+15 CHI GUARDS, +25 0-COST GUARDS)
 function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMoveKey, defenderKey) {
-  const isOffensive = !!(atkMove && OFFENSIVE_TYPES.includes(atkMove.type?.toUpperCase()));
+  const rules = window.COMBAT_RULES || COMBAT_RULES;
+  const isOffensive = !!(atkMove && rules.OFFENSIVE_TYPES.includes(atkMove.type?.toUpperCase()));
 
   if (!isOffensive) {
     return { isOffensive: false, hitLanded: false, isGlancing: false, guardSuccess: false, isMatchingGuard: false, chiGained: 0, finalDmg: 0 };
@@ -804,9 +825,12 @@ function resolveAttack(attacker, defender, atkMove, atkMoveKey, defMove, defMove
   if (isGuarding) {
     const atkButton = atkMoveKey ? atkMoveKey.split('+')[1] : null;
 
-    // +15 FAINT PTS FOR CHI-COSTING GUARDS, +25 FAINT PTS FOR 0-COST GUARDS
+    // READ FAINT PENALTY FROM SHARED RULES (+15 CHI GUARDS, +25 0-COST GUARDS)
     const guardChiCost = defMove.chiCost || 0;
-    const faintPenalty = guardChiCost > 0 ? 15 : 25;
+    const faintPenalty = guardChiCost > 0 
+      ? rules.FAINT_PENALTY_CHI_GUARD 
+      : rules.FAINT_PENALTY_STANDARD_GUARD;
+
     applyFaintBuildUp(defender, defenderKey, faintPenalty);
 
     let defenderChargeRatio = Math.min(1.0, Math.max(0.0, (defender.activeChargePercent !== undefined ? defender.activeChargePercent : 100) / 100));
