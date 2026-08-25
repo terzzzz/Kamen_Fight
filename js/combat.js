@@ -3,7 +3,6 @@
  * Path: js/combat.js
  */
 
-// SAFE FALLBACK CONSTANTS IN CASE common.js IS NOT LOADED YET
 const COMBAT_RULES = window.COMBAT_RULES || {
   FAINT_THRESHOLD: 100,
   HIT_BUILDUP: 25,
@@ -48,16 +47,17 @@ async function startBattle(matchConfig) {
       gameState.p2Moves = typeof FALLBACK_ICHIGO_MOVES !== 'undefined' ? FALLBACK_ICHIGO_MOVES : {};
     }
 
-    const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1050 };
-    const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 1200 };
+    // UPDATED DEFAULT FALLBACK LP TO REFLECT +800 BOOST
+    const p1Rider = matchConfig.p1Rider || { id: 'ichigo', name: 'Kamen Rider Ichigo', maxLp: 1850 };
+    const p2Rider = matchConfig.p2Rider || { id: 'nigo', name: 'Kamen Rider Nigo', maxLp: 2000 };
 
     const rules = window.COMBAT_RULES || COMBAT_RULES;
     const hpMultiplier = (window.GAME_CONFIG && window.GAME_CONFIG.HARD_CPU_HP_MULTIPLIER) || 1.30;
 
-    let p1MaxLp = p1Rider.maxLp || 1050;
+    let p1MaxLp = p1Rider.maxLp || 1850;
     if (matchConfig.p1IsCPU && matchConfig.p1Difficulty === 'hard') p1MaxLp = Math.floor(p1MaxLp * hpMultiplier);
 
-    let p2MaxLp = p2Rider.maxLp || 1200;
+    let p2MaxLp = p2Rider.maxLp || 2000;
     if (matchConfig.p2IsCPU && matchConfig.p2Difficulty === 'hard') p2MaxLp = Math.floor(p2MaxLp * hpMultiplier);
 
     gameState.p1 = {
