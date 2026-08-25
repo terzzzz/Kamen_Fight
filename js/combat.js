@@ -32,7 +32,7 @@ function triggerStaggeredPopups(slotKey, popups) {
       } else if (item.type === 'number') {
         triggerFloatingNumber(slotKey, item.amount, item.isHeal || false);
       }
-    }, index * 700); // STRICT 0.7 SECOND DELAY PER POPUP
+    }, index * 700);
   });
 }
 
@@ -240,7 +240,6 @@ function triggerFloatingNumber(slotKey, amount, isHeal = false) {
   popup.className = `damage-popup popup-number ${isHeal ? 'heal' : 'damage'}`;
   popup.textContent = isHeal ? `+${roundedAmount}` : `-${roundedAmount}`;
 
-  // VERTICAL & HORIZONTAL STACKING OFFSETS TO PREVENT ANY OVERLAP
   if (stackIndex > 0) {
     popup.style.marginTop = `${stackIndex * -30}px`;
     popup.style.marginLeft = `${(stackIndex % 2 === 1 ? 15 : -15)}px`;
@@ -264,7 +263,6 @@ function triggerFloatingText(slotKey, text, customClass = '') {
   popup.className = `damage-popup popup-text ${customClass}`;
   popup.textContent = text;
 
-  // VERTICAL & HORIZONTAL STACKING OFFSETS TO PREVENT ANY OVERLAP
   if (stackIndex > 0) {
     popup.style.marginTop = `${stackIndex * -30}px`;
     popup.style.marginLeft = `${(stackIndex % 2 === 1 ? -15 : 15)}px`;
@@ -442,12 +440,13 @@ async function executeTurnResolutionPhase() {
   } else {
     p1MoveKey = gameState.input ? gameState.input.selectedMoveKey : null;
 
-    if (gameState.input && typeof gameState.input.chargePercent === 'number') {
-      gameState.p1.activeChargePercent = gameState.input.chargePercent;
-    } else if (gameState.input && typeof gameState.input.lockedChargePercent === 'number') {
-      gameState.p1.activeChargePercent = gameState.input.lockedChargePercent;
-    } else {
-      gameState.p1.activeChargePercent = 100;
+    // PRESERVE LOCKED CHARGE PERCENTAGE FROM HUMAN INPUT
+    if (gameState.p1.activeChargePercent === undefined) {
+      if (gameState.input && typeof gameState.input.currentPercent === 'number' && gameState.input.currentPercent > 0) {
+        gameState.p1.activeChargePercent = gameState.input.currentPercent;
+      } else {
+        gameState.p1.activeChargePercent = 100;
+      }
     }
   }
   if (!p1MoveKey) p1MoveKey = 'DO_NOTHING';
@@ -459,7 +458,13 @@ async function executeTurnResolutionPhase() {
       gameState.p2.activeChargePercent = 100;
     }
   } else if (!gameState.p2.isCPU) {
-    gameState.p2.activeChargePercent = gameState.p2ChargePercent || 100;
+    if (gameState.p2.activeChargePercent === undefined) {
+      if (typeof gameState.p2ChargePercent === 'number') {
+        gameState.p2.activeChargePercent = gameState.p2ChargePercent;
+      } else {
+        gameState.p2.activeChargePercent = 100;
+      }
+    }
   }
   if (!p2MoveKey) p2MoveKey = 'DO_NOTHING';
 
