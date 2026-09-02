@@ -1,4 +1,7 @@
-ver. 20260820-
+To run this game please follow this link: https://terzzzz.github.io/Kamen_Fight_v2/
+
+
+ver. 20260902-
 
 Kamen Fight - Project DocumentationKamen Fight is a Web-based, turn-based Kamen Rider fighting game built with vanilla JavaScript, HTML5 Video, and CSS3. 
 The game features simultaneous command selection, directional charge mechanics, sequential video-driven combat resolution, and full mirror-match support.
